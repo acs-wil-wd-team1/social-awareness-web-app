@@ -1,0 +1,23 @@
+/*
+ * Shared design tokens
+ *
+ * The values below are neutral placeholders. The Front-end Designers will
+ * replace them with the team's approved colours, typography and spacing.
+ */
+
+:root {
+  --brand-primary: #2c5f9e;
+  --brand-secondary: #e8a33d;
+  --text-body: #1f2933;
+  --text-muted: #52606d;
+  --surface: #ffffff;
+  --surface-muted: #f4f6f8;
+  --border: #d9e2ec;
+  --success: #2e7d32;
+  --danger: #c62828;
+  --font-heading: system-ui, sans-serif;
+  --font-body: system-ui, sans-serif;
+  --space-unit: 8px;
+  --radius: 8px;
+  --container-max: 1140px;
+}

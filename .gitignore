@@ -1,0 +1,26 @@
+# Dependencies and builds
+node_modules/
+dist/
+build/
+coverage/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editors and operating systems
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local certificates and keys
+*.pem
+*.key
+*.p12
+*.pfx
