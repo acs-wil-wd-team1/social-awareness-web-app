@@ -1,11 +1,40 @@
-# Frontend
+# CauseConnect frontend
 
-Owner lane: Developer/Programmer
+This branch contains Unice's Stage 2 campaign homepage work. Registration, login and logout are separate Stage 2 tasks; participation and campaign posting remain Stage 3 work.
 
-React, Redux Toolkit and React Bootstrap are the current frontend direction. Vite, React Router, Vitest, React Testing Library and Mock Service Worker are implementation suggestions for review before the application scaffold is created.
+The page follows the current CauseConnect storyboard direction and uses local campaign data while the backend is being developed. Colours, photographs and layout remain open to the Front-end Designers' final standards.
 
-The application scaffold will be added in a focused implementation branch after the repository foundation is reviewed. Authentication persistence remains blocked until the frontend and Database Developers agree on bearer tokens or HttpOnly cookies.
+## Run locally
 
-## Configuration
+```sh
+npm install
+npm run dev
+```
 
-The required environment-variable names will be added to `.env.example` after the API and development approach are agreed. Local environment files are ignored by Git.
+## Verify
+
+```sh
+npm test
+npm run build
+```
+
+## Integration handoff
+
+These are working paths, not active links until the matching page is implemented and merged.
+
+| Path | Expected owner contribution | Current state |
+|---|---|---|
+| `/` | Campaign homepage | Implemented locally on this branch |
+| `/login` | Login form and validation | Planned; header link is commented out |
+| `/register` | Account-registration form and validation | Planned; link from the login page when ready |
+
+The local service returns the draft campaign-list envelope and the fields needed by this page. `createdBy` remains omitted because its format has not been agreed. Replace the local service during integration using the [draft API contract](../docs/api/api-contract.md).
+
+## Current design decisions
+
+- `Campaigns` moves to the list on the homepage.
+- Campaign-detail buttons, search and filters are waiting for confirmed scope and working backend behaviour.
+- Login stays hidden until `/login` exists.
+- The photographs are provisional. They use empty alternative text because the adjacent title and description already provide the campaign meaning; this avoids repeating the same information to screen-reader users.
+
+Image provenance is recorded in [the Stage 2 evidence folder](../docs/evidence/stage-2/campaign-image-provenance.md).

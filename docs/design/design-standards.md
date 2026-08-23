@@ -47,7 +47,7 @@ Suggested widths to check:
 ## Accessibility
 
 - Every form field has a visible label.
-- Images have useful alternative text.
+- Meaningful images have useful alternative text; decorative images use empty alternative text.
 - Keyboard focus is visible.
 - Information is not communicated through colour alone.
 - Text and controls meet appropriate contrast requirements.
