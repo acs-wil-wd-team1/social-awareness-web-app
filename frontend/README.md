@@ -1,8 +1,8 @@
-# CauseConnect frontend
+# CauseConnect Frontend
 
-This branch contains Unice's Stage 2 campaign homepage work. Registration, login and logout are separate Stage 2 tasks; participation and campaign posting remain Stage 3 work.
+This feature branch contains the Stage 2 campaign homepage implementation. Registration, login and logout are separate Stage 2 tasks; participation and campaign posting remain Stage 3 work.
 
-The page follows the current CauseConnect storyboard direction and uses local campaign data while the backend is being developed. Colours, photographs and layout remain open to the Front-end Designers' final standards.
+The page follows the current CauseConnect storyboard direction and uses local campaign data while the backend is being developed. Colours, photographs and layout remain open for the Front-end Designers to finalise.
 
 ## Run locally
 
@@ -24,7 +24,7 @@ These are working paths, not active links until the matching page is implemented
 
 | Path | Expected owner contribution | Current state |
 |---|---|---|
-| `/` | Campaign homepage | Implemented locally on this branch |
+| `/` | Campaign homepage | Implemented on this feature branch |
 | `/login` | Login form and validation | Planned; header link is commented out |
 | `/register` | Account-registration form and validation | Planned; link from the login page when ready |
 
