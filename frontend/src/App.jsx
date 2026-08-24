@@ -33,7 +33,7 @@ export default function App({ pathname = window.location.pathname }) {
           <nav aria-label="Primary navigation">
             <a href="/" aria-current={route.name === 'home' ? 'page' : undefined}>Home</a>
             <a href="/#campaigns">Campaigns</a>
-            {/* Enable after the /login route is implemented: <a href="/login">Login</a> */}
+            {/* Add Login and Register after their routes are implemented. */}
           </nav>
         </div>
       </header>
@@ -51,6 +51,13 @@ export default function App({ pathname = window.location.pathname }) {
           </section>
         ) : null}
       </main>
+
+      <footer className="site-footer">
+        <div className="site-footer__inner">
+          <p className="site-footer__name">CauseConnect</p>
+          <p>Raise awareness. Create change.</p>
+        </div>
+      </footer>
     </div>
   )
 }

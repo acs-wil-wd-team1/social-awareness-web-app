@@ -2,7 +2,7 @@
 
 This feature branch contains the Stage 2 campaign homepage implementation. Registration, login and logout are separate Stage 2 tasks; participation and campaign posting remain Stage 3 work.
 
-The page follows the current CauseConnect storyboard direction and uses local campaign data while the backend is being developed. Colours, photographs and layout remain open for the Front-end Designers to finalise.
+The page follows the current CauseConnect storyboard and the web design standards recorded in the team's Stage 2 Design Document. It uses local campaign data while the backend is being developed. Photographs and smaller layout details can still be revised if the team updates the wireframes or standards.
 
 ## Run locally
 
@@ -33,6 +33,7 @@ The local service returns the draft campaign-list and single-campaign envelopes 
 
 ## Current design decisions
 
+- The shared colours, typography and responsive layout follow the current Stage 2 web design standards.
 - `Campaigns` moves to the list on the homepage.
 - Each `View campaign` link opens the matching public campaign details route. Search and filters remain outside this branch.
 - Login stays hidden until `/login` exists.

@@ -1,23 +1,23 @@
 /*
  * Shared design tokens
  *
- * These provisional values follow the team's CauseConnect storyboard. The
- * Front-end Designers can refine them in the final design standards.
+ * These values follow the current Web Design Standards in the team's Stage 2
+ * Design Document. They can be revised if the team updates those standards.
  */
 
 :root {
-  --brand-primary: #145667;
-  --brand-primary-hover: #0d4553;
-  --brand-secondary: #f4a23a;
-  --text-body: #19343b;
-  --text-muted: #5d6c70;
+  --brand-primary: #2563eb;
+  --brand-primary-hover: #1d4ed8;
+  --brand-secondary: #16a34a;
+  --text-body: #1f2937;
+  --text-muted: #6b7280;
   --surface: #ffffff;
-  --surface-muted: #f5f9f8;
-  --border: #d7e1e0;
-  --success: #2fa276;
-  --danger: #c62828;
-  --font-heading: system-ui, sans-serif;
-  --font-body: system-ui, sans-serif;
+  --surface-muted: #f8fafc;
+  --border: #d1d5db;
+  --success: #16a34a;
+  --danger: #dc2626;
+  --font-heading: Inter, Arial, Helvetica, sans-serif;
+  --font-body: Inter, Arial, Helvetica, sans-serif;
   --space-unit: 8px;
   --radius: 18px;
   --container-max: 1140px;

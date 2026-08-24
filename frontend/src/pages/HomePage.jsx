@@ -35,8 +35,8 @@ export default function HomePage({ campaignLoader = listCampaigns }) {
   const hasError = requestState === 'error'
 
   return (
-    <section className="homepage content-width" aria-labelledby="page-title">
-      <header className="page-intro">
+    <section className="homepage" aria-labelledby="page-title">
+      <header className="page-intro content-width">
         <h1 id="page-title" aria-label="Raise awareness. Create change.">
           <span>Raise awareness.</span>
           <span>Create change.</span>
@@ -44,39 +44,41 @@ export default function HomePage({ campaignLoader = listCampaigns }) {
       </header>
 
       <section className="campaign-section" id="campaigns" aria-labelledby="campaigns-title">
-        <h2 className="visually-hidden" id="campaigns-title">Current campaigns</h2>
-        {!isLoading && !hasError ? (
-          <p className="visually-hidden" role="status">
-            {result.total} campaign{result.total === 1 ? '' : 's'}
-          </p>
-        ) : null}
+        <div className="content-width">
+          <h2 className="visually-hidden" id="campaigns-title">Current campaigns</h2>
+          {!isLoading && !hasError ? (
+            <p className="visually-hidden" role="status">
+              {result.total} campaign{result.total === 1 ? '' : 's'}
+            </p>
+          ) : null}
 
-        {hasError ? (
-          <div className="campaign-state campaign-state--error" role="alert">
-            <h3>Campaigns could not be loaded</h3>
-            <p>Please try again.</p>
-            <button type="button" onClick={() => setRetryKey((current) => current + 1)}>Try again</button>
-          </div>
-        ) : (
-          <ul className="campaign-grid" aria-busy={isLoading} aria-label="Campaigns">
-            {result.items.map((campaign) => (
-              <CampaignCard key={campaign.id} campaign={campaign} />
-            ))}
+          {hasError ? (
+            <div className="campaign-state campaign-state--error" role="alert">
+              <h3>Campaigns could not be loaded</h3>
+              <p>Please try again.</p>
+              <button type="button" onClick={() => setRetryKey((current) => current + 1)}>Try again</button>
+            </div>
+          ) : (
+            <ul className="campaign-grid" aria-busy={isLoading} aria-label="Campaigns">
+              {result.items.map((campaign) => (
+                <CampaignCard key={campaign.id} campaign={campaign} />
+              ))}
 
-            {isLoading ? (
-              <li className="campaign-state" role="status">
-                <p>Loading campaigns…</p>
-              </li>
-            ) : null}
+              {isLoading ? (
+                <li className="campaign-state" role="status">
+                  <p>Loading campaigns…</p>
+                </li>
+              ) : null}
 
-            {!isLoading && result.items.length === 0 ? (
-              <li className="campaign-state">
-                <h3>No campaigns are available yet</h3>
-                <p>Please check again later.</p>
-              </li>
-            ) : null}
-          </ul>
-        )}
+              {!isLoading && result.items.length === 0 ? (
+                <li className="campaign-state">
+                  <h3>No campaigns are available yet</h3>
+                  <p>Please check again later.</p>
+                </li>
+              ) : null}
+            </ul>
+          )}
+        </div>
       </section>
     </section>
   )
