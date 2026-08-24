@@ -26,7 +26,14 @@ export default function CampaignCard({ campaign }) {
         <div className="campaign-card__body">
           <p className="campaign-card__category">{campaign.category}</p>
           <h3>{campaign.title}</h3>
-          <p>{campaign.description}</p>
+          <p className="campaign-card__description">{campaign.description}</p>
+          <a
+            className="campaign-card__link"
+            href={`/campaigns/${encodeURIComponent(campaign.id)}`}
+            aria-label={`View ${campaign.title}`}
+          >
+            View campaign
+          </a>
         </div>
       </article>
     </li>

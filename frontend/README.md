@@ -20,20 +20,21 @@ npm run build
 
 ## Integration handoff
 
-These are working paths, not active links until the matching page is implemented and merged.
+These paths show what is available in this branch and what still needs to be added.
 
 | Path | Expected owner contribution | Current state |
 |---|---|---|
 | `/` | Campaign homepage | Implemented on this feature branch |
+| `/campaigns/:campaignId` | Public campaign details | Implemented with local campaign data |
 | `/login` | Login form and validation | Planned; header link is commented out |
 | `/register` | Account-registration form and validation | Planned; link from the login page when ready |
 
-The local service returns the draft campaign-list envelope and the fields needed by this page. `createdBy` remains omitted because its format has not been agreed. Replace the local service during integration using the [draft API contract](../docs/api/api-contract.md).
+The local service returns the draft campaign-list and single-campaign envelopes and the fields needed by these pages. `createdBy` remains omitted because its format has not been agreed. The longer campaign copy and goals are provisional local content; they will need to be confirmed or mapped when the backend response is agreed. Replace the local service during integration using the [draft API contract](../docs/api/api-contract.md).
 
 ## Current design decisions
 
 - `Campaigns` moves to the list on the homepage.
-- Campaign-detail buttons, search and filters are waiting for confirmed scope and working backend behaviour.
+- Each `View campaign` link opens the matching public campaign details route. Search and filters remain outside this branch.
 - Login stays hidden until `/login` exists.
 - The photographs are provisional. They use empty alternative text because the adjacent title and description already provide the campaign meaning; this avoids repeating the same information to screen-reader users.
 

@@ -1,6 +1,26 @@
 import HomePage from './pages/HomePage.jsx'
+import CampaignDetailsPage from './pages/CampaignDetailsPage.jsx'
 
-export default function App() {
+function getRoute(pathname) {
+  const campaignMatch = pathname.match(/^\/campaigns\/([^/]+)\/?$/)
+
+  if (campaignMatch) {
+    return {
+      name: 'campaign-details',
+      campaignId: decodeURIComponent(campaignMatch[1]),
+    }
+  }
+
+  if (pathname === '/') {
+    return { name: 'home' }
+  }
+
+  return { name: 'not-found' }
+}
+
+export default function App({ pathname = window.location.pathname }) {
+  const route = getRoute(pathname)
+
   return (
     <div className="site-shell">
       <a className="skip-link" href="#main-content">Skip to main content</a>
@@ -11,15 +31,25 @@ export default function App() {
             CauseConnect
           </a>
           <nav aria-label="Primary navigation">
-            <a href="/" aria-current="page">Home</a>
-            <a href="#campaigns">Campaigns</a>
+            <a href="/" aria-current={route.name === 'home' ? 'page' : undefined}>Home</a>
+            <a href="/#campaigns">Campaigns</a>
             {/* Enable after the /login route is implemented: <a href="/login">Login</a> */}
           </nav>
         </div>
       </header>
 
       <main id="main-content">
-        <HomePage />
+        {route.name === 'home' ? <HomePage /> : null}
+        {route.name === 'campaign-details' ? (
+          <CampaignDetailsPage campaignId={route.campaignId} />
+        ) : null}
+        {route.name === 'not-found' ? (
+          <section className="not-found-page content-width" aria-labelledby="not-found-title">
+            <h1 id="not-found-title">Page not found</h1>
+            <p>The page you requested is not available.</p>
+            <a className="text-link" href="/">Return to the homepage</a>
+          </section>
+        ) : null}
       </main>
     </div>
   )

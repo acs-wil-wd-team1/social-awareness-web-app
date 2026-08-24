@@ -22,6 +22,9 @@ describe('CauseConnect campaign homepage', () => {
     expect(await screen.findByRole('heading', { level: 3, name: 'Clean Water Initiative' })).toBeTruthy()
     expect(screen.getByRole('heading', { level: 3, name: 'Community Food Drive' })).toBeTruthy()
     expect(screen.getByRole('heading', { level: 3, name: 'Digital Skills Workshops' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'View Clean Water Initiative' }).getAttribute('href'))
+      .toBe('/campaigns/clean-water-initiative')
+    expect(screen.getAllByRole('link', { name: /^View / })).toHaveLength(3)
     expect(screen.getByText('3 campaigns')).toBeTruthy()
   })
 
