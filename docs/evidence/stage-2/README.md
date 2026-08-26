@@ -5,7 +5,7 @@ The final Prototype Document and video use selected evidence from this index. Ev
 | Evidence | Owner | Status | File or link |
 |---|---|---|---|
 | Homepage visible while logged out | Developer/Programmer | Not captured | |
-| Search or category filter changes results | Developer/Programmer | Not captured | |
+| Campaign list loads approved campaign data | Developer/Programmer | Not captured | |
 | Registration validation and success | Developer/Programmer | Not captured | |
 | Invalid and successful login | Developer/Programmer | Not captured | |
 | Logout returns to anonymous state | Developer/Programmer | Not captured | |

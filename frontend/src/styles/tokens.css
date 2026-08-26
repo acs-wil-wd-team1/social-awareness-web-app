@@ -1,23 +1,24 @@
 /*
  * Shared design tokens
  *
- * The values below are neutral placeholders. The Front-end Designers will
- * replace them with the team's approved colours, typography and spacing.
+ * These values follow the current Web Design Standards in the team's Stage 2
+ * Design Document. They can be revised if the team updates those standards.
  */
 
 :root {
-  --brand-primary: #2c5f9e;
-  --brand-secondary: #e8a33d;
-  --text-body: #1f2933;
-  --text-muted: #52606d;
+  --brand-primary: #2563eb;
+  --brand-primary-hover: #1d4ed8;
+  --brand-secondary: #16a34a;
+  --text-body: #1f2937;
+  --text-muted: #6b7280;
   --surface: #ffffff;
-  --surface-muted: #f4f6f8;
-  --border: #d9e2ec;
-  --success: #2e7d32;
-  --danger: #c62828;
-  --font-heading: system-ui, sans-serif;
-  --font-body: system-ui, sans-serif;
+  --surface-muted: #f8fafc;
+  --border: #d1d5db;
+  --success: #16a34a;
+  --danger: #dc2626;
+  --font-heading: Inter, Arial, Helvetica, sans-serif;
+  --font-body: Inter, Arial, Helvetica, sans-serif;
   --space-unit: 8px;
-  --radius: 8px;
+  --radius: 18px;
   --container-max: 1140px;
 }
