@@ -17,3 +17,45 @@ Backend documentation should include:
 - Stage 3 process/deployment requirements
 
 Never commit real database passwords, tokens or private keys.
+
+# Backend Setup
+
+Current dependencies
+
+- Express
+- Sequelize
+- MySQL2
+- dotenv
+- bcrypt
+- jsonwebtoken
+- cors
+
+## Prerequisites
+
+- Node.js (v22 or later)
+- MySQL
+- Git
+
+## Initial Setup
+
+```bash
+git pull
+cd backend
+npm install
+```
+
+## Create your environment file
+
+Copy:
+
+```bash
+cp .env.example .env
+```
+
+Update the values in `.env` with your local database configuration.
+
+## Run the development server
+
+```bash
+npm run dev
+```
