@@ -1,5 +1,6 @@
 import HomePage from './pages/HomePage.jsx'
 import CampaignDetailsPage from './pages/CampaignDetailsPage.jsx'
+import RegistrationPage from './pages/RegistrationPage.jsx'
 
 function getRoute(pathname) {
   const campaignMatch = pathname.match(/^\/campaigns\/([^/]+)\/?$/)
@@ -13,6 +14,10 @@ function getRoute(pathname) {
 
   if (pathname === '/') {
     return { name: 'home' }
+  }
+
+  if (pathname === '/register') {
+    return { name: 'register' }
   }
 
   return { name: 'not-found' }
@@ -33,7 +38,6 @@ export default function App({ pathname = window.location.pathname }) {
           <nav aria-label="Primary navigation">
             <a href="/" aria-current={route.name === 'home' ? 'page' : undefined}>Home</a>
             <a href="/#campaigns">Campaigns</a>
-            {/* Add Login and Register after their routes are implemented. */}
           </nav>
         </div>
       </header>
@@ -43,6 +47,7 @@ export default function App({ pathname = window.location.pathname }) {
         {route.name === 'campaign-details' ? (
           <CampaignDetailsPage campaignId={route.campaignId} />
         ) : null}
+        {route.name === 'register' ? <RegistrationPage /> : null}
         {route.name === 'not-found' ? (
           <section className="not-found-page content-width" aria-labelledby="not-found-title">
             <h1 id="not-found-title">Page not found</h1>
