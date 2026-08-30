@@ -9,6 +9,43 @@ body {
   font-family: var(--font-body);
   line-height: 1.5;
 }
+.logout-image-box {
+  width: 80px;
+  height: 80px;
+  margin: 20px auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logout-image-box img {
+  width: 60px;
+  height: 60px;
+  object-fit: contain;
+}
+
+.logout-message {
+  text-align: center;
+  color: darkcyan;
+  margin-top: 60px;
+  margin-bottom: 30px;
+}
+
+.logout-home-button {
+  display: block;
+  margin: 0 auto;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.logout-home-button:hover {
+  text-decoration: underline;
+}
+
 
 button,
 a {
