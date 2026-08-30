@@ -1,6 +1,8 @@
 import HomePage from './pages/HomePage.jsx'
 import CampaignDetailsPage from './pages/CampaignDetailsPage.jsx'
 import RegistrationPage from './pages/RegistrationPage.jsx'
+import LoginPage from './pages/LoginPage.jsx'
+import LogoutPage from './pages/LogoutPage.jsx'
 
 function getRoute(pathname) {
   const campaignMatch = pathname.match(/^\/campaigns\/([^/]+)\/?$/)
@@ -19,12 +21,21 @@ function getRoute(pathname) {
   if (pathname === '/register') {
     return { name: 'register' }
   }
+  if (pathname === '/login') {
+    return { name: 'login' }
+  }
+  if (pathname === '/logout') {
+    return { name: 'logout' }
+  }
+  
 
   return { name: 'not-found' }
 }
 
 export default function App({ pathname = window.location.pathname }) {
   const route = getRoute(pathname)
+  const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true'
+
 
   return (
     <div className="site-shell">
@@ -36,9 +47,18 @@ export default function App({ pathname = window.location.pathname }) {
             CauseConnect
           </a>
           <nav aria-label="Primary navigation">
-            <a href="/" aria-current={route.name === 'home' ? 'page' : undefined}>Home</a>
-            <a href="/#campaigns">Campaigns</a>
-          </nav>
+  <a href="/" aria-current={route.name === 'home' ? 'page' : undefined}>
+    Home
+  </a>
+
+  <a href="/#campaigns">Campaigns</a>
+
+  {isLoggedIn ? (
+    <a href="/logout">Logout</a>
+  ) : (
+    <a href="/login">Login</a>
+  )}
+</nav>
         </div>
       </header>
 
@@ -48,6 +68,8 @@ export default function App({ pathname = window.location.pathname }) {
           <CampaignDetailsPage campaignId={route.campaignId} />
         ) : null}
         {route.name === 'register' ? <RegistrationPage /> : null}
+        {route.name === 'login' ? <LoginPage /> : null}
+        {route.name === 'logout' ? <LogoutPage /> : null}
         {route.name === 'not-found' ? (
           <section className="not-found-page content-width" aria-labelledby="not-found-title">
             <h1 id="not-found-title">Page not found</h1>
