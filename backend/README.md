@@ -54,6 +54,31 @@ cp .env.example .env
 
 Update the values in `.env` with your local database configuration.
 
+## Running the database locally
+
+A `docker-compose.yml` in this folder runs MySQL 8 for local development
+(not used for Stage 3 deployment — see `infra/`).
+
+```bash
+docker compose up -d
+```
+
+This reads `DB_NAME`, `DB_NAME_TEST`, `DB_USER`, `DB_PORT` and `DB_PASSWORD`
+from your `.env`, and on first boot creates both the `CauseConnect` and
+`CauseConnect_test` databases. Data persists in a named volume across
+restarts. To wipe it and start over:
+
+```bash
+docker compose down -v
+```
+
+Check the container is healthy before running migrations or starting the
+server:
+
+```bash
+docker compose ps
+```
+
 ## Run the development server
 
 ```bash
