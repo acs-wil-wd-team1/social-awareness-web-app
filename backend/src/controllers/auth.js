@@ -5,6 +5,11 @@ const bcrypt = require("bcrypt");
 
 const { User, UserSession } = require("../database/models");
 
+const accountTypeToRole = {
+  user: "public",
+  business: "business_owner",
+};
+
 const getUsers = async (req, res) => {
   try {
     const data = await User.findAll();
@@ -44,6 +49,19 @@ const registration = async (req, res) => {
       });
     }
 
+    const role = accountTypeToRole[accountType];
+
+    if (!role) {
+      return res.status(422).json({
+        status: 422,
+        code: "VALIDATION_FAILED",
+        message: "Validation failed",
+        fieldErrors: {
+          accountType: "Account type must be user or business",
+        },
+      });
+    }
+
     const allowedFields = ["name", "email", "password", "accountType"];
 
     const unknownFields = Object.keys(req.body).filter(
@@ -53,11 +71,8 @@ const registration = async (req, res) => {
     if (unknownFields.length > 0) {
       return res.status(422).json({
         status: 422,
-
         code: "VALIDATION_FAILED",
-
         message: "Registration data is invalid",
-
         fieldErrors: null,
       });
     }
@@ -87,6 +102,7 @@ const registration = async (req, res) => {
       fullName: name.trim(),
       email: normalizedEmail,
       passwordHash,
+      role: role
     });
 
     return res.status(201).json({
