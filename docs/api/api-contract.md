@@ -126,12 +126,7 @@ Query parameters:
 Response:
 
 ```json
-{
-  "items": [],
-  "page": 1,
-  "pageSize": 20,
-  "total": 0
-}
+
 ```
 
 Campaign fields:
