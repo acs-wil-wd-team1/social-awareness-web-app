@@ -2,7 +2,7 @@
 
 This feature branch contains the Stage 2 campaign homepage implementation. Registration, login and logout are separate Stage 2 tasks; participation and campaign posting remain Stage 3 work.
 
-The page follows the current CauseConnect storyboard and the web design standards recorded in the team's Stage 2 Design Document. It uses local campaign data while the backend is being developed. Photographs and smaller layout details can still be revised if the team updates the wireframes or standards.
+The page follows the current CauseConnect storyboard and the web design standards recorded in the team's Stage 2 Design Document. Campaigns are loaded from the public backend API implemented in PR #8.
 
 ## Run locally
 
@@ -10,6 +10,8 @@ The page follows the current CauseConnect storyboard and the web design standard
 npm install
 npm run dev
 ```
+
+The local development server forwards `/api` requests to the backend on `http://127.0.0.1:3000`, so the backend must also be running when testing the live campaign data.
 
 ## Verify
 
@@ -24,12 +26,12 @@ These paths show what is available in this branch and what still needs to be add
 
 | Path | Expected owner contribution | Current state |
 |---|---|---|
-| `/` | Campaign homepage | Implemented on this feature branch |
-| `/campaigns/:campaignId` | Public campaign details | Implemented with local campaign data |
+| `/` | Campaign homepage | Loads approved campaigns from `GET /api/campaigns/public` |
+| `/campaigns/:campaignId` | Public campaign details | Temporarily finds the selected campaign in the public list |
 | `/login` | Login form and validation | Planned; header link is commented out |
 | `/register` | Account-registration form and validation | Planned; link from the login page when ready |
 
-The local service returns the draft campaign-list and single-campaign envelopes and the fields needed by these pages. `createdBy` remains omitted because its format has not been agreed. The longer campaign copy and goals are provisional local content; they will need to be confirmed or mapped when the backend response is agreed. Replace the local service during integration using the [draft API contract](../docs/api/api-contract.md).
+The frontend maps the backend's `campaigns` response into the existing card layout, converts numeric campaign IDs for browser routes, and uses a placeholder when `imageUrl` is empty. A dedicated campaign-details request can replace the current list lookup if a single-campaign endpoint is added later.
 
 ## Current design decisions
 
@@ -37,6 +39,6 @@ The local service returns the draft campaign-list and single-campaign envelopes 
 - `Campaigns` moves to the list on the homepage.
 - Each `View campaign` link opens the matching public campaign details route. Search and filters remain outside this branch.
 - Login stays hidden until `/login` exists.
-- The photographs are provisional. They use empty alternative text because the adjacent title and description already provide the campaign meaning; this avoids repeating the same information to screen-reader users.
+- Campaign images use empty alternative text because the adjacent title and description already provide the campaign meaning. Campaigns without an image use the local CauseConnect placeholder.
 
 Image provenance is recorded in [the Stage 2 evidence folder](../docs/evidence/stage-2/campaign-image-provenance.md).
