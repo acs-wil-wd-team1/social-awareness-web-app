@@ -90,7 +90,7 @@ describe('CauseConnect campaign homepage', () => {
     expect(response).toMatchObject({ page: 1, pageSize: 100, total: 4 })
     expect(response.items.every(({ status }) => status === 'approved')).toBe(true)
     expect(response.items.every(({ imageUrl }) => imageUrl === '/campaign-placeholder.svg')).toBe(true)
-    expect(fetch).toHaveBeenCalledWith('/api/campaigns/public?page=1&pageSize=100', expect.any(Object))
+    expect(fetch).toHaveBeenCalledWith('/api/campaigns?page=1&pageSize=100', expect.any(Object))
   })
 
   it('filters hidden campaigns and applies the draft sort order', () => {

@@ -28,14 +28,22 @@ const backendCampaigns = [
 ]
 
 beforeEach(() => {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
-    campaigns: backendCampaigns,
-    page: 1,
-    pageSize: 100,
-  }), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
-  })))
+  vi.stubGlobal('fetch', vi.fn().mockImplementation((url) => {
+    const campaignId = String(url).split('/').at(-1)
+    const campaign = backendCampaigns.find(({ id }) => String(id) === campaignId)
+
+    return Promise.resolve(new Response(JSON.stringify(
+      campaign ?? {
+        status: 404,
+        code: 'CAMPAIGN_NOT_FOUND',
+        message: 'Campaign not found',
+        fieldErrors: null,
+      },
+    ), {
+      status: campaign ? 200 : 404,
+      headers: { 'Content-Type': 'application/json' },
+    }))
+  }))
 })
 
 afterEach(() => {
@@ -59,7 +67,7 @@ describe('CauseConnect campaign details', () => {
     expect(screen.queryByText(/campaign posting/i)).toBeNull()
   })
 
-  it('finds an approved integer-ID campaign in the list response', async () => {
+  it('loads an approved integer-ID campaign from the details response', async () => {
     const response = await getCampaignById('3')
 
     expect(response).toMatchObject({
@@ -70,6 +78,7 @@ describe('CauseConnect campaign details', () => {
         type: null,
       },
     })
+    expect(fetch).toHaveBeenCalledWith('/api/campaigns/3', expect.any(Object))
   })
 
   it('shows a clear not-found state for an unavailable campaign', async () => {

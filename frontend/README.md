@@ -26,12 +26,12 @@ These paths show what is available in this branch and what still needs to be add
 
 | Path | Expected owner contribution | Current state |
 |---|---|---|
-| `/` | Campaign homepage | Loads approved campaigns from `GET /api/campaigns/public` |
-| `/campaigns/:campaignId` | Public campaign details | Temporarily finds the selected campaign in the public list |
+| `/` | Campaign homepage | Loads approved campaigns from `GET /api/campaigns` |
+| `/campaigns/:campaignId` | Public campaign details | Loads the selected campaign from `GET /api/campaigns/:id` |
 | `/login` | Login form and validation | Planned; header link is commented out |
 | `/register` | Account-registration form and validation | Planned; link from the login page when ready |
 
-The frontend maps the backend's `campaigns` response into the existing card layout, converts numeric campaign IDs for browser routes, and uses a placeholder when `imageUrl` is empty. A dedicated campaign-details request can replace the current list lookup if a single-campaign endpoint is added later.
+The frontend maps the backend's campaign responses into the existing card and details layouts, converts numeric campaign IDs for browser routes, and uses a placeholder when `imageUrl` is empty.
 
 ## Current design decisions
 

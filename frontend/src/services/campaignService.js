@@ -20,7 +20,7 @@ async function readJson(response) {
 
   if (!response.ok) {
     throw new CampaignRequestError(
-      body?.code ?? (response.status === 404 ? 'NOT_FOUND' : 'REQUEST_FAILED'),
+      response.status === 404 ? 'NOT_FOUND' : (body?.code ?? 'REQUEST_FAILED'),
       body?.message ?? 'The campaign request failed.',
     )
   }
@@ -41,7 +41,7 @@ export async function listCampaigns({ signal } = {}) {
   let response
 
   try {
-    response = await fetch('/api/campaigns/public?page=1&pageSize=100', { signal })
+    response = await fetch('/api/campaigns?page=1&pageSize=100', { signal })
   } catch (error) {
     if (error?.name === 'AbortError') {
       throw new CampaignRequestError('ABORTED', 'The campaign request was cancelled.')
@@ -62,13 +62,24 @@ export async function listCampaigns({ signal } = {}) {
 }
 
 export async function getCampaignById(id, { signal } = {}) {
-  // Temporary fallback until a single-campaign endpoint is available.
-  const { items } = await listCampaigns({ signal })
-  const campaign = items.find(({ id: campaignId }) => campaignId === String(id))
+  let response
 
-  if (!campaign) {
+  try {
+    response = await fetch(`/api/campaigns/${encodeURIComponent(id)}`, { signal })
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new CampaignRequestError('ABORTED', 'The campaign request was cancelled.')
+    }
+
+    throw new CampaignRequestError('NETWORK_ERROR', 'The campaign API could not be reached.')
+  }
+
+  const body = await readJson(response)
+  const campaign = body?.campaign ?? body
+
+  if (!campaign?.id) {
     throw new CampaignRequestError('NOT_FOUND', 'The campaign could not be found.')
   }
 
-  return { campaign }
+  return { campaign: normalizeCampaign(campaign) }
 }
