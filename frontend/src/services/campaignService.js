@@ -1,54 +1,3 @@
-const mockCampaigns = [
-  {
-    id: 'clean-water-initiative',
-    title: 'Clean Water Initiative',
-    description: 'Supporting community access to clean and safe drinking water.',
-    details: 'Access to safe drinking water is not equal in every community. This campaign focuses attention on practical local projects that improve water access and help people use and store water safely.',
-    goals: [
-      'Raise awareness of barriers to safe drinking water.',
-      'Support practical community water initiatives.',
-      'Share clear information about safer water use.',
-    ],
-    category: 'Environment',
-    type: 'cause',
-    imageUrl: '/images/campaigns/clean-water-initiative.jpg',
-    status: 'approved',
-    createdAt: '2026-08-21T06:00:00Z',
-  },
-  {
-    id: 'community-food-drive',
-    title: 'Community Food Drive',
-    description: 'Collecting pantry essentials for local households that need support.',
-    details: 'Households can face short periods when groceries and everyday essentials are difficult to afford. This campaign helps local groups coordinate useful donations and direct them to people who need support.',
-    goals: [
-      'Collect useful pantry staples and household essentials.',
-      'Connect local donations with households needing support.',
-      'Encourage ongoing community involvement.',
-    ],
-    category: 'Community',
-    type: 'cause',
-    imageUrl: '/images/campaigns/community-food-drive.jpg',
-    status: 'approved',
-    createdAt: '2026-08-19T04:30:00Z',
-  },
-  {
-    id: 'digital-skills-workshops',
-    title: 'Digital Skills Workshops',
-    description: 'Free practical sessions helping people use everyday online services safely.',
-    details: 'Everyday services increasingly require people to go online. This campaign promotes friendly, practical sessions where participants can learn at their own pace and ask questions about common digital tasks.',
-    goals: [
-      'Build confidence using everyday online services.',
-      'Promote safer digital habits.',
-      'Make practical technology help easier to access.',
-    ],
-    category: 'Education',
-    type: 'cause',
-    imageUrl: '/images/campaigns/digital-skills-workshops.jpg',
-    status: 'approved',
-    createdAt: '2026-08-17T02:15:00Z',
-  },
-]
-
 export class CampaignRequestError extends Error {
   constructor(code, message) {
     super(message)
@@ -57,44 +6,80 @@ export class CampaignRequestError extends Error {
   }
 }
 
+function normalizeCampaign(campaign) {
+  return {
+    ...campaign,
+    id: String(campaign.id),
+    imageUrl: campaign.imageUrl || '/campaign-placeholder.svg',
+    type: campaign.type ?? null,
+  }
+}
+
+async function readJson(response) {
+  const body = await response.json().catch(() => null)
+
+  if (!response.ok) {
+    throw new CampaignRequestError(
+      response.status === 404 ? 'NOT_FOUND' : (body?.code ?? 'REQUEST_FAILED'),
+      body?.message ?? 'The campaign request failed.',
+    )
+  }
+
+  return body
+}
+
 export function selectPublicCampaigns(campaigns) {
   return campaigns
     .filter(({ status }) => status === 'approved')
+    .map(normalizeCampaign)
     .toSorted((left, right) => (
       right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id)
     ))
 }
 
 export async function listCampaigns({ signal } = {}) {
-  await Promise.resolve()
+  let response
 
-  if (signal?.aborted) {
-    throw new CampaignRequestError('ABORTED', 'The campaign request was cancelled.')
+  try {
+    response = await fetch('/api/campaigns?page=1&pageSize=100', { signal })
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new CampaignRequestError('ABORTED', 'The campaign request was cancelled.')
+    }
+
+    throw new CampaignRequestError('NETWORK_ERROR', 'The campaign API could not be reached.')
   }
 
-  const items = selectPublicCampaigns(mockCampaigns)
+  const body = await readJson(response)
+  const items = selectPublicCampaigns(Array.isArray(body?.campaigns) ? body.campaigns : [])
 
   return {
     items,
-    page: 1,
-    pageSize: 20,
-    total: items.length,
+    page: body?.page ?? 1,
+    pageSize: body?.pageSize ?? items.length,
+    total: body?.total ?? items.length,
   }
 }
 
 export async function getCampaignById(id, { signal } = {}) {
-  await Promise.resolve()
+  let response
 
-  if (signal?.aborted) {
-    throw new CampaignRequestError('ABORTED', 'The campaign request was cancelled.')
+  try {
+    response = await fetch(`/api/campaigns/${encodeURIComponent(id)}`, { signal })
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new CampaignRequestError('ABORTED', 'The campaign request was cancelled.')
+    }
+
+    throw new CampaignRequestError('NETWORK_ERROR', 'The campaign API could not be reached.')
   }
 
-  const campaign = selectPublicCampaigns(mockCampaigns)
-    .find(({ id: campaignId }) => campaignId === id)
+  const body = await readJson(response)
+  const campaign = body?.campaign ?? body
 
-  if (!campaign) {
+  if (!campaign?.id) {
     throw new CampaignRequestError('NOT_FOUND', 'The campaign could not be found.')
   }
 
-  return { campaign }
+  return { campaign: normalizeCampaign(campaign) }
 }
