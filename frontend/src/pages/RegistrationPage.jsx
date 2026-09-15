@@ -11,6 +11,8 @@ export default function RegistrationPage() {
   const [formValues, setFormValues] = useState(initialValues)
   const [errors, setErrors] = useState({})
   const [isSubmitted, setIsSubmitted] = useState(false)
+  const [apiError, setApiError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   function validateField(name, value) {
     if (!value.trim()) {
@@ -45,7 +47,7 @@ export default function RegistrationPage() {
     }
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
 
     const nextErrors = {
@@ -56,13 +58,48 @@ export default function RegistrationPage() {
     }
 
     setErrors(nextErrors)
-    setIsSubmitted(true)
+    setIsSubmitted(false)
+    setApiError('')
 
     if (Object.values(nextErrors).some(Boolean)) {
       return
     }
 
-    alert('Frontend-only registration preview: this form is not connected to an API yet.')
+    setIsSubmitting(true)
+
+    try {
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formValues.name,
+          email: formValues.email,
+          password: formValues.password,
+          accountType: 'user',
+        }),
+      })
+      const body = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        setErrors((currentErrors) => ({
+          ...currentErrors,
+          ...(body?.fieldErrors ?? {}),
+        }))
+        setApiError(body?.message ?? 'Registration failed. Please try again.')
+        return
+      }
+
+      setIsSubmitted(true)
+      window.setTimeout(() => {
+        window.location.href = '/login'
+      }, 1200)
+    } catch {
+      setApiError('The registration service could not be reached.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -127,10 +164,16 @@ export default function RegistrationPage() {
             {errors.confirmPassword ? <p className="auth-field__error">{errors.confirmPassword}</p> : null}
           </div>
 
-          <button className="auth-button" type="submit">Register</button>
+          <button className="auth-button" type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Registering...' : 'Register'}
+          </button>
+
+          {apiError ? <p className="auth-field__error" role="alert">{apiError}</p> : null}
 
           {isSubmitted && !Object.values(errors).some(Boolean) ? (
-            <p className="auth-form__status" role="status">Registration form validated successfully.</p>
+            <p className="auth-form__status" role="status">
+              Registration successful. Redirecting to login...
+            </p>
           ) : null}
         </form>
 
