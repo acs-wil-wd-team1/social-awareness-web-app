@@ -60,7 +60,7 @@ describe('CauseConnect campaign details', () => {
     expect(screen.getAllByText('Environment')).toHaveLength(2)
     expect(screen.getByText('A week of zero-waste practices.')).toBeTruthy()
     expect(screen.getByRole('heading', { level: 2, name: 'Campaign information' })).toBeTruthy()
-    expect(screen.getByText('Not specified')).toBeTruthy()
+    expect(screen.getByText('Small business')).toBeTruthy()
     expect(screen.getByText('1 September 2026')).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Back to campaigns' }).getAttribute('href')).toBe('/#campaigns')
     expect(screen.queryByRole('button', { name: /participate/i })).toBeNull()
@@ -75,7 +75,8 @@ describe('CauseConnect campaign details', () => {
         id: '3',
         title: 'Community Food Drive',
         status: 'approved',
-        type: null,
+        imageUrl: '/images/campaigns/community-food-drive.jpg',
+        type: 'cause',
       },
     })
     expect(fetch).toHaveBeenCalledWith('/api/campaigns/3', expect.any(Object))

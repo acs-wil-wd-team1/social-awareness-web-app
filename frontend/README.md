@@ -28,17 +28,19 @@ These paths show what is available in this branch and what still needs to be add
 |---|---|---|
 | `/` | Campaign homepage | Loads approved campaigns from `GET /api/campaigns` |
 | `/campaigns/:campaignId` | Public campaign details | Loads the selected campaign from `GET /api/campaigns/:id` |
-| `/login` | Login form and validation | Planned; header link is commented out |
-| `/register` | Account-registration form and validation | Planned; link from the login page when ready |
+| `/login` | Login form and validation | Available; currently uses frontend-only login state |
+| `/register` | Account-registration form and validation | Available; currently validates locally without an API request |
+| `/logout` | Logout confirmation | Available; currently clears frontend-only login state |
 
-The frontend maps the backend's campaign responses into the existing card and details layouts, converts numeric campaign IDs for browser routes, and uses a placeholder when `imageUrl` is empty.
+The frontend maps the backend's campaign responses into the existing card and details layouts and converts numeric campaign IDs for browser routes. For the four current Stage 2 seeded campaigns, local presentation metadata supplies the matching image and campaign type when those values are absent from the API response. Values supplied by the API always take precedence.
 
 ## Current design decisions
 
 - The shared colours, typography and responsive layout follow the current Stage 2 web design standards.
 - `Campaigns` moves to the list on the homepage.
 - Each `View campaign` link opens the matching public campaign details route. Search and filters remain outside this branch.
-- Login stays hidden until `/login` exists.
-- Campaign images use empty alternative text because the adjacent title and description already provide the campaign meaning. Campaigns without an image use the local CauseConnect placeholder.
+- The header shows Login or Logout according to the current frontend-only login state.
+- Campaign images use empty alternative text because the adjacent title and description already provide the campaign meaning. Unknown campaigns without an image still use the local CauseConnect placeholder.
+- The seeded presentation fallback is limited to the Stage 2 demo data and can be removed once the API returns image and type values for every campaign.
 
 Image provenance is recorded in [the Stage 2 evidence folder](../docs/evidence/stage-2/campaign-image-provenance.md).

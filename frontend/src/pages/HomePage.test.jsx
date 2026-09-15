@@ -89,8 +89,40 @@ describe('CauseConnect campaign homepage', () => {
 
     expect(response).toMatchObject({ page: 1, pageSize: 100, total: 4 })
     expect(response.items.every(({ status }) => status === 'approved')).toBe(true)
-    expect(response.items.every(({ imageUrl }) => imageUrl === '/campaign-placeholder.svg')).toBe(true)
+    expect(response.items.map(({ title, imageUrl, type }) => ({ title, imageUrl, type }))).toEqual([
+      {
+        title: 'Books for Kids',
+        imageUrl: '/images/campaigns/books-for-kids.jpg',
+        type: 'cause',
+      },
+      {
+        title: 'Community Food Drive',
+        imageUrl: '/images/campaigns/community-food-drive.jpg',
+        type: 'cause',
+      },
+      {
+        title: 'Mindful Mornings',
+        imageUrl: '/images/campaigns/mindful-mornings.jpg',
+        type: 'business',
+      },
+      {
+        title: 'Zero-Waste Week',
+        imageUrl: '/images/campaigns/zero-waste-week.jpg',
+        type: 'business',
+      },
+    ])
     expect(fetch).toHaveBeenCalledWith('/api/campaigns?page=1&pageSize=100', expect.any(Object))
+  })
+
+  it('uses campaign data from the API before the seeded frontend fallback', () => {
+    const [campaign] = selectPublicCampaigns([{
+      ...backendCampaigns[0],
+      imageUrl: 'https://example.com/books.jpg',
+      type: 'business',
+    }])
+
+    expect(campaign.imageUrl).toBe('https://example.com/books.jpg')
+    expect(campaign.type).toBe('business')
   })
 
   it('filters hidden campaigns and applies the draft sort order', () => {

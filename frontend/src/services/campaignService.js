@@ -6,12 +6,33 @@ export class CampaignRequestError extends Error {
   }
 }
 
+const seededCampaignPresentation = {
+  'Books for Kids': {
+    imageUrl: '/images/campaigns/books-for-kids.jpg',
+    type: 'cause',
+  },
+  'Community Food Drive': {
+    imageUrl: '/images/campaigns/community-food-drive.jpg',
+    type: 'cause',
+  },
+  'Mindful Mornings': {
+    imageUrl: '/images/campaigns/mindful-mornings.jpg',
+    type: 'business',
+  },
+  'Zero-Waste Week': {
+    imageUrl: '/images/campaigns/zero-waste-week.jpg',
+    type: 'business',
+  },
+}
+
 function normalizeCampaign(campaign) {
+  const presentation = seededCampaignPresentation[campaign.title] ?? {}
+
   return {
     ...campaign,
     id: String(campaign.id),
-    imageUrl: campaign.imageUrl || '/campaign-placeholder.svg',
-    type: campaign.type ?? null,
+    imageUrl: campaign.imageUrl || presentation.imageUrl || '/campaign-placeholder.svg',
+    type: campaign.type ?? presentation.type ?? null,
   }
 }
 
