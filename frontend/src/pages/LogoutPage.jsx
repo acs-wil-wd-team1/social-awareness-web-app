@@ -1,9 +1,27 @@
-
 import { useEffect } from 'react'
 
 export default function LogoutPage() {
   useEffect(() => {
-    localStorage.removeItem('isLoggedIn')
+    async function logout() {
+      const token = localStorage.getItem('token')
+
+      if (token) {
+        try {
+          await fetch('/api/auth/logout', {
+            method: 'PUT',
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          })
+        } catch {
+          // Clear the local token even if the logout request fails.
+        }
+      }
+
+      localStorage.removeItem('token')
+    }
+
+    logout()
   }, [])
 
   function handleReturnHome() {

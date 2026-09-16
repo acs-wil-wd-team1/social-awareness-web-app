@@ -34,7 +34,9 @@ function getRoute(pathname) {
 
 export default function App({ pathname = window.location.pathname }) {
   const route = getRoute(pathname)
-  const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true'
+  
+  const isLoggedIn = Boolean(localStorage.getItem('token'))
+
 
 
   return (

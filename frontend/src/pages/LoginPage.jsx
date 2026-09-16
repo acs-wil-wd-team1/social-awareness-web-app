@@ -8,7 +8,8 @@ const initialValues = {
 export default function LoginPage() {
   const [formValues, setFormValues] = useState(initialValues)
   const [errors, setErrors] = useState({})
-  const [isSubmitted, setIsSubmitted] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [apiError, setApiError] = useState('')
 
   function validateField(name, value) {
     if (!value.trim()) {
@@ -34,6 +35,7 @@ export default function LoginPage() {
     }
 
     setFormValues(nextValues)
+    setApiError('')
 
     if (errors[name]) {
       setErrors({
@@ -43,7 +45,7 @@ export default function LoginPage() {
     }
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
 
     const nextErrors = {
@@ -52,14 +54,51 @@ export default function LoginPage() {
     }
 
     setErrors(nextErrors)
-    setIsSubmitted(true)
+    setApiError('')
 
     if (Object.values(nextErrors).some(Boolean)) {
       return
     }
-    localStorage.setItem('isLoggedIn', 'true')
-    window.location.href = '/' //to redirect it to home page
-    //alert('Frontend-only login preview: this form is not connected to an API yet.')
+
+    setIsSubmitting(true)
+
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: formValues.email,
+          password: formValues.password,
+        }),
+      })
+
+      const body = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        setErrors((currentErrors) => ({
+          ...currentErrors,
+          ...(body?.fieldErrors ?? {}),
+        }))
+
+        setApiError(body?.message ?? 'Login failed. Please try again.')
+        return
+      }
+
+      if (!body?.token) {
+        setApiError('Login succeeded, but no authentication token was returned.')
+        return
+      }
+
+      localStorage.setItem('token', body.token)
+
+      window.location.href = '/'
+    } catch {
+      setApiError('The login service could not be reached.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -100,13 +139,13 @@ export default function LoginPage() {
             ) : null}
           </div>
 
-          <button className="auth-button" type="submit">
-            Login
+          <button className="auth-button" type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Logging in...' : 'Login'}
           </button>
 
-          {isSubmitted && !Object.values(errors).some(Boolean) ? (
-            <p className="auth-form__status" role="status">
-              Login form validated successfully.
+          {apiError ? (
+            <p className="auth-field__error" role="alert">
+              {apiError}
             </p>
           ) : null}
         </form>
@@ -120,4 +159,3 @@ export default function LoginPage() {
     </section>
   )
 }
-
