@@ -5,7 +5,7 @@ const { apiErrorResponse } = require("../utils/apiErrorResponse");
 
 const getPublicCampaigns = async (req, res) => {
   try {
-    const { page = 1, pageSize = 2, category, search } = req.query;
+    const { page = 1, pageSize = 20, category, search } = req.query;
 
     const result = await getCampaigns({
       page,
