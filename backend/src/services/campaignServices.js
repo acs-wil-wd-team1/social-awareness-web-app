@@ -2,11 +2,12 @@
 
 const { Op } = require("sequelize");
 const { Campaign, Category } = require("../database/models");
+const { errorMonitor } = require("events");
 
 const getCampaigns = async ({ page, pageSize, category, search, status }) => {
 
   const pageNumber = Math.max(Number(page) || 1, 1);
-  const limit = Math.max(Number(pageSize) || 2, 1);
+  const limit = Math.max(Number(pageSize) || 20, 1);
 
   const where = {};
 

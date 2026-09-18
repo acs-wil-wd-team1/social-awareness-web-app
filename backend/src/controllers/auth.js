@@ -11,13 +11,14 @@ const {
 // REGISTRATION
 const registration = async (req, res) => {
   try {
-    const { name, email, password, accountType } = req.body;
-
+    const { name, email, password, accountType, ...extraFields } = req.body;
+    
     const result = await registerUser({
       name,
       email,
       password,
       accountType,
+      extraFields
     });
 
     return res.status(201).json(result);
@@ -34,25 +35,27 @@ const registration = async (req, res) => {
   }
 };
 
-// LOGIN 
+// LOGIN
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
     const result = await loginUser(email, password, {
       ipAddress: req.ip,
-      userAgent: req.get("user-agent"),
+      userAgent: req.get("user-agent")
     });
 
     return res.status(200).json(result);
   } catch (err) {
     console.error(err);
 
+    const status = err.status || 500;
+
     return apiErrorResponse(
       res,
-      err.status || 500,
+      status,
       err.code || "INTERNAL_SERVER_ERROR",
-      err.message || "Something went wrong",
+      status === 500 ? "Something went wrong" : err.message,
       err.fieldErrors ?? null,
     );
   }
@@ -63,15 +66,19 @@ const logout = async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
 
-    const result = await logoutUser(authHeader)
+    await logoutUser(authHeader);
 
-    res.status(204).send()
+    res.status(204).send();
   } catch (err) {
+    console.log(err);
+
+    const status = err.status || 500;
+    
     return apiErrorResponse(
       res,
-      err.status || 500,
+      status || 500,
       err.code || "INTERNAL_SERVER_ERROR",
-      err.message || "Something went wrong",
+      status === 500 ? "Something went wrong" : err.message,
       err.fieldErrors ?? null,
     );
   }

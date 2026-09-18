@@ -15,7 +15,7 @@ const registerUser = async ({
   email,
   password,
   accountType,
-  ...extraFields
+  extraFields
 }) => {
   if (!name || !email || !password || !accountType) {
     const error = new Error("Registration data is invalid");
@@ -34,7 +34,11 @@ const registerUser = async ({
   }
 
   if (Object.keys(extraFields).length > 0) {
-    const error = new Error("Registration data is invalid");
+    const fields = Object.keys(extraFields);
+
+    const error = new Error(
+      `Unsupported registration field${fields.length > 1 ? "s" : ""}: ${fields.join(", ")}`,
+    );
     error.status = 422;
     error.code = "VALIDATION_FAILED";
     error.fieldErrors = null;
@@ -64,11 +68,11 @@ const registerUser = async ({
   });
 
   if (existing) {
-    const error = new Error("Email has already been registered");
+    const error = new Error("Unable to create your account");
     error.status = 409;
     error.code = "EMAIL_EXISTS";
     error.fieldErrors = {
-      email: "Email has already been registered",
+      email: "Email has already been registered. Please use different email.",
     };
 
     throw error;
@@ -113,26 +117,22 @@ const loginUser = async (email, password, requestMeta = {}) => {
     },
   });
 
-  if (!user) {
+  const invalidCredentialsError = () => {
     const error = new Error("Email or password is incorrect");
-
     error.status = 401;
     error.code = "INVALID_CREDENTIALS";
     error.fieldErrors = null;
+    return error;
+  };
 
-    throw error;
+  if (!user) {
+    throw invalidCredentialsError();
   }
 
   const isMatch = await bcrypt.compare(password, user.passwordHash);
 
   if (!isMatch) {
-    const error = new Error("Email or password is incorrect");
-
-    error.status = 401;
-    error.code = "INVALID_CREDENTIALS";
-    error.fieldErrors = null;
-
-    throw error;
+    throw invalidCredentialsError();
   }
 
   if (user.status === "suspended") {
@@ -159,7 +159,7 @@ const loginUser = async (email, password, requestMeta = {}) => {
     userId: user.userId,
     token,
     ipAddress: requestMeta.ipAddress,
-    userAgent: requestMeta.userAgent,
+    userAgent: requestMeta.userAgent?.trim() || "Unknown",
     status: "active",
   });
 
@@ -205,7 +205,7 @@ const logoutUser = async (authHeader) => {
         token,
         status: "active",
       },
-    }
+    },
   );
 
   if (updatedRows === 0) {
@@ -213,7 +213,6 @@ const logoutUser = async (authHeader) => {
     error.status = 401;
     error.code = "INVALID_TOKEN";
     error.fieldErrors = null;
-
     throw error;
   }
 
@@ -223,5 +222,5 @@ const logoutUser = async (authHeader) => {
 module.exports = {
   registerUser,
   loginUser,
-  logoutUser
+  logoutUser,
 };
