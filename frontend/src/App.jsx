@@ -1,10 +1,18 @@
+import { lazy, Suspense } from 'react'
 import HomePage from './pages/HomePage.jsx'
 import CampaignDetailsPage from './pages/CampaignDetailsPage.jsx'
 import RegistrationPage from './pages/RegistrationPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import LogoutPage from './pages/LogoutPage.jsx'
+const CreateCampaignDraft = import.meta.env.DEV
+  ? lazy(() => import('./pages/CreateCampaignPage.jsx'))
+  : null
 
 function getRoute(pathname) {
+  if (import.meta.env.DEV && pathname === '/draft/campaigns/new') {
+    return { name: 'campaign-draft' }
+  }
+
   const campaignMatch = pathname.match(/^\/campaigns\/([^/]+)\/?$/)
 
   if (campaignMatch) {
@@ -27,17 +35,12 @@ function getRoute(pathname) {
   if (pathname === '/logout') {
     return { name: 'logout' }
   }
-  
-
   return { name: 'not-found' }
 }
 
 export default function App({ pathname = window.location.pathname }) {
   const route = getRoute(pathname)
-  
   const isLoggedIn = Boolean(localStorage.getItem('token'))
-
-
 
   return (
     <div className="site-shell">
@@ -49,18 +52,18 @@ export default function App({ pathname = window.location.pathname }) {
             CauseConnect
           </a>
           <nav aria-label="Primary navigation">
-  <a href="/" aria-current={route.name === 'home' ? 'page' : undefined}>
-    Home
-  </a>
+            <a href="/" aria-current={route.name === 'home' ? 'page' : undefined}>
+              Home
+            </a>
 
-  <a href="/#campaigns">Campaigns</a>
+            <a href="/#campaigns">Campaigns</a>
 
-  {isLoggedIn ? (
-    <a href="/logout">Logout</a>
-  ) : (
-    <a href="/login">Login</a>
-  )}
-</nav>
+            {isLoggedIn ? (
+              <a href="/logout">Logout</a>
+            ) : (
+              <a href="/login">Login</a>
+            )}
+          </nav>
         </div>
       </header>
 
@@ -72,6 +75,11 @@ export default function App({ pathname = window.location.pathname }) {
         {route.name === 'register' ? <RegistrationPage /> : null}
         {route.name === 'login' ? <LoginPage /> : null}
         {route.name === 'logout' ? <LogoutPage /> : null}
+        {route.name === 'campaign-draft' && CreateCampaignDraft ? (
+          <Suspense fallback={<p className="content-width">Loading frontend draft…</p>}>
+            <CreateCampaignDraft />
+          </Suspense>
+        ) : null}
         {route.name === 'not-found' ? (
           <section className="not-found-page content-width" aria-labelledby="not-found-title">
             <h1 id="not-found-title">Page not found</h1>

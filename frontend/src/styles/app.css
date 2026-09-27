@@ -245,6 +245,214 @@ a {
   color: var(--text-body);
 }
 
+.campaign-form-page {
+  padding-block: 48px 88px;
+}
+
+.campaign-form-card {
+  max-width: 840px;
+  margin-inline: auto;
+  padding: clamp(26px, 5vw, 48px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 12px 28px rgba(20, 52, 59, 0.09);
+}
+
+.campaign-form-intro {
+  max-width: 680px;
+  margin-bottom: 32px;
+}
+
+.campaign-form-intro > p:last-child {
+  margin-top: 14px;
+  color: var(--text-muted);
+}
+
+.campaign-form-eyebrow {
+  margin-bottom: 8px;
+  color: var(--brand-primary);
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.campaign-form {
+  display: grid;
+  gap: 22px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.campaign-draft-notice {
+  margin-bottom: 24px;
+  padding: 14px 16px;
+  border: 1px solid #b7893f;
+  border-radius: 10px;
+  background: #fff5df;
+  color: #654612;
+  font-weight: 700;
+}
+
+.campaign-draft-controls {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-muted);
+}
+
+.campaign-draft-error-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+}
+
+.campaign-draft-error-option input { width: 18px; height: 18px; }
+
+.campaign-draft-context,
+.campaign-draft-account-notice { margin-block: 0 26px; color: var(--text-muted); }
+
+.campaign-draft-account-notice h2 { font-size: 1.4rem; color: var(--text-body); }
+
+.campaign-draft-image {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  object-fit: contain;
+}
+
+.campaign-draft-remove-image {
+  justify-self: start;
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-body);
+  font: inherit;
+  cursor: pointer;
+}
+
+.campaign-draft-remove-image:focus-visible,
+.campaign-draft-error-option input:focus-visible {
+  outline: 3px solid var(--brand-primary);
+  outline-offset: 3px;
+}
+
+.campaign-draft-upload-note { margin-block: 18px; }
+
+.campaign-form-field {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.campaign-form-field--full {
+  grid-column: 1 / -1;
+}
+
+.campaign-form-field label {
+  font-weight: 750;
+}
+
+.campaign-form-field label span,
+.campaign-form-help {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.campaign-form-field input,
+.campaign-form-field select,
+.campaign-form-field textarea {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-body);
+  font: inherit;
+}
+
+.campaign-form-field textarea {
+  min-height: 150px;
+  resize: vertical;
+}
+
+.campaign-form-field input:focus-visible,
+.campaign-form-field select:focus-visible,
+.campaign-form-field textarea:focus-visible,
+.campaign-form-actions button:focus-visible {
+  outline: 3px solid var(--brand-primary);
+  outline-offset: 3px;
+}
+
+.campaign-form-field [aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.campaign-form-help,
+.campaign-form-error {
+  margin: 0;
+}
+
+.campaign-form-error {
+  color: var(--danger);
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.campaign-form-actions button {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  padding: 11px 18px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--brand-primary);
+  color: #ffffff;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.campaign-form-actions button {
+  width: 100%;
+  cursor: pointer;
+}
+
+.campaign-form-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.campaign-form-success {
+  padding: 18px;
+  border: 1px solid #86b89a;
+  border-radius: 12px;
+  background: #edf8f1;
+}
+
+.campaign-form-success h2 {
+  margin: 0 0 6px;
+  font-size: 1.25rem;
+}
+
+.campaign-form-success p {
+  margin: 0;
+}
+
 .homepage {
   padding-top: 64px;
 }
@@ -759,6 +967,14 @@ h1 span {
 
   .site-footer__inner {
     width: min(calc(100% - 28px), var(--container-max));
+  }
+
+  .campaign-form {
+    grid-template-columns: 1fr;
+  }
+
+  .campaign-form-field--full {
+    grid-column: auto;
   }
 }
 
