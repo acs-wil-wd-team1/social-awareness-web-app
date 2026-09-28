@@ -4,11 +4,16 @@ import CampaignDetailsPage from './pages/CampaignDetailsPage.jsx'
 import RegistrationPage from './pages/RegistrationPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import LogoutPage from './pages/LogoutPage.jsx'
+import CreateCampaignPage from './pages/CreateCampaignPage.jsx'
 const CreateCampaignDraft = import.meta.env.DEV
-  ? lazy(() => import('./pages/CreateCampaignPage.jsx'))
+  ? lazy(() => import('./pages/CreateCampaignDraftPage.jsx'))
   : null
 
 function getRoute(pathname) {
+  if (pathname === '/campaigns/new' || pathname === '/campaigns/new/') {
+    return { name: 'create-campaign' }
+  }
+
   if (import.meta.env.DEV && pathname === '/draft/campaigns/new') {
     return { name: 'campaign-draft' }
   }
@@ -59,7 +64,10 @@ export default function App({ pathname = window.location.pathname }) {
             <a href="/#campaigns">Campaigns</a>
 
             {isLoggedIn ? (
-              <a href="/logout">Logout</a>
+              <>
+                <a href="/campaigns/new" aria-current={route.name === 'create-campaign' ? 'page' : undefined}>Create campaign</a>
+                <a href="/logout">Logout</a>
+              </>
             ) : (
               <a href="/login">Login</a>
             )}
@@ -75,6 +83,7 @@ export default function App({ pathname = window.location.pathname }) {
         {route.name === 'register' ? <RegistrationPage /> : null}
         {route.name === 'login' ? <LoginPage /> : null}
         {route.name === 'logout' ? <LogoutPage /> : null}
+        {route.name === 'create-campaign' ? <CreateCampaignPage /> : null}
         {route.name === 'campaign-draft' && CreateCampaignDraft ? (
           <Suspense fallback={<p className="content-width">Loading frontend draft…</p>}>
             <CreateCampaignDraft />

@@ -1,225 +1,243 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App.jsx'
-import { maxImageBytes, validateDraftCampaign, validateDraftImage } from '../drafts/campaignSubmissionDraft.js'
 import CreateCampaignPage from './CreateCampaignPage.jsx'
+import { loadCampaignCategories } from '../services/campaignSubmissionService.js'
+import { validateCampaignSubmission } from '../services/campaignSubmissionValidation.js'
 
-const validValues = {
-  title: 'Community Garden Day',
-  description: 'Help prepare a shared neighbourhood garden.',
-  categoryId: '3',
+const categories = [{ id: 7, name: 'Local action' }, { id: 12, name: 'Education' }]
+const values = {
+  title: 'Neighbourhood garden',
+  description: 'Help plant and care for a shared garden.',
+  categoryId: '7',
   targetAudience: '',
   startDate: '2026-10-10',
   endDate: '2026-10-11',
 }
-const sampleResult = { sampleOnly: true, campaign: { title: validValues.title, status: 'pending' } }
+const saved = { campaign: { id: 42, title: values.title, status: 'pending' } }
+const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+const submitButton = () => screen.getByRole('button', { name: 'Submit campaign for review' })
 
-function fillForm() {
+async function readyForm() {
+  await screen.findByRole('option', { name: 'Local action' })
   for (const [label, value] of Object.entries({
-    'Campaign title': validValues.title,
-    Description: validValues.description,
-    Category: validValues.categoryId,
-    'Start date': validValues.startDate,
-    'End date': validValues.endDate,
+    'Campaign title': values.title,
+    Description: values.description,
+    Category: values.categoryId,
+    'Start date': values.startDate,
+    'End date': values.endDate,
   })) fireEvent.change(screen.getByLabelText(label), { target: { value } })
 }
 
-function choosePhoto(file) {
-  fireEvent.change(screen.getByLabelText(/Campaign photo/), { target: { files: [file] } })
-}
-
 beforeEach(() => {
-  vi.stubEnv('DEV', true)
-  vi.stubGlobal('fetch', vi.fn(() => { throw new Error('The draft must not call fetch') }))
-  const NativeURL = URL
-  vi.stubGlobal('URL', class extends NativeURL {
-    static createObjectURL = vi.fn().mockReturnValueOnce('blob:first-photo').mockReturnValue('blob:next-photo')
-    static revokeObjectURL = vi.fn()
-  })
+  localStorage.setItem('token', 'test-token')
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(json({ categories })))
 })
 
 afterEach(() => {
   cleanup()
   localStorage.clear()
-  vi.restoreAllMocks()
   vi.unstubAllGlobals()
   vi.unstubAllEnvs()
+  vi.restoreAllMocks()
 })
 
-describe('Local campaign frontend draft', () => {
-  it('opens only at the development draft route with an explicit sample notice', async () => {
-    render(<App pathname="/draft/campaigns/new" />)
-    expect(await screen.findByText('Frontend draft — uses sample data; nothing is sent or saved')).toBeTruthy()
-    expect(screen.queryByRole('link', { name: 'Create campaign' })).toBeNull()
-    expect(fetch).not.toHaveBeenCalled()
-  })
-
-  it('does not expose the draft route in production', () => {
+describe('Campaign submission', () => {
+  it('opens the real creation route in production before the campaign ID route', async () => {
     vi.stubEnv('DEV', false)
-    render(<App pathname="/draft/campaigns/new" />)
-    expect(screen.getByRole('heading', { name: 'Page not found' })).toBeTruthy()
+    render(<App pathname="/campaigns/new" />)
+    await readyForm()
+    expect(screen.getByRole('heading', { name: 'Create a campaign' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Create campaign' }).getAttribute('aria-current')).toBe('page')
+    expect(fetch).toHaveBeenCalledWith('/api/campaigns/categories', expect.objectContaining({ signal: expect.any(AbortSignal) }))
     expect(screen.queryByLabelText('Sample account')).toBeNull()
-    expect(fetch).not.toHaveBeenCalled()
+    expect(screen.queryByLabelText(/Campaign photo/)).toBeNull()
+    expect(fetch).toHaveBeenCalledTimes(1)
   })
 
-  it('does not add a creation link to the normal authenticated navigation', () => {
-    localStorage.setItem('token', 'existing-token')
-    render(<App pathname="/login" />)
-    expect(screen.getByRole('link', { name: 'Logout' })).toBeTruthy()
+  it('asks guests to log in without loading categories or showing a form', () => {
+    localStorage.removeItem('token')
+    render(<App pathname="/campaigns/new/" />)
+    expect(screen.getByRole('link', { name: 'Log in' }).getAttribute('href')).toBe('/login')
+    expect(screen.queryByRole('form')).toBeNull()
     expect(screen.queryByRole('link', { name: 'Create campaign' })).toBeNull()
     expect(fetch).not.toHaveBeenCalled()
   })
 
-  it('lets reviewers inspect guest and missing-business-profile states without changing login', () => {
-    localStorage.setItem('token', 'existing-token')
-    const setItem = vi.spyOn(Storage.prototype, 'setItem')
-    const removeItem = vi.spyOn(Storage.prototype, 'removeItem')
+  it('disables submission while categories load, then sends only editable fields and the token', async () => {
+    fetch.mockResolvedValueOnce(json(saved, 201))
     render(<CreateCampaignPage />)
-    fireEvent.change(screen.getByLabelText('Sample account'), { target: { value: 'guest' } })
-    expect(screen.getByRole('heading', { name: 'Guest preview' })).toBeTruthy()
-    expect(screen.queryByRole('form')).toBeNull()
-    fireEvent.change(screen.getByLabelText('Sample account'), { target: { value: 'business-missing' } })
-    expect(screen.getByRole('heading', { name: 'Business profile needed' })).toBeTruthy()
-    expect(screen.queryByRole('form')).toBeNull()
-    fireEvent.change(screen.getByLabelText('Sample account'), { target: { value: 'business' } })
-    expect(screen.getByText(/Small-business campaign for Green Leaf Cafe/)).toBeTruthy()
-    expect(screen.getByRole('form', { name: 'Sample campaign form' })).toBeTruthy()
-    expect(localStorage.getItem('token')).toBe('existing-token')
-    expect(setItem).not.toHaveBeenCalled()
-    expect(removeItem).not.toHaveBeenCalled()
-    expect(fetch).not.toHaveBeenCalled()
+    expect(submitButton().disabled).toBe(true)
+    await readyForm()
+    fireEvent.change(screen.getByLabelText('Campaign title'), { target: { value: `  ${values.title}  ` } })
+    fireEvent.change(screen.getByLabelText(/Target audience/), { target: { value: '  Local residents  ' } })
+    fireEvent.click(submitButton())
+    expect(await screen.findByRole('heading', { name: 'Campaign submitted' })).toBeTruthy()
+    const [url, options] = fetch.mock.calls[1]
+    expect(url).toBe('/api/campaigns')
+    expect(options.method).toBe('POST')
+    expect(options.headers).toEqual({ Authorization: 'Bearer test-token', 'Content-Type': 'application/json' })
+    expect(JSON.parse(options.body)).toEqual({ ...values, categoryId: 7, targetAudience: 'Local residents' })
+    expect(screen.getByText(/saved as campaign #42/)).toBeTruthy()
+    expect(screen.getByText('Status: pending review. It is not publicly visible yet.')).toBeTruthy()
+    expect(document.activeElement).toBe(screen.getByRole('status'))
+    expect(document.querySelector('a[href="/campaigns/42"]')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Create another campaign' }))
+    expect(screen.getByLabelText('Campaign title').value).toBe('')
   })
 
-  it('shows required-field errors and focuses the first invalid field', () => {
-    const submitSample = vi.fn()
-    render(<CreateCampaignPage submitSample={submitSample} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Preview submission' }))
-    for (const message of ['Title is required.', 'Description is required.', 'Choose a category.', 'Start date is required.', 'End date is required.']) {
-      expect(screen.getByText(message, { selector: 'p' })).toBeTruthy()
+  it('omits an empty optional audience and blocks a second submit while the request is pending', async () => {
+    let resolvePost
+    fetch.mockReturnValueOnce(new Promise((resolve) => { resolvePost = resolve }))
+    render(<CreateCampaignPage />)
+    await readyForm()
+    fireEvent.submit(screen.getByRole('form'))
+    fireEvent.submit(screen.getByRole('form'))
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(JSON.parse(fetch.mock.calls[1][1].body)).not.toHaveProperty('targetAudience')
+    expect(screen.getByRole('button', { name: 'Submitting…' }).disabled).toBe(true)
+    expect(screen.getByLabelText('Campaign title').closest('fieldset').disabled).toBe(true)
+    await act(async () => { resolvePost(json(saved, 201)) })
+    expect(screen.getByRole('heading', { name: 'Campaign submitted' })).toBeTruthy()
+  })
+
+  it('shows required field errors and focuses the first invalid field without posting', async () => {
+    render(<CreateCampaignPage />)
+    await screen.findByRole('option', { name: 'Local action' })
+    fireEvent.click(submitButton())
+    for (const message of ['Title is required.', 'Description is required.', 'Choose an available category.', 'Start date is required.', 'End date is required.']) {
+      expect(screen.getByText(message)).toBeTruthy()
     }
     expect(document.activeElement).toBe(screen.getByLabelText('Campaign title'))
-    expect(submitSample).not.toHaveBeenCalled()
+    expect(fetch).toHaveBeenCalledTimes(1)
   })
 
-  it('rejects reversed dates while preserving the entered values', () => {
+  it('keeps entered text when category loading fails and can retry', async () => {
+    fetch.mockReset().mockRejectedValueOnce(new TypeError('Network down')).mockResolvedValueOnce(json({ categories }))
     render(<CreateCampaignPage />)
-    fillForm()
-    fireEvent.change(screen.getByLabelText('End date'), { target: { value: '2026-10-09' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Preview submission' }))
-    expect(screen.getByText('End date must be on or after the start date.')).toBeTruthy()
-    expect(screen.getByLabelText('Campaign title').value).toBe(validValues.title)
-    expect(document.activeElement).toBe(screen.getByLabelText('End date'))
-  })
-
-  it('validates impossible dates, unknown categories and field limits', () => {
-    expect(validateDraftCampaign({ ...validValues, startDate: '2026-02-30' }).startDate).toBe('Enter a valid start date.')
-    expect(validateDraftCampaign({ ...validValues, categoryId: '999' }).categoryId).toBeTruthy()
-    expect(validateDraftCampaign({ ...validValues, title: 'x'.repeat(151), description: 'x'.repeat(5001), targetAudience: 'x'.repeat(256) })).toMatchObject({
-      title: expect.any(String), description: expect.any(String), targetAudience: expect.any(String),
-    })
-    expect(validateDraftCampaign({ ...validValues, endDate: validValues.startDate })).toEqual({})
-  })
-
-  it.each(['image/jpeg', 'image/png', 'image/webp'])('allows a local %s preview', (type) => {
-    render(<CreateCampaignPage />)
-    choosePhoto(new File(['sample'], 'photo', { type }))
-    expect(screen.getByRole('img', { name: 'Selected campaign photo preview' }).getAttribute('src')).toBe('blob:first-photo')
-    expect(fetch).not.toHaveBeenCalled()
-  })
-
-  it('rejects unsupported, empty and oversized images with a precise 5 MB boundary', () => {
-    expect(maxImageBytes).toBe(5_000_000)
-    expect(validateDraftImage({ type: 'image/png', size: 5_000_000 })).toBe('')
-    expect(validateDraftImage({ type: 'image/png', size: 5_000_001 })).toMatch(/no larger than 5 MB/)
-    expect(validateDraftImage(new File([], 'empty.png', { type: 'image/png' }))).toMatch(/not empty/)
-    const submitSample = vi.fn()
-    render(<CreateCampaignPage submitSample={submitSample} />)
-    fillForm()
-    choosePhoto(new File(['gif'], 'photo.gif', { type: 'image/gif' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Preview submission' }))
-    expect(screen.getByText('Choose a JPEG, PNG or WebP image.')).toBeTruthy()
-    expect(URL.createObjectURL).not.toHaveBeenCalled()
-    expect(submitSample).not.toHaveBeenCalled()
-  })
-
-  it('releases object URLs on replacement, removal and unmount', () => {
-    const { unmount } = render(<CreateCampaignPage />)
-    choosePhoto(new File(['one'], 'one.png', { type: 'image/png' }))
-    choosePhoto(new File(['two'], 'two.png', { type: 'image/png' }))
-    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:first-photo')
-    fireEvent.click(screen.getByRole('button', { name: 'Remove photo' }))
-    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:next-photo')
-    expect(screen.queryByRole('img')).toBeNull()
-    choosePhoto(new File(['three'], 'three.png', { type: 'image/png' }))
-    unmount()
-    expect(URL.revokeObjectURL).toHaveBeenCalledTimes(3)
-  })
-
-  it('does not submit an image that the browser cannot preview', () => {
-    const submitSample = vi.fn()
-    render(<CreateCampaignPage submitSample={submitSample} />)
-    fillForm()
-    choosePhoto(new File(['bad'], 'broken.png', { type: 'image/png' }))
-    fireEvent.error(screen.getByRole('img'))
-    fireEvent.click(screen.getByRole('button', { name: 'Preview submission' }))
-    expect(screen.getByText('This image could not be previewed. Choose another file.')).toBeTruthy()
-    expect(submitSample).not.toHaveBeenCalled()
-  })
-
-  it('previews a pending result without requests, saved data or an invented image ID', async () => {
-    const submitSample = vi.fn().mockResolvedValue(sampleResult)
-    localStorage.setItem('token', 'existing-token')
-    const setItem = vi.spyOn(Storage.prototype, 'setItem')
-    const removeItem = vi.spyOn(Storage.prototype, 'removeItem')
-    render(<CreateCampaignPage submitSample={submitSample} />)
-    fillForm()
-    choosePhoto(new File(['sample'], 'photo.png', { type: 'image/png' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Preview submission' }))
-    expect(await screen.findByRole('heading', { name: 'Sample result: pending review' })).toBeTruthy()
-    expect(submitSample).toHaveBeenCalledWith({ title: validValues.title, description: validValues.description, categoryId: 3, startDate: validValues.startDate, endDate: validValues.endDate }, { sampleAccount: 'public', simulateError: false })
-    expect(screen.getByRole('status').textContent).toContain('No campaign was created')
-    expect(fetch).not.toHaveBeenCalled()
-    expect(setItem).not.toHaveBeenCalled()
-    expect(removeItem).not.toHaveBeenCalled()
-    expect(localStorage.getItem('token')).toBe('existing-token')
-  })
-
-  it('supports a sample error and a successful retry without making a request', async () => {
-    render(<CreateCampaignPage />)
-    fillForm()
-    fireEvent.click(screen.getByLabelText('Try a sample submission error'))
-    fireEvent.click(screen.getByRole('button', { name: 'Preview submission' }))
+    fireEvent.change(screen.getByLabelText('Campaign title'), { target: { value: values.title } })
     expect(await screen.findByRole('alert')).toBeTruthy()
-    expect(screen.getByLabelText('Campaign title').value).toBe(validValues.title)
-    fireEvent.click(screen.getByLabelText('Try a sample submission error'))
-    fireEvent.click(screen.getByRole('button', { name: 'Preview submission' }))
-    expect(await screen.findByRole('heading', { name: 'Sample result: pending review' })).toBeTruthy()
-    expect(fetch).not.toHaveBeenCalled()
+    expect(submitButton().disabled).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Retry categories' }))
+    await screen.findByRole('option', { name: 'Local action' })
+    expect(screen.getByLabelText('Campaign title').value).toBe(values.title)
+    expect(submitButton().disabled).toBe(false)
   })
 
-  it('shows sample field errors and allows correction', async () => {
-    const submitSample = vi.fn().mockRejectedValueOnce(Object.assign(new Error('Check the sample title.'), { fieldErrors: { title: 'Sample title needs checking.' } })).mockResolvedValue(sampleResult)
-    render(<CreateCampaignPage submitSample={submitSample} />)
-    fillForm()
-    fireEvent.click(screen.getByRole('button', { name: 'Preview submission' }))
-    expect(await screen.findByText('Sample title needs checking.')).toBeTruthy()
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Campaign title')))
-    fireEvent.change(screen.getByLabelText('Campaign title'), { target: { value: 'Garden Day revised' } })
-    expect(screen.queryByText('Sample title needs checking.')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Preview submission' }))
-    expect(await screen.findByRole('heading', { name: 'Sample result: pending review' })).toBeTruthy()
+  it('explains an empty category list and prevents posting until categories are available', async () => {
+    fetch.mockReset().mockResolvedValueOnce(json({ categories: [] })).mockResolvedValueOnce(json({ categories }))
+    render(<CreateCampaignPage />)
+    await screen.findByText('No categories are available yet. Please check again later.')
+    expect(submitButton().disabled).toBe(true)
+    fireEvent.submit(screen.getByRole('form'))
+    expect(fetch).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Retry categories' }))
+    await screen.findByRole('option', { name: 'Local action' })
+    expect(submitButton().disabled).toBe(false)
   })
 
-  it('ignores a second submission while the first sample is pending', async () => {
-    let resolveSubmission
-    const submitSample = vi.fn(() => new Promise((resolve) => { resolveSubmission = resolve }))
-    render(<CreateCampaignPage submitSample={submitSample} />)
-    fillForm()
-    fireEvent.submit(screen.getByRole('form'))
-    fireEvent.submit(screen.getByRole('form'))
-    expect(submitSample).toHaveBeenCalledTimes(1)
-    expect(screen.getByRole('group').disabled).toBe(true)
-    await act(async () => resolveSubmission(sampleResult))
-    expect(screen.getByRole('heading', { name: 'Sample result: pending review' })).toBeTruthy()
+  it.each([
+    [401, 'Your session has expired. Please log in again.'],
+    [403, 'Only public users can submit social-cause campaigns.'],
+    [500, 'The campaign could not be saved. Please try again.'],
+  ])('shows the server message for HTTP %s and preserves the form', async (status, message) => {
+    fetch.mockResolvedValueOnce(json({ code: 'REQUEST_FAILED', message }, status))
+    render(<CreateCampaignPage />)
+    await readyForm()
+    fireEvent.click(submitButton())
+    await screen.findByText(message)
+    expect(screen.queryByRole('heading', { name: 'Campaign submitted' })).toBeNull()
+    expect(screen.getByLabelText('Campaign title').value).toBe(values.title)
+    await waitFor(() => expect(submitButton().disabled).toBe(false))
+    expect(Boolean(screen.queryByRole('link', { name: 'Log in again' }))).toBe(status === 401)
+  })
+
+  it('shows and focuses server field errors, then allows a corrected submission', async () => {
+    fetch.mockResolvedValueOnce(json({ code: 'VALIDATION_ERROR', message: 'Please check the campaign details.', fieldErrors: { categoryId: 'This category is no longer available.' } }, 422))
+      .mockResolvedValueOnce(json(saved, 201))
+    render(<CreateCampaignPage />)
+    await readyForm()
+    fireEvent.click(submitButton())
+    await screen.findByText('This category is no longer available.')
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Category')))
+    fireEvent.change(screen.getByLabelText('Category'), { target: { value: '12' } })
+    fireEvent.click(submitButton())
+    await screen.findByRole('heading', { name: 'Campaign submitted' })
+    expect(JSON.parse(fetch.mock.calls[2][1].body).categoryId).toBe(12)
+  })
+
+  it('warns that a network failure does not prove the campaign was not saved', async () => {
+    fetch.mockRejectedValueOnce(new TypeError('Connection lost'))
+    render(<CreateCampaignPage />)
+    await readyForm()
+    fireEvent.click(submitButton())
+    await screen.findByText(/could not confirm whether your campaign was saved/)
+    expect(screen.queryByRole('heading', { name: 'Campaign submitted' })).toBeNull()
+    expect(screen.getByLabelText('Description').value).toBe(values.description)
+  })
+
+  it.each([
+    [201, {}],
+    [201, { campaign: { ...saved.campaign, id: '42' } }],
+    [201, { campaign: { ...saved.campaign, status: 'approved' } }],
+    [201, { campaign: { ...saved.campaign, title: '' } }],
+    [200, saved],
+  ])('does not claim success for an unexpected %s response: %j', async (status, body) => {
+    fetch.mockResolvedValueOnce(json(body, status))
+    render(<CreateCampaignPage />)
+    await readyForm()
+    fireEvent.click(submitButton())
+    await screen.findByText(/server did not confirm the saved campaign/)
+    expect(screen.queryByRole('heading', { name: 'Campaign submitted' })).toBeNull()
+    expect(screen.getByLabelText('Campaign title').value).toBe(values.title)
+  })
+
+  it('aborts a pending submission on unmount', async () => {
+    let resolvePost
+    fetch.mockReturnValueOnce(new Promise((resolve) => { resolvePost = resolve }))
+    const view = render(<CreateCampaignPage />)
+    await readyForm()
+    fireEvent.click(submitButton())
+    const signal = fetch.mock.calls[1][1].signal
+    view.unmount()
+    expect(signal.aborted).toBe(true)
+    await act(async () => { resolvePost(json(saved, 201)) })
+    expect(screen.queryByText('Campaign submitted')).toBeNull()
+  })
+
+  it('ignores a previous session response after the session changes', async () => {
+    let resolvePost
+    fetch.mockReturnValueOnce(new Promise((resolve) => { resolvePost = resolve }))
+      .mockResolvedValueOnce(json({ categories }))
+    const view = render(<CreateCampaignPage token="old-session" />)
+    await readyForm()
+    fireEvent.click(submitButton())
+    view.rerender(<CreateCampaignPage token="new-session" />)
+    await waitFor(() => expect(submitButton().disabled).toBe(false))
+    await act(async () => { resolvePost(json(saved, 201)) })
+    expect(screen.queryByText('Campaign submitted')).toBeNull()
+  })
+})
+
+describe('Campaign submission validation', () => {
+  it('accepts a real leap day and same-day campaigns', () => {
+    expect(validateCampaignSubmission({ ...values, startDate: '2028-02-29', endDate: '2028-02-29' }, categories)).toEqual({})
+  })
+
+  it.each(['2026-02-29', '2026-04-31', '0999-12-31', '10000-01-01', '2026-1-01'])('rejects invalid date %s', (startDate) => {
+    expect(validateCampaignSubmission({ ...values, startDate }, categories)).toHaveProperty('startDate')
+  })
+
+  it('checks lengths, category membership, and date order', () => {
+    expect(validateCampaignSubmission({ ...values, title: 'a'.repeat(151), description: 'a'.repeat(5001), targetAudience: 'a'.repeat(256), categoryId: '99', endDate: '2026-10-09' }, categories)).toEqual({
+      title: 'Use 150 characters or fewer.', description: 'Use 5,000 characters or fewer.',
+      targetAudience: 'Use 255 characters or fewer.', categoryId: 'Choose an available category.',
+      endDate: 'End date must be on or after the start date.',
+    })
+  })
+
+  it.each([{}, { categories: [{ id: '7', name: 'Local action' }] }, { categories: [{ id: 7, name: '' }] }, { categories: [categories[0], categories[0]] }])('rejects a malformed category response: %j', async (body) => {
+    fetch.mockReset().mockResolvedValueOnce(json(body))
+    await expect(loadCampaignCategories()).rejects.toMatchObject({ code: 'INVALID_RESPONSE' })
   })
 })

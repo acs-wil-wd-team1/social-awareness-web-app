@@ -110,6 +110,8 @@ a {
   align-items: center;
   justify-content: space-between;
   gap: 24px;
+  flex-wrap: wrap;
+  padding-block: 10px;
   margin-inline: auto;
 }
 
@@ -133,6 +135,7 @@ a {
 
 .site-header nav {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -451,6 +454,39 @@ a {
 
 .campaign-form-success p {
   margin: 0;
+}
+
+.campaign-category-state,
+.campaign-submission-error {
+  margin-block: 20px;
+}
+
+.campaign-submission-error {
+  color: var(--danger);
+}
+
+.campaign-secondary-button {
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-body);
+  cursor: pointer;
+}
+
+.campaign-secondary-button:focus-visible,
+.campaign-form-success:focus-visible {
+  outline: 3px solid var(--brand-primary);
+  outline-offset: 3px;
+}
+
+.campaign-submission-followup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin-top: 18px;
 }
 
 .homepage {

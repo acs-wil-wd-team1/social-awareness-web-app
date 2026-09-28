@@ -2,6 +2,8 @@
 
 **Status:** Proposed for Stage 3. These rules are not a claim that every current route already implements them.
 
+The new public-user submission in this branch has its implemented request and error rules in the [campaign contract](campaign-posting-contract.md). In particular, its oversized JSON body uses `413 REQUEST_TOO_LARGE`; the image-upload codes below are still proposals.
+
 ## Requests and permissions
 
 - Base path: `/api`.
