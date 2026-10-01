@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run --config vitest.config.js"
+    "test": "vitest run --config vitest.config.js",
+    "test:real-backend": "node ../infra/test-real-backend.mjs"
   },
   "dependencies": {
     "react": "19.2.8",

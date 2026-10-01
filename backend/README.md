@@ -1,42 +1,14 @@
-# Backend
+# CauseConnect backend
 
-Owner lane: Database Developer
-
-This area is reserved for the team's Node.js, Express and MySQL implementation. Unice's frontend work will not create or claim the backend implementation.
-
-Before development begins, the Database Developers and Developer/Programmers should review and sign `docs/api/api-contract.md`.
-
-Backend documentation should include:
-
-- local setup and start commands
-- required environment-variable names using `.env.example`
-- schema and migration instructions
-- endpoint implementation notes
-- validation and authentication decisions
-- tests and evidence
-- Stage 3 process/deployment requirements
-
-Never commit real database passwords, tokens or private keys.
-
-# Backend Setup
-
-Current dependencies
-
-- Express
-- Sequelize
-- MySQL2
-- dotenv
-- bcrypt
-- jsonwebtoken
-- cors
+Node.js, Express, Sequelize and MySQL. This branch adds category lookup and text-only campaign submission for active public users alongside the existing authentication and campaign reads.
 
 ## Prerequisites
 
-- Node.js (v22 or later)
-- MySQL
+- Node.js 22.12+ and npm
+- MySQL 8
 - Git
 
-## Initial Setup
+## Initial setup
 
 ```bash
 git pull
@@ -44,36 +16,27 @@ cd backend
 npm install
 ```
 
-## Create your environment file
+## Environment file
 
-Copy:
+If you do not already have a local `.env`, copy the example:
 
 ```bash
 cp .env.example .env
 ```
 
-Update the values in `.env` with your local database configuration.
+Update the values with your local database configuration. Never commit database passwords, tokens or private keys.
 
 ## Running the database locally
 
-A `docker-compose.yml` in this folder runs MySQL 8 for local development
-(not used for Stage 3 deployment — see `infra/`).
+The `docker-compose.yml` in this folder runs MySQL 8 for local development, not Stage 3 deployment. An existing local MySQL Server works too.
 
 ```bash
 docker compose up -d
 ```
 
-This reads `DB_NAME`, `DB_NAME_TEST`, `DB_USER`, `DB_PORT` and `DB_PASSWORD`
-from your `.env`, and on first boot creates both the `CauseConnect` and
-`CauseConnect_test` databases. Data persists in a named volume across
-restarts. To wipe it and start over:
+This reads `DB_NAME`, `DB_NAME_TEST`, `DB_USER`, `DB_PORT` and `DB_PASSWORD` from `.env`. On first initialization it creates the configured databases. Data persists in a named volume across restarts.
 
-```bash
-docker compose down -v
-```
-
-Check the container is healthy before running migrations or starting the
-server:
+Check the container is healthy before running migrations or starting the server:
 
 ```bash
 docker compose ps
@@ -84,3 +47,16 @@ docker compose ps
 ```bash
 npm run dev
 ```
+
+## Tests
+
+```sh
+npm test
+npm run test:integration
+```
+
+Unit tests do not need MySQL. The integration suite requires an already-migrated, separate local test database: set `RUN_DB_INTEGRATION=1`, `NODE_ENV=test`, a local `DB_HOST`, and `DB_NAME_TEST` ending in `_test` and different from `DB_NAME`. It also needs your local database credentials and `JWT_SECRET`. It creates and removes only its own test records; do not point it at a shared or production database.
+
+## Campaign submission
+
+The [campaign submission contract](../docs/api/campaign-posting-contract.md) lists the endpoints, validation rules and API-to-database field mapping. This flow uses the existing tables and needs no new migration. Images, business posting and admin approval writes are separate work.

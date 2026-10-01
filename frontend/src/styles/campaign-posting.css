@@ -1,0 +1,11 @@
+.campaign-photo-preview { display: flex; align-items: center; gap: 1rem; padding: 1rem; border: 1px solid var(--color-border, #d5dce4); border-radius: 12px; }
+.campaign-photo-preview img { width: 140px; height: 100px; object-fit: cover; border-radius: 8px; }
+.campaign-photo-preview p { margin: 0 0 .5rem; overflow-wrap: anywhere; }
+.campaign-photo-preview > div { min-width: 0; }
+.campaign-photo-field input[type='file'] { max-width: 100%; padding: .65rem; }
+.campaign-posting-context { border-left: 3px solid var(--color-primary, #2563eb); padding: .75rem 1rem; background: #f1f6ff; border-radius: 0 8px 8px 0; margin-bottom: 1.5rem; }
+.campaign-posting-context p { margin: 0 0 .4rem; }
+.campaign-profile-state { padding: 1rem 0; }
+.campaign-submission-error p { overflow-wrap: anywhere; }
+.business-profile-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
+@media (max-width: 540px) { .campaign-photo-preview { align-items: flex-start; flex-direction: column; } .campaign-photo-preview img { width: 100%; height: 180px; } }

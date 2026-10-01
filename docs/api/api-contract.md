@@ -1,171 +1,71 @@
-# API contract — frontend and backend
+# CauseConnect API reference and proposals
 
-**Status:** Draft — not agreed
+This index separates implemented backend routes from the Stage 3 contracts already consumed by the frontend. Branch implementation does not mean the changes have been merged into `main`. Start with the [Kim/Raj implementation handoff](../handoff/stage3-api-handoff.md).
 
-**Reviewers:** Developer/Programmer and Database Developer roles
-
-This document records the expected communication between the frontend and backend. It must not be marked agreed until the relevant roles review the decisions below.
-
-Base path: to be agreed
-
-Request and response format: JSON unless a successful response has no body
-
-Timestamps: ISO 8601 UTC
-
-## Decisions to agree
-
-| Decision | Status |
+| Document | Status and purpose |
 |---|---|
-| Bearer token or HttpOnly cookie | Open — blocks final authentication persistence |
-| Whether registration automatically logs the user in | Open |
-| Identifier format: integer or UUID string | Open |
-| `createdBy`: identifier or public summary object | Open |
-| Session lifetime and logout invalidation | Open |
-| API base path and versioning | Open |
-| Allowed frontend origin and credential/CORS behaviour | Open |
-| Campaign category values and field limits | Open |
-| User response fields and role values | Open |
+| [Current authentication](current-authentication.md) | Implemented registration, login and logout requests and responses |
+| [Shared conventions](shared-conventions.md) | Proposed Stage 3 identifiers, permissions and error handling |
+| [Campaign submission](campaign-posting-contract.md) | Category lookup and real text-only public-user submission in this branch |
+| [Business posting and images](campaign-posting-future-proposal.md) | Frontend implemented; backend upload/business creation extension pending |
+| [Business profile](business-profile-contract.md) | Frontend implemented; proposed profile getter/upsert on existing Business table |
+| [Campaign reads and owner submissions](campaign-read-contract.md) | Existing read compatibility, proposed owner route and expanded campaign/review fields |
+| [Admin moderation](admin-campaign-moderation-contract.md) | Admin frontend implemented; existing admin reads and proposed transactional approval/rejection |
+| [Owner campaign management](owned-campaign-management-contract.md) | Frontend implemented; proposed owner detail/edit/resubmit/soft-delete with version checks |
+| [Participation and business enquiries](engagement-contract.md) | Frontend implemented; proposed participation, enquiry submission and owner inbox APIs |
+| [Admin management](admin-management-contract.md) | Frontend implemented; proposed account status, review history, unpublish and soft-delete APIs |
+| [Postman requests](postman/README.md) | Importable requests and response assertions; use only with an isolated local test database |
 
-The authentication mechanism changes Redux state, browser persistence, request credentials, CSRF handling and logout behaviour. A mock implementation must follow the agreed decision rather than silently choosing the production security model.
+The [real-backend regression runner](../../infra/real-backend-testing.md) checks existing frontend pages/services against Express and disposable MySQL. It does not certify endpoints that have not been implemented.
 
-## Error contracts
+## Existing routes on the reviewed main baseline (`0146365c`)
 
-### `ApiErrorResponse`
-
-The backend returns this shape for every non-success response:
-
-```json
-{
-  "status": 401,
-  "code": "INVALID_CREDENTIALS",
-  "message": "Email or password is incorrect",
-  "fieldErrors": null
-}
-```
-
-`fieldErrors` is `null` or an object keyed by form field. Error responses use `Content-Type: application/json`.
-
-### `AppError`
-
-The frontend normalises API errors and failures for which no server response exists into its application error shape.
-
-| Code | Status | Meaning |
-|---|---:|---|
-| `NETWORK_ERROR` | 0 | The request did not reach the server |
-| `TIMEOUT` | 0 | The request exceeded the client timeout |
-| `ABORTED` | 0 | The request was cancelled |
-| `INVALID_RESPONSE` | 0 | The response could not be handled as agreed |
-
-The backend implements `ApiErrorResponse`; the frontend owns `AppError` normalisation.
-
-## Registration
-
-`POST /api/auth/register`
-
-Request:
-
-```json
-{
-  "name": "Jane Doe",
-  "email": "jane@example.com",
-  "password": "example only",
-  "accountType": "user"
-}
-```
-
-Accepted fields are exactly `name`, `email`, `password` and `accountType`. `accountType` is `user` or `business`.
-
-Any request containing `role`, `admin`, `isAdmin` or another privilege field is rejected with `422`. Administrator privilege is assigned only through an authorised server-side process.
-
-Responses:
-
-- `201` — account created; response shape depends on the auto-login and authentication decisions
-- `409` — `EMAIL_EXISTS`, with an `email` field error
-- `422` — `VALIDATION_FAILED`, with relevant field errors
-
-## Login
-
-`POST /api/auth/login`
-
-Request:
-
-```json
-{
-  "email": "jane@example.com",
-  "password": "example only"
-}
-```
-
-Responses:
-
-- `200` — authenticated user and the agreed session representation
-- `401` — `INVALID_CREDENTIALS`
-- `422` — `VALIDATION_FAILED`
-
-If the team retains `401`, HTTP semantics require a `WWW-Authenticate` challenge. A Bearer-token API would normally use `WWW-Authenticate: Bearer realm="api"`. If the team selects cookie sessions and does not use HTTP challenge semantics for login, it should agree on a different failure status and document that choice before implementation.
-
-## Logout
-
-`POST /api/auth/logout`
-
-Authentication headers, cookies and CSRF requirements depend on the agreed authentication mechanism.
-
-- `204` — session invalidated; no response body
-
-## List campaigns
-
-`GET /api/campaigns`
-
-Query parameters:
-
-- `page`, default `1`
-- `pageSize`, default `20`, maximum `100`
-- `search`, matched case-insensitively against title and description
-- `category`, using the category values still to be agreed
-
-Response:
-
-```json
-
-```
-
-Campaign fields:
-
-```text
-id, title, description, category, type, imageUrl,
-createdBy, status, createdAt
-```
-
-Rules:
-
-- `type` is `cause` or `business`.
-- Guests receive approved campaigns only.
-- Results are sorted by `createdAt` descending and then `id` descending.
-- A page beyond the end returns `200` with an empty `items` array.
-- Invalid recognised query values return `422`; unknown query parameters are ignored.
-
-## Get one campaign
-
-`GET /api/campaigns/:id`
-
-- `200` — `{ "campaign": { ... } }`
-- `404` — `NOT_FOUND`
-
-An unauthenticated request for a pending or rejected campaign returns `404` so the endpoint does not reveal that a hidden record exists.
-
-## Rules applying everywhere
-
-1. Passwords never appear in responses or logs.
-2. Emails are trimmed and lower-cased before uniqueness checks.
-3. Timestamps use ISO 8601 UTC, for example `2026-09-20T04:00:00Z`.
-4. Every server error uses `ApiErrorResponse`.
-5. Field limits and category values must be recorded here once agreed.
-
-## Agreement record
-
-| Team member | Role | Agreed | Date |
+| Method | Endpoint | Access | Successful response |
 |---|---|---|---|
-| Unice Bondoc | Developer/Programmer | ☐ | |
-| Sanjay | Developer/Programmer | ☐ | |
-| Rajitha Harshana | Database Developer | ☐ | |
-| Kim Lengen Nieto Gesite | Database Developer | ☐ | |
+| `POST` | `/api/auth/register` | Guest | `201` with message and user |
+| `POST` | `/api/auth/login` | Guest | `200` with user and token |
+| `PUT` | `/api/auth/logout` | Authenticated user | `204`, no body |
+| `GET` | `/api/campaigns` | Public; approved only | `200` with `campaigns`, `page`, `pageSize` |
+| `GET` | `/api/campaigns/:id` | Public; approved only | `200` with the campaign object |
+| `GET` | `/api/campaigns/admin` | Admin | `200` with `campaigns`, `page`, `pageSize` |
+| `GET` | `/api/campaigns/admin/:id` | Admin | `200` with the campaign object |
+
+## Added in this branch
+
+| Method | Endpoint | Access | Successful response |
+|---|---|---|---|
+| `GET` | `/api/campaigns/categories` | Public | `200` with `categories: [{ id, name }]` |
+| `POST` | `/api/campaigns` | Active authenticated account with current `public` role | `201` with a saved pending `campaign` |
+
+The frontend `/campaigns/new` uses both routes. Text-only public requests can save through this branch's API and database. The optional image field requires the proposed upload/attachment extension.
+
+## Backend work needed for the completed Stage 3 frontend
+
+| Method | Endpoint | Required backend work |
+|---|---|---|
+| `GET`, `PUT` | `/api/business/me` | Current owner's Business row or `null`; safe create/update |
+| `POST` | `/api/campaign-images` | Private image upload, ownership, expiry and opaque reference |
+| `POST` | `/api/campaigns` | Extend existing route for optional `imageId` and current `business_owner` |
+| `GET` | `/api/campaigns/mine` | Own submissions, pagination, status and latest review feedback |
+| `GET`, `PATCH`, `DELETE` | `/api/campaigns/mine/:id` | Owner-only detail/edit/resubmit/soft-delete with `expectedUpdatedAt` on writes |
+| `GET` | Existing public/admin campaign routes | Add type/category ID, business, date/audience and appropriate image delivery fields |
+| `PATCH` | `/api/campaigns/admin/:id/status` | Transactional pending → approved/rejected, expected-version check and matching review record |
+| `GET`, `PUT` | `/api/campaigns/:id/participation` | Current user's join/withdraw/rejoin state for approved cause campaigns |
+| `GET` | `/api/participations/mine` | Current user's participation history |
+| `POST` | `/api/campaigns/:id/enquiries` | Contact enquiry for an approved business campaign |
+| `GET` | `/api/business/me/enquiries` | Private inbox scoped to the signed-in business owner |
+| `GET` | `/api/admin/users` | Admin-only safe account list/search/filter |
+| `PATCH` | `/api/admin/users/:id/status` | Suspend/reactivate non-admin accounts; revoke suspended users' sessions |
+| `GET` | `/api/campaigns/admin/:id/reviews` | Paginated approval/rejection history |
+| `PATCH` | `/api/campaigns/admin/:id/publication` | Approved → pending, with expected-version check, required reason and audit record |
+| `DELETE` | `/api/campaigns/admin/:id` | Recoverable soft deletion, with expected-version check, required reason and audit record |
+
+These endpoint implementations remain pending in the checked-out backend. The frontend pages and sample preview exercise their intended contract. Account role changes/admin promotion, account deletion and a full CRM are not included.
+
+Public campaign list/detail and My campaigns use their read endpoints for visible/online polling every 30 seconds, plus refresh on focus/reconnection. No WebSocket or separate push API is required by this implementation. Reads must reflect current status/ownership, exclude soft-deleted campaigns and avoid caching private responses publicly.
+
+## Frontend preview
+
+`VITE_DEMO_MODE=true` runs the full frontend journey with explicitly labelled sample accounts and browser data. It does not call a deployed backend or prove database, storage, authentication or permission enforcement. With demo mode disabled, the same pages call the API contracts above. The old `/draft/campaigns/new` development prototype is only a separate historical form preview.
+
+Keep existing callers compatible while reviewing the proposals. Update each accepted contract with its implementation and tests; document any schema changes through migrations.

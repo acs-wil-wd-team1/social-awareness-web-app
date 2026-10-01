@@ -2,6 +2,28 @@
 
 const { getCampaigns, campaignById  } = require("../services/campaignServices");
 const { apiErrorResponse } = require("../utils/apiErrorResponse");
+const { Campaign, Category } = require("../database/models");
+const { createCampaignSubmissionService } = require("../services/campaignSubmission");
+const submissionService = createCampaignSubmissionService({ Campaign, Category });
+
+const getCampaignCategories = async (req, res) => {
+  try {
+    return res.status(200).json(await submissionService.listCategories());
+  } catch {
+    return apiErrorResponse(res, 500, "INTERNAL_SERVER_ERROR", "Something went wrong", null);
+  }
+};
+
+const submitCampaign = async (req, res) => {
+  try {
+    return res.status(201).json(await submissionService.submit(req.body, req.user));
+  } catch (err) {
+    if (err.status === 422 && err.code === "VALIDATION_FAILED") {
+      return apiErrorResponse(res, 422, err.code, err.message, err.fieldErrors);
+    }
+    return apiErrorResponse(res, 500, "INTERNAL_SERVER_ERROR", "Something went wrong", null);
+  }
+};
 
 const getPublicCampaigns = async (req, res) => {
   try {
@@ -101,6 +123,8 @@ const getAdminCampaignById = async (req, res) => {
 };
 
 module.exports = {
+  getCampaignCategories,
+  submitCampaign,
   getPublicCampaigns,
   getPublicCampaignById,
   getAdminCampaigns,

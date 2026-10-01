@@ -1,0 +1,46 @@
+.admin-action-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  background: rgb(15 23 42 / 65%);
+}
+
+.admin-action-dialog {
+  width: min(100%, 560px);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  padding: clamp(20px, 4vw, 32px);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text-body);
+  box-shadow: 0 24px 80px rgb(0 0 0 / 25%);
+}
+
+.admin-action-dialog h2 { margin-top: 0; }
+.admin-action-dialog .campaign-management__actions { margin-top: 24px; }
+.admin-action-dialog label { display: block; font-weight: 650; margin: 16px 0 6px; }
+.admin-action-dialog textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 100px;
+  padding: 10px 12px;
+  border: 1px solid #9ca3af;
+  border-radius: 8px;
+  font: inherit;
+}
+
+.account-status { padding: 5px 12px; border-radius: 999px; font-size: 0.8rem; font-weight: 750; text-transform: capitalize; }
+.account-status--active { background: #dcfce7; color: #166534; }
+.account-status--suspended { background: #fee2e2; color: #991b1b; }
+.admin-user-email { overflow-wrap: anywhere; }
+.admin-content-actions { border-top: 1px solid var(--border); margin-top: 24px; padding-top: 20px; }
+.campaign-management .admin-danger-button { background: #b91c1c; }
+.campaign-management .admin-danger-button:hover:not(:disabled) { background: #991b1b; }
+.campaign-review-history { margin-top: 28px; }
+.campaign-review-history ol { list-style: none; padding: 0; }
+.campaign-review-history li { padding: 16px 0; border-top: 1px solid var(--border); }
+.campaign-review-history__comments { white-space: pre-wrap; overflow-wrap: anywhere; }
