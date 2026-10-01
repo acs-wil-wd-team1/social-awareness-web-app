@@ -27,3 +27,21 @@ The opt-in files use `.real-backend.jsx`, not `.test.jsx`, so ordinary `npm test
 If interrupted with a force-kill or the Docker engine stops, automatic cleanup may not finish. Check the exact `causeconnect-regression-<run-id>` name printed by that run and its `causeconnect.regression.run` label before removing that specific test container. Do not delete Docker volumes, images or other containers in bulk.
 
 Verified on 1 October 2026: 9 migrations, 10 backend unit checks, 7 backend HTTP/MySQL checks and 9 real frontend/API/database checks passed. The disposable container was removed. This result covers the existing implemented endpoints, not the unfinished Stage 3 backend.
+
+## Browser checks with an isolated database
+
+From `frontend`, run this in a terminal:
+
+```sh
+npm run test:real-backend -- --browser
+```
+
+This uses the same local-only Docker checks, empty temporary database and repository migrations. It starts the real Express application and a separate Vite server on unused loopback ports. Vite ignores project `.env` files, disables sample mode, and proxies `/api` to this run's Express server. Your usual development servers stay untouched.
+
+The terminal prints the frontend address and fresh local-only public, business-owner and admin logins. It also creates one approved and one pending campaign. Open the printed address in a browser to check registration, login, public campaign reading, text-only campaign submission, permissions and logout. The browser mode does not run the automated suites; run the original command separately for those results.
+
+Type `inspect` in that terminal for database evidence: user IDs/roles/statuses, whether passwords are hashed, campaign titles/owners/statuses and session states. It never prints password hashes, session tokens or database credentials. These records belong only to this run's disposable database. No arbitrary database or API arguments are accepted.
+
+Press **Ctrl+C** when finished. The runner closes its Vite and Express servers and removes only its own labelled test container. Each cleanup step is attempted even if another fails; any failures are printed and exit unsuccessfully. A container is never removed if its ownership label cannot be verified. Browser data remains in that browser origin until cleared. Do not reuse these disposable credentials for any real account.
+
+This is a same-origin browser check through a local proxy. It does not validate cross-origin cloud CORS configuration or AWS deployment. Missing Stage 3 endpoints are not simulated here: business/profile/image/owner/moderation/participation/enquiry/user-management calls will still need the actual implementation before their complete browser journeys can pass.

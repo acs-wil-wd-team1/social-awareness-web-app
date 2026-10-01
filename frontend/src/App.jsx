@@ -72,7 +72,8 @@ export default function App({ pathname = window.location.pathname }) {
         </nav>
       </div>
     </header>
-    <main id="main-content" key={token || 'guest'}>
+    {/* Logout must retain its in-memory revocation token after clearing browser storage. */}
+    <main id="main-content" key={route.name === 'logout' ? 'logout' : token || 'guest'}>
       {route.name === 'home' ? <HomePage /> : null}
       {route.name === 'campaign-details' ? <CampaignDetailsPage {...sessionProps} campaignId={route.campaignId} /> : null}
       {route.name === 'register' ? <RegistrationPage /> : null}

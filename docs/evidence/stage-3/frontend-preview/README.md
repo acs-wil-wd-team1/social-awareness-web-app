@@ -114,3 +114,50 @@ The [Postman collection](../../../api/postman/README.md) provides 41 ready-made 
 Updated local packages: `infra/dist/causeconnect-demo-RHq6MN` and `infra/dist/causeconnect-live-ht3XN8`. Demo archive SHA-256: `b89636804f789c6ff767958d83885e11942229eff60978543f5209c7fdb6a2d1`. Live archive SHA-256: `7a86f5a0dbeea04aba16f25a907ebda303a338f0e5257753e48e8261bf1ff9e1`. These are local artifacts, not uploaded releases.
 
 These changes do not modify backend application code or deploy a new AWS build. The hosted URL above still serves the earlier sample package. Missing Stage 3 APIs, real browser integration and the final cloud release remain open; rerun the relevant checks against the implemented endpoints before accepting each flow.
+
+## Browser and failure-path pass — 1 October 2026
+
+This pass used `e77a66a` plus the local fixes below. No commit, push, merge or AWS deployment was made during this pass.
+
+### Fixes
+
+Regression cases reproduced these problems before the fixes:
+
+- The app shell could remount logout after a session refresh and report completion while server revocation was still pending or had failed. Logout now keeps its in-memory revocation token and retry state; session subscriptions also catch a child's initial sign-out.
+- A cancelled or timed-out response body could look like invalid JSON. Cancellation now retains its actual error classification.
+- A content-change event arriving during a read could be lost. The old result is discarded and one fresh read follows.
+- Blocked browser storage could interrupt logout, and a partially saved login could pair a new token with old account details. Storage failures now have explicit recovery paths.
+- After a rejected image upload, choosing the same file could fail to trigger a new selection. The native picker resets without losing the selected preview.
+- Malformed moderation responses could pass unexpected fields or non-text review comments into the UI. The service validates comments and returns only the documented campaign status fields.
+
+The full frontend suite passed **508 tests in 29 files**. Demo and live production builds passed, both ZIP archives passed integrity checks, four routing tests passed, and the Postman collection passed its 14 offline checks. These are separate from the browser/database evidence below.
+
+A fresh automated real-backend run after the fixes also passed: **10 backend unit, 7 HTTP/MySQL and 9 frontend/Express/MySQL checks**. Its disposable container was removed.
+
+### Real browser, Express and MySQL
+
+The runner's new `--browser` mode started actual Vite and Express servers against a fresh disposable MySQL database, with nine migrations and sample mode disabled. The browser called the same-origin Vite proxy; no existing project database was used.
+
+The Codex in-app browser verified:
+
+- Registration required fields and password mismatch; saved registration with a hashed password; duplicate-email rejection without a second user row.
+- Invalid-password rejection, successful login and authenticated navigation after refresh.
+- Campaign required fields and reversed-date rejection; a text-only campaign saved through the form as pending, with its actual owner ID in MySQL.
+- Approved public listing, pending campaign hidden from the public detail route, ordinary-user denial of admin access, and the real admin queue showing pending records.
+- Signing into a business account in a second tab cleared the first tab's admin queue and access immediately.
+- Real logout after a retry marked the database session expired. Final readback showed all three explicitly logged-out accounts expired; the admin session remained active after being replaced by another account, which was not tested as a server revocation operation.
+- Missing image/profile APIs produced visible errors rather than false success. An upload timeout retained the form and allowed retry.
+
+Two recovery checks deliberately substituted responses in the browser: a logout `503`, followed by a retry against the real backend; and an image-upload `422`, followed by selecting the identical file and clearing the error. These prove frontend recovery only, not implementation of an image API. No photo-test campaign was saved. Date values were entered through the native input setter because the automation's date fill did not populate them; physical calendar-picker interaction remains unverified.
+
+Final database readback contained four users with hashed passwords and three campaigns: the initial approved/pending fixtures plus the browser-submitted pending campaign. Both temporary browser tabs were closed. No application warnings or errors were returned by the browser log query; expected rejected API responses were checked separately.
+
+The test runner itself had a cleanup defect: a failed server shutdown could skip container removal. Cleanup now attempts each resource independently, retains the exact container ID/ownership-label guard and reports errors. Seven focused fault-injection checks passed, with an independent read-only recheck. The original browser fixture needed explicit removal after verifying its full ID and run label; other container IDs were unchanged. A fresh browser fixture then started and stopped successfully with Ctrl+C, including automatic removal. No regression fixture remains.
+
+![Campaign saved through the real browser and API](real-api-campaign-submitted.jpg)
+
+### Scope still open
+
+Business/profile/image/owner/engagement/moderation-write/account-management endpoints still need real implementation and browser/database acceptance. Same-origin local tests do not certify cloud CORS, AWS routing, cross-browser behaviour or the final deployment. This is evidence for the checked flows, not a zero-bug guarantee.
+
+New local packages: `infra/dist/causeconnect-demo-0J1huK` and `infra/dist/causeconnect-live-sdrugE`. SHA-256: demo `3c7c6dbe5a9e62290fbd7943cde1893ba28a6f7c11ca40dfc46bdb1624205d6e`; live `798e7647de0ad9d5db51881e3e87b71e5c7ed7f4f98893383d014749cecd62df`. Neither package was uploaded.

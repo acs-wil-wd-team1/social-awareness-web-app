@@ -30,4 +30,24 @@ describe('Campaign photo input', () => {
     URL.createObjectURL = previousCreate
     URL.revokeObjectURL = previousRevoke
   })
+
+  it('clears the native selection after a server image error so the same photo can be selected again', () => {
+    const file = new File(['photo'], 'garden.png', { type: 'image/png' })
+    const onChange = vi.fn()
+    const onError = vi.fn()
+    const view = render(<CampaignImageInput file={file} onChange={onChange} onError={onError} />)
+    const input = screen.getByLabelText(/Campaign photo/)
+    const setValue = vi.spyOn(input, 'value', 'set')
+
+    view.rerender(<CampaignImageInput file={file} onChange={onChange} onError={onError} error="The upload expired. Choose the photo again." />)
+
+    // A browser suppresses change when a file input still holds the same file.
+    // Clearing only its native value allows a repeat selection without discarding the preview.
+    expect(setValue).toHaveBeenCalledWith('')
+    expect(screen.getByText('garden.png')).toBeTruthy()
+    expect(onChange).not.toHaveBeenCalled()
+    fireEvent.change(input, { target: { files: [file] } })
+    expect(onChange).toHaveBeenCalledWith(file)
+    expect(onError).toHaveBeenCalledWith('')
+  })
 })

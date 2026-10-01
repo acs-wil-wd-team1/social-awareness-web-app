@@ -23,16 +23,22 @@ export function getSession() {
 }
 
 export function storeSession(token, user) {
-  localStorage.setItem('token', token)
-  if (user) localStorage.setItem('causeconnect.user', JSON.stringify({ id: user.id, name: user.name, role: user.role }))
-  else localStorage.removeItem('causeconnect.user')
+  try {
+    localStorage.setItem('token', token)
+    if (user) localStorage.setItem('causeconnect.user', JSON.stringify({ id: user.id, name: user.name, role: user.role }))
+    else localStorage.removeItem('causeconnect.user')
+  } catch {
+    // Never leave a new token paired with the previous account's saved details.
+    clearSession()
+    throw new Error('Your browser could not save the login. Allow site storage and try again.')
+  }
   window.dispatchEvent(new Event(changeEvent))
 }
 
 export function clearSession() {
-  localStorage.removeItem('token')
-  localStorage.removeItem('causeconnect.user')
-  localStorage.removeItem('isLoggedIn')
+  for (const key of ['token', 'causeconnect.user', 'isLoggedIn']) {
+    try { localStorage.removeItem(key) } catch { /* Storage may have become blocked since login. */ }
+  }
   window.dispatchEvent(new Event(changeEvent))
 }
 
@@ -41,11 +47,13 @@ export function useSession() {
   useEffect(() => {
     const update = () => setSession(getSession())
     const unauthorized = (event) => {
-      if (event.detail?.token === localStorage.getItem('token')) clearSession()
+      if (event.detail?.token && event.detail.token === getSession().token) clearSession()
     }
     window.addEventListener(changeEvent, update)
     window.addEventListener('storage', update)
     window.addEventListener('causeconnect:unauthorized', unauthorized)
+    // A child effect can sign out before this subscription is installed.
+    update()
     const interval = setInterval(update, 30000)
     return () => {
       window.removeEventListener(changeEvent, update)

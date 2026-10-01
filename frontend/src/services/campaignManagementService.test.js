@@ -75,6 +75,27 @@ describe('campaign management API requests', () => {
     await expect(reviewCampaign(12, { status: 'approved', expectedUpdatedAt: version }, { token: 'a' })).rejects.toMatchObject({ code: 'INVALID_RESPONSE' })
   })
 
+  it.each([{ message: 'Approved' }, ['Approved'], 12])('rejects non-text approval comments before they can reach the screen: %j', async (comments) => {
+    respond({ campaign: { id: 12, status: 'approved', updatedAt: nextVersion },
+      review: { id: 4, campaignId: 12, adminId: 1, action: 'approved', comments, reviewedAt: nextVersion } })
+    await expect(reviewCampaign(12, { status: 'approved', expectedUpdatedAt: version }, { token: 'a' })).rejects.toMatchObject({ code: 'INVALID_RESPONSE' })
+  })
+
+  it('uses only the documented status fields from a moderation response', async () => {
+    const review = { id: 4, campaignId: 12, adminId: 1, action: 'approved', comments: null, reviewedAt: nextVersion }
+    respond({ campaign: { id: 12, status: 'approved', updatedAt: nextVersion, title: { invalid: 'Do not render this' }, description: null }, review })
+    await expect(reviewCampaign(12, { status: 'approved', expectedUpdatedAt: version }, { token: 'a' })).resolves.toEqual({
+      campaign: { id: 12, status: 'approved', updatedAt: nextVersion }, review,
+    })
+  })
+
+  it('uses only the documented status fields from an unpublish response', async () => {
+    respond({ campaign: { id: 12, status: 'pending', updatedAt: nextVersion, title: { invalid: 'Do not render this' }, review: { comments: { invalid: true } } } })
+    await expect(unpublishCampaign(12, 'Check the content.', { token: 'a', expectedUpdatedAt: version })).resolves.toEqual({
+      id: 12, status: 'pending', updatedAt: nextVersion,
+    })
+  })
+
   it('preserves conflict errors for the review page to reload', async () => {
     respond({ code: 'CAMPAIGN_ALREADY_REVIEWED', message: 'Already reviewed' }, 409)
     await expect(reviewCampaign(12, { status: 'approved', expectedUpdatedAt: version }, { token: 'a' })).rejects.toMatchObject({ status: 409, code: 'CAMPAIGN_ALREADY_REVIEWED' })

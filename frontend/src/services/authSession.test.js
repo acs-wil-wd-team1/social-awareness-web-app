@@ -1,4 +1,5 @@
 import { act, cleanup, renderHook } from '@testing-library/react'
+import { useLayoutEffect } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearSession, getSession, safeReturnPath, storeSession, useSession } from './authSession.js'
 
@@ -68,6 +69,42 @@ describe('browser sessions', () => {
       window.dispatchEvent(new StorageEvent('storage', { key: 'token', newValue: token }))
     })
     expect(result.current.token).toBe(token)
+  })
+
+  it('rechecks a session changed before the subscription effect was installed', () => {
+    storeSession(token, { id: 7, role: 'public' })
+    const { result } = renderHook(() => {
+      const session = useSession()
+      useLayoutEffect(() => clearSession(), [])
+      return session
+    })
+    expect(result.current).toEqual({ token: null, user: null })
+  })
+
+  it('does not throw during logout or unauthorized handling when browser storage becomes blocked', () => {
+    storeSession(token, { id: 7, role: 'public' })
+    const { result } = renderHook(() => useSession())
+    const blocked = () => { throw new DOMException('Access denied', 'SecurityError') }
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(blocked)
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(blocked)
+    expect(() => act(() => clearSession())).not.toThrow()
+    expect(result.current).toEqual({ token: null, user: null })
+    expect(() => act(() => window.dispatchEvent(new CustomEvent('causeconnect:unauthorized', { detail: { token } })))).not.toThrow()
+  })
+
+  it('does not retain a half-written login when saving the user fails', () => {
+    storeSession(token, { id: 7, name: 'Earlier user', role: 'public' })
+    const { result } = renderHook(() => useSession())
+    const setItem = Storage.prototype.setItem
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (key, value) {
+      if (key === 'causeconnect.user') throw new DOMException('Storage full', 'QuotaExceededError')
+      return setItem.call(this, key, value)
+    })
+    const nextToken = jwt({ id: 9, role: 'business_owner', exp: 9999999999 })
+    act(() => expect(() => storeSession(nextToken, { id: 9, name: 'Next user', role: 'business_owner' })).toThrow())
+    expect(getSession()).toEqual({ token: null, user: null })
+    expect(result.current).toEqual({ token: null, user: null })
+    expect(localStorage.getItem('token')).toBeNull()
   })
 
   it('ignores an unauthorized response from an older token, but clears the current rejected one', () => {

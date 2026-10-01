@@ -18,6 +18,10 @@ export default function CampaignImageInput({ file, onChange, error = '', onError
     setPreview(url)
     return () => URL.revokeObjectURL(url)
   }, [file])
+  useEffect(() => {
+    // A rejected upload can be retried with the same file selected again.
+    if (error && input.current) input.current.value = ''
+  }, [error])
 
   function change(event) {
     const selected = event.target.files?.[0] || null

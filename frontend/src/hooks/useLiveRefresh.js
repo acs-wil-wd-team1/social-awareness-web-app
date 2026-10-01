@@ -31,17 +31,17 @@ export default function useLiveRefresh(loader, {
     const run = () => {
       if (!active || pauseReason()) return Promise.resolve()
       if (pending) return pending.promise
-      const request = { controller: new AbortController(), promise: null }
+      const request = { controller: new AbortController(), promise: null, invalidated: false }
       pending = request
       setState((previous) => ({ ...previous, refreshing: true, error: null }))
       request.promise = (async () => {
         try {
           const data = await loader({ signal: request.controller.signal })
-          if (active && pending === request && !request.controller.signal.aborted) {
+          if (active && pending === request && !request.controller.signal.aborted && !request.invalidated) {
             setState((previous) => ({ ...previous, data, error: null, updatedAt: new Date(), refreshing: false }))
           }
         } catch (error) {
-          if (active && pending === request && !request.controller.signal.aborted && error?.code !== 'ABORTED') {
+          if (active && pending === request && !request.controller.signal.aborted && !request.invalidated && error?.code !== 'ABORTED') {
             setState((previous) => ({ ...previous, error, refreshing: false,
               ...(isUnavailable(error) ? { data: null, updatedAt: null } : {}) }))
           }
@@ -49,10 +49,18 @@ export default function useLiveRefresh(loader, {
           if (pending === request) {
             pending = null
             if (active) setState((previous) => ({ ...previous, refreshing: false }))
+            if (active && request.invalidated) run()
           }
         }
       })()
       return request.promise
+    }
+
+    const contentChanged = () => {
+      // A read already in flight may contain the snapshot from before this write.
+      // Coalesce writes into one fresh read rather than dropping the invalidation.
+      if (pending) pending.invalidated = true
+      else run()
     }
 
     const syncActivity = () => {
@@ -74,7 +82,7 @@ export default function useLiveRefresh(loader, {
     window.addEventListener('online', syncActivity)
     window.addEventListener('offline', syncActivity)
     window.addEventListener('focus', run)
-    window.addEventListener('causeconnect:content', run)
+    window.addEventListener('causeconnect:content', contentChanged)
     syncActivity()
     return () => {
       active = false
@@ -84,7 +92,7 @@ export default function useLiveRefresh(loader, {
       window.removeEventListener('online', syncActivity)
       window.removeEventListener('offline', syncActivity)
       window.removeEventListener('focus', run)
-      window.removeEventListener('causeconnect:content', run)
+      window.removeEventListener('causeconnect:content', contentChanged)
       if (runRef.current === run) runRef.current = null
     }
   }, [loader, resourceKey, intervalMs, enabled, isUnavailable])

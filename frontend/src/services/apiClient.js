@@ -53,7 +53,11 @@ export async function apiRequest(path, { method = 'GET', body, token, signal, he
       ...(body !== undefined ? { body: isForm ? body : JSON.stringify(body) } : {}),
       signal: controller.signal,
     })
-    const data = response.status === 204 ? null : await response.json().catch(() => null)
+    const data = response.status === 204 ? null : await response.json().catch((error) => {
+      // Reading the body is part of fetch: cancellation must not look like bad JSON.
+      if (controller.signal.aborted) throw error
+      return null
+    })
     if (!response.ok) {
       if (response.status === 401 && token) {
         window.dispatchEvent(new CustomEvent('causeconnect:unauthorized', { detail: { token } }))

@@ -1,5 +1,5 @@
-import { useLayoutEffect } from 'react'
-import { act, cleanup, render, screen, within } from '@testing-library/react'
+import { StrictMode, useLayoutEffect } from 'react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App, { getRoute } from './App.jsx'
 import { clearSession, storeSession, useSession } from './services/authSession.js'
@@ -175,5 +175,35 @@ describe('protected page access', () => {
     render(<App pathname={path} />)
     expect(screen.getByText(message)).toBeTruthy()
     expect(fetch).not.toHaveBeenCalled()
+  })
+})
+
+describe('logout in the application shell', () => {
+  it('does not remount logout or claim success while server revocation is pending', async () => {
+    let finish
+    fetch.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    loginAs('public')
+    render(<StrictMode><App pathname="/logout" /></StrictMode>)
+    act(() => window.dispatchEvent(new Event('storage')))
+    expect(localStorage.getItem('token')).toBeNull()
+    expect(screen.getByRole('status').textContent).toContain('Ending your server session')
+    expect(screen.queryByText('You’re logged out.')).toBeNull()
+    expect(fetch).toHaveBeenCalledTimes(1)
+    await act(async () => finish(new Response(null, { status: 204 })))
+    expect(await screen.findByText('You’re logged out.')).toBeTruthy()
+  })
+
+  it('retains the memory-only token for retry after a failed server logout', async () => {
+    fetch.mockRejectedValueOnce(new TypeError('Network unavailable'))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+    loginAs('public')
+    render(<StrictMode><App pathname="/logout" /></StrictMode>)
+    act(() => window.dispatchEvent(new Event('storage')))
+    expect((await screen.findByRole('alert')).textContent).toContain('couldn’t confirm')
+    expect(screen.queryByText('You’re logged out.')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry logout' }))
+    expect(await screen.findByText('You’re logged out.')).toBeTruthy()
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(fetch.mock.calls[1][1].headers.Authorization).toBe(`Bearer ${tokenFor('public')}`)
   })
 })

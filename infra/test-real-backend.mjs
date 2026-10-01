@@ -3,13 +3,15 @@
 import { spawn } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { randomBytes } from 'node:crypto'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { createInterface } from 'node:readline'
 import path from 'node:path'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 const backend = path.join(root, 'backend')
 const frontend = path.join(root, 'frontend')
 const backendRequire = createRequire(path.join(backend, 'package.json'))
+const frontendRequire = createRequire(path.join(frontend, 'package.json'))
 const tag = randomBytes(6).toString('hex')
 const name = `causeconnect-regression-${tag}`
 const password = randomBytes(24).toString('hex')
@@ -19,6 +21,9 @@ let server
 let db
 let cleaning
 let dockerEndpoint
+let vite
+let input
+const browserMode = process.argv.length === 3 && process.argv[2] === '--browser'
 
 function command(program, args, { cwd = root, env = process.env, capture = false } = {}) {
   return new Promise((resolve, reject) => {
@@ -61,27 +66,118 @@ function docker(args, options = {}) {
 async function cleanup() {
   if (cleaning) return cleaning
   cleaning = (async () => {
+    const failures = []
+    async function attempt(label, close) {
+      try { await close() }
+      catch (error) { failures.push(`${label}: ${String(error?.message || error).replaceAll(password, '[redacted]')}`) }
+    }
+    if (input) await attempt('terminal input', () => input.close())
+    if (vite) await attempt('Vite server', () => vite.close())
     if (server) {
-      server.closeAllConnections()
-      await new Promise(resolve => server.close(resolve))
+      await attempt('Express connections', () => server.closeAllConnections())
+      await attempt('Express server', () => new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve())))
     }
-    if (db) await db.sequelize.close()
-    if (containerId && /^[a-f0-9]{64}$/.test(containerId)) {
-      const label = await docker(['inspect', '--format', '{{ index .Config.Labels "causeconnect.regression.run" }}', containerId], { capture: true })
-      if (label !== tag) throw new Error('Container ownership check failed; refusing cleanup.')
-      await docker(['rm', '--force', '--volumes', containerId], { capture: true })
-      console.log('Removed this run’s disposable database container. Existing databases were not touched.')
+    if (db) await attempt('Sequelize connection', () => db.sequelize.close())
+    if (containerId) {
+      await attempt('disposable database container', async () => {
+        if (!/^[a-f0-9]{64}$/.test(containerId)) throw new Error('Invalid container ID; refusing removal. Check this run’s printed name and ownership label manually.')
+        const label = await docker(['inspect', '--format', '{{ index .Config.Labels "causeconnect.regression.run" }}', containerId], { capture: true })
+        if (label !== tag) throw new Error('Container ownership check failed; refusing removal.')
+        await docker(['rm', '--force', '--volumes', containerId], { capture: true })
+        console.log('Removed this run’s disposable database container. Existing databases were not touched.')
+      })
     }
+    if (failures.length) throw new Error(failures.join('\n'))
   })()
   return cleaning
 }
 
-for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => {
-  cleanup().finally(() => process.exit(signal === 'SIGINT' ? 130 : 143))
-})
+async function stop(signal) {
+  try {
+    await cleanup()
+    process.exit(signal === 'SIGINT' ? 130 : 143)
+  } catch (error) {
+    console.error(`Cleanup needs attention: ${error.message}`)
+    process.exit(1)
+  }
+}
+
+for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => stop(signal))
+
+async function browserFixture(env) {
+  const fixturePassword = `Browser-${randomBytes(10).toString('hex')}!`
+  const bcrypt = backendRequire('bcrypt')
+  const passwordHash = await bcrypt.hash(fixturePassword, 10)
+  const accounts = []
+  for (const role of ['public', 'business_owner', 'admin']) {
+    const user = await db.User.create({ fullName: `Browser ${role}`, email: `${role}-${tag}@example.test`, passwordHash, role, status: 'active' })
+    accounts.push({ id: user.userId, email: user.email, role: user.role })
+  }
+  const category = await db.Category.create({ categoryName: `Browser Education ${tag}` })
+  const campaigns = []
+  for (const status of ['approved', 'pending']) {
+    const campaign = await db.Campaign.create({ title: `Browser ${status} ${tag}`, description: `Disposable ${status} campaign for browser regression.`, categoryId: category.categoryId, createdBy: accounts[0].id, status })
+    campaigns.push({ id: campaign.campaignId, title: campaign.title, status })
+  }
+  const { createServer } = await import(pathToFileURL(frontendRequire.resolve('vite')).href)
+  const { default: react } = await import(pathToFileURL(frontendRequire.resolve('@vitejs/plugin-react')).href)
+  // Ignore project config and .env files: this browser must never use demo mode,
+  // the usual backend on port 3000, or a previously configured remote API.
+  env.VITE_API_BASE_URL = '/api'
+  process.env.VITE_API_BASE_URL = '/api'
+  vite = await createServer({
+    root: frontend,
+    configFile: false,
+    envDir: false,
+    plugins: [react()],
+    define: {
+      'import.meta.env.VITE_DEMO_MODE': JSON.stringify('false'),
+      'import.meta.env.VITE_API_BASE_URL': JSON.stringify('/api'),
+    },
+    cacheDir: path.join(frontend, 'node_modules', '.vite-browser-regression', tag),
+    server: {
+      host: '127.0.0.1', port: 0, strictPort: true,
+      proxy: { '/api': { target: `http://127.0.0.1:${server.address().port}`, changeOrigin: true } },
+    },
+  })
+  await vite.listen()
+  const address = vite.httpServer.address()
+  if (!address || typeof address === 'string' || address.address !== '127.0.0.1') throw new Error('Browser fixture did not bind to loopback.')
+  console.log('Browser fixture ready. These accounts exist only in this disposable database:')
+  console.log(JSON.stringify({ frontendUrl: `http://127.0.0.1:${address.port}`, run: tag, password: fixturePassword, accounts, category: { id: category.categoryId, name: category.categoryName }, campaigns }, null, 2))
+  console.log('Actual frontend and Express/MySQL are running. Missing Stage 3 APIs are still missing; this is not sample mode.')
+  console.log('Enter inspect for a safe database readback, or press Ctrl+C to stop and remove this run’s fixture.')
+  input = createInterface({ input: process.stdin, output: process.stdout, terminal: Boolean(process.stdin.isTTY) })
+  input.on('SIGINT', () => stop('SIGINT'))
+  let inspecting = false
+  input.on('line', async line => {
+    if (line.trim() !== 'inspect') {
+      if (line.trim()) console.log('Only the read-only inspect command is supported. Press Ctrl+C to stop.')
+      return
+    }
+    if (inspecting || cleaning) return
+    inspecting = true
+    try {
+      if (db.sequelize.config.database !== database || db.sequelize.config.host !== '127.0.0.1' || env.CAUSECONNECT_TEST_RUN !== tag) throw new Error('Disposable database readback guard failed.')
+      const users = await db.User.scope('withPassword').findAll({ order: [['userId', 'ASC']] })
+      const records = await db.Campaign.findAll({ order: [['campaignId', 'ASC']] })
+      const sessions = await db.UserSession.findAll({ attributes: ['userId', 'status'] })
+      console.log(JSON.stringify({
+        run: tag,
+        users: users.map(user => ({ id: user.userId, role: user.role, status: user.status, passwordHashed: /^\$2[aby]\$\d\d\$/.test(user.passwordHash) })),
+        campaigns: records.map(record => ({ id: record.campaignId, title: record.title, status: record.status, userId: record.createdBy })),
+        sessions: sessions.map(session => ({ userId: session.userId, status: session.status })),
+      }, null, 2))
+    } catch (error) { console.error(`Fixture readback failed: ${error.message.replaceAll(password, '[redacted]')}`) }
+    finally { inspecting = false }
+  })
+  // Signal handlers own cleanup. Keeping the same process alive retains the
+  // endpoint pin and the ownership label needed for safe container removal.
+  await new Promise(() => {})
+}
 
 try {
-  if (process.argv.length > 2) throw new Error('This runner accepts no remote database, credentials, host or API arguments.')
+  if (process.argv.length > 2 && !browserMode) throw new Error('Only --browser is accepted. This runner accepts no remote database, credentials, host or API arguments.')
   dockerEndpoint = await resolveLocalDockerEndpoint()
   await docker(['info', '--format', '{{.ServerVersion}}'], { capture: true })
   try {
@@ -123,13 +219,16 @@ try {
   if (!ready) throw new Error('Disposable MySQL did not become ready within 90 seconds.')
   console.log('Applying repository migrations to the empty test database.')
   await command(process.execPath, [backendRequire.resolve('sequelize-cli/lib/sequelize'), 'db:migrate'], { cwd: backend, env })
-  await command(process.execPath, ['--test', 'test/unit/*.test.js'], { cwd: backend, env })
-  await command(process.execPath, ['--test', 'test/integration/*.test.js'], { cwd: backend, env })
+  if (!browserMode) {
+    await command(process.execPath, ['--test', 'test/unit/*.test.js'], { cwd: backend, env })
+    await command(process.execPath, ['--test', 'test/integration/*.test.js'], { cwd: backend, env })
+  }
   Object.assign(process.env, env)
   db = backendRequire('./src/database/models')
   db.sequelize.options.logging = false
   const app = backendRequire('./src/app')
   await new Promise(resolve => { server = app.listen(0, '127.0.0.1', resolve) })
+  if (browserMode) await browserFixture(env)
   env.VITE_API_BASE_URL = `http://127.0.0.1:${server.address().port}/api`
   console.log('Testing actual frontend components and services against Express and MySQL (jsdom, native HTTP fetch; no API mocks).')
   await command(process.execPath, [path.join(frontend, 'node_modules/vitest/vitest.mjs'), 'run', '--config', 'vitest.real-backend.config.js'], { cwd: frontend, env })

@@ -47,6 +47,10 @@ function confirmedNewVersion(campaign, expectedUpdatedAt) {
   return validVersion(campaign?.updatedAt) && Date.parse(campaign.updatedAt) > Date.parse(expectedUpdatedAt)
 }
 
+function savedStatus({ id, status, updatedAt }) {
+  return { id, status, updatedAt }
+}
+
 function readCampaign(campaign) {
   if (!campaign || !Number.isSafeInteger(campaign.id) || campaign.id < 1
     || typeof campaign.title !== 'string' || !campaign.title.trim()
@@ -119,12 +123,13 @@ export async function reviewCampaign(id, { status, comments = '', expectedUpdate
   if (body?.campaign?.id !== Number(campaignId) || body.campaign.status !== status || !confirmedNewVersion(body.campaign, expectedUpdatedAt)
     || !Number.isSafeInteger(body?.review?.id) || body.review.id < 1
     || body.review.campaignId !== Number(campaignId) || body.review.action !== status
+    || (body.review.comments != null && (typeof body.review.comments !== 'string' || body.review.comments.length > 2000))
     || (reason && body.review.comments !== reason)
     || !Number.isSafeInteger(body.review.adminId) || body.review.adminId < 1
     || typeof body.review.reviewedAt !== 'string' || !Number.isFinite(Date.parse(body.review.reviewedAt))) {
     throw invalidResponse('We could not confirm the review result. Reload the campaign to check its current status before trying again.')
   }
-  return body
+  return { campaign: savedStatus(body.campaign), review: body.review }
 }
 
 export async function loadCampaignReviews(id, { token, signal, page = 1, pageSize = 10 } = {}) {
@@ -167,7 +172,7 @@ export async function unpublishCampaign(id, reason, { token, signal, expectedUpd
   if (body?.campaign?.id !== Number(campaignId) || body.campaign.status !== 'pending' || !confirmedNewVersion(body.campaign, expectedUpdatedAt)) {
     throw invalidResponse('The publication change was not confirmed. Reload the campaign before trying again.')
   }
-  return body.campaign
+  return savedStatus(body.campaign)
 }
 
 export async function deleteCampaign(id, reason, { token, signal, expectedUpdatedAt } = {}) {

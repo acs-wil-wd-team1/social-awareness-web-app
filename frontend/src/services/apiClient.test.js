@@ -159,4 +159,25 @@ describe('API requests', () => {
     await assertion
     expect(vi.getTimerCount()).toBe(0)
   })
+
+  it.each(['cancel', 'timeout'])('preserves %s while the response body is still arriving', async (reason) => {
+    vi.useFakeTimers()
+    vi.stubGlobal('fetch', vi.fn(async (_url, { signal }) => ({
+      status: 200,
+      ok: true,
+      json: () => new Promise((_resolve, reject) => {
+        signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true })
+      }),
+    })))
+    const controller = new AbortController()
+    const pending = apiRequest('/api/campaigns', { signal: controller.signal, timeoutMs: 100 }).catch(error => error)
+    // Headers have arrived, but fetch has not finished reading the body.
+    await Promise.resolve()
+    if (reason === 'cancel') controller.abort()
+    else await vi.advanceTimersByTimeAsync(100)
+    expect(await pending).toMatchObject(reason === 'cancel'
+      ? { code: 'ABORTED' }
+      : { code: 'NETWORK_ERROR', message: expect.stringContaining('timed out') })
+    expect(vi.getTimerCount()).toBe(0)
+  })
 })
