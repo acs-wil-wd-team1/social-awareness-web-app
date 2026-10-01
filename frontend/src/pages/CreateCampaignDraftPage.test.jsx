@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App.jsx'
 import { maxImageBytes, validateDraftCampaign, validateDraftImage } from '../drafts/campaignSubmissionDraft.js'
 import CreateCampaignPage from './CreateCampaignDraftPage.jsx'
+import { storeSession } from '../services/authSession.js'
 
 const validValues = {
   title: 'Community Garden Day',
@@ -63,7 +64,7 @@ describe('Local campaign frontend draft', () => {
   })
 
   it('keeps the sample out of navigation while linking to real campaign creation', () => {
-    localStorage.setItem('token', 'existing-token')
+    storeSession('existing-token', { id: 3, name: 'Test user', role: 'public' })
     render(<App pathname="/login" />)
     expect(screen.getByRole('link', { name: 'Logout' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Create campaign' }).getAttribute('href')).toBe('/campaigns/new')

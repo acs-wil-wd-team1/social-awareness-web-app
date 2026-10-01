@@ -5,105 +5,94 @@ import RegistrationPage from './pages/RegistrationPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import LogoutPage from './pages/LogoutPage.jsx'
 import CreateCampaignPage from './pages/CreateCampaignPage.jsx'
-const CreateCampaignDraft = import.meta.env.DEV
-  ? lazy(() => import('./pages/CreateCampaignDraftPage.jsx'))
-  : null
+import BusinessProfilePage from './pages/BusinessProfilePage.jsx'
+import MyCampaignsPage from './pages/MyCampaignsPage.jsx'
+import AdminCampaignsPage from './pages/AdminCampaignsPage.jsx'
+import AdminCampaignReviewPage from './pages/AdminCampaignReviewPage.jsx'
+import EditCampaignPage from './pages/EditCampaignPage.jsx'
+import MyParticipationPage from './pages/MyParticipationPage.jsx'
+import BusinessEnquiriesPage from './pages/BusinessEnquiriesPage.jsx'
+import AdminUsersPage from './pages/AdminUsersPage.jsx'
+import { useSession } from './services/authSession.js'
+import './styles/stage3-shell.css'
 
-function getRoute(pathname) {
-  if (pathname === '/campaigns/new' || pathname === '/campaigns/new/') {
-    return { name: 'create-campaign' }
-  }
+const DemoBanner = import.meta.env.VITE_DEMO_MODE === 'true' ? lazy(() => import('./demo/DemoBanner.jsx')) : null
+const hasTeamLogo = Object.keys(import.meta.glob('/public/images/brand/causeconnect-logo.png', { eager: true, query: '?url', import: 'default' })).length > 0
+const CreateCampaignDraft = import.meta.env.DEV ? lazy(() => import('./pages/CreateCampaignDraftPage.jsx')) : null
 
-  if (import.meta.env.DEV && pathname === '/draft/campaigns/new') {
-    return { name: 'campaign-draft' }
-  }
-
-  const campaignMatch = pathname.match(/^\/campaigns\/([^/]+)\/?$/)
-
-  if (campaignMatch) {
-    return {
-      name: 'campaign-details',
-      campaignId: decodeURIComponent(campaignMatch[1]),
-    }
-  }
-
-  if (pathname === '/') {
-    return { name: 'home' }
-  }
-
-  if (pathname === '/register') {
-    return { name: 'register' }
-  }
-  if (pathname === '/login') {
-    return { name: 'login' }
-  }
-  if (pathname === '/logout') {
-    return { name: 'logout' }
-  }
+export function getRoute(pathname) {
+  const path = pathname.length > 1 ? pathname.replace(/\/$/, '') : pathname
+  const routes = { '/': 'home', '/login': 'login', '/register': 'register', '/logout': 'logout',
+    '/campaigns/new': 'create-campaign', '/business/campaigns/new': 'business-campaign',
+    '/business/profile': 'business-profile', '/my-campaigns': 'my-campaigns', '/admin/campaigns': 'admin-campaigns',
+    '/my-participation': 'my-participation', '/business/enquiries': 'business-enquiries', '/admin/users': 'admin-users' }
+  if (routes[path]) return { name: routes[path] }
+  if (import.meta.env.DEV && path === '/draft/campaigns/new') return { name: 'campaign-draft' }
+  const admin = path.match(/^\/admin\/campaigns\/(\d+)$/)
+  if (admin) return { name: 'admin-review', campaignId: admin[1] }
+  const edit = path.match(/^\/my-campaigns\/(\d+)\/edit$/)
+  if (edit) return { name: 'edit-campaign', campaignId: edit[1] }
+  const campaign = path.match(/^\/campaigns\/(\d+)$/)
+  if (campaign) return { name: 'campaign-details', campaignId: campaign[1] }
   return { name: 'not-found' }
 }
 
 export default function App({ pathname = window.location.pathname }) {
   const route = getRoute(pathname)
-  const isLoggedIn = Boolean(localStorage.getItem('token'))
-
-  return (
-    <div className="site-shell">
-      <a className="skip-link" href="#main-content">Skip to main content</a>
-
-      <header className="site-header">
-        <div className="site-header__inner">
-          <a className="site-name" href="/" aria-label="CauseConnect home">
-            CauseConnect
-          </a>
-          <nav aria-label="Primary navigation">
-            <a href="/" aria-current={route.name === 'home' ? 'page' : undefined}>
-              Home
-            </a>
-
-            <a href="/#campaigns">Campaigns</a>
-
-            {isLoggedIn ? (
-              <>
-                <a href="/campaigns/new" aria-current={route.name === 'create-campaign' ? 'page' : undefined}>Create campaign</a>
-                <a href="/logout">Logout</a>
-              </>
-            ) : (
-              <a href="/login">Login</a>
-            )}
-          </nav>
-        </div>
-      </header>
-
-      <main id="main-content">
-        {route.name === 'home' ? <HomePage /> : null}
-        {route.name === 'campaign-details' ? (
-          <CampaignDetailsPage campaignId={route.campaignId} />
-        ) : null}
-        {route.name === 'register' ? <RegistrationPage /> : null}
-        {route.name === 'login' ? <LoginPage /> : null}
-        {route.name === 'logout' ? <LogoutPage /> : null}
-        {route.name === 'create-campaign' ? <CreateCampaignPage /> : null}
-        {route.name === 'campaign-draft' && CreateCampaignDraft ? (
-          <Suspense fallback={<p className="content-width">Loading frontend draft…</p>}>
-            <CreateCampaignDraft />
-          </Suspense>
-        ) : null}
-        {route.name === 'not-found' ? (
-          <section className="not-found-page content-width" aria-labelledby="not-found-title">
-            <h1 id="not-found-title">Page not found</h1>
-            <p>The page you requested is not available.</p>
-            <a className="text-link" href="/">Return to the homepage</a>
-          </section>
-        ) : null}
-      </main>
-
-      <footer className="site-footer">
-        <div className="site-footer__inner">
-          <p className="site-footer__name">CauseConnect</p>
-          <p>Raise awareness. Create change.</p>
-        </div>
-      </footer>
-    </div>
-  )
+  const { token, user } = useSession()
+  const role = user?.role
+  const owner = role === 'public' || role === 'business_owner'
+  const sessionProps = { token, role }
+  const createPath = role === 'business_owner' ? '/business/campaigns/new' : '/campaigns/new'
+  return <div className="site-shell">
+    <a className="skip-link" href="#main-content">Skip to main content</a>
+    {DemoBanner ? <Suspense fallback={<aside className="preview-banner"><strong>Frontend preview · sample data</strong></aside>}><DemoBanner /></Suspense> : null}
+    <header className="site-header">
+      <div className="site-header__inner">
+        <a className="site-name" href="/" aria-label="CauseConnect home">
+          {hasTeamLogo ? <img className="site-logo" src="/images/brand/causeconnect-logo.png" alt="CauseConnect — Connect people. Create change." /> : 'CauseConnect'}
+        </a>
+        <nav aria-label="Primary navigation">
+          <a href="/" aria-current={route.name === 'home' ? 'page' : undefined}>Home</a>
+          <a href="/#campaigns">Campaigns</a>
+          {token && owner ? <>
+            <a href={createPath} aria-current={['create-campaign', 'business-campaign'].includes(route.name) ? 'page' : undefined}>Create campaign</a>
+            <a href="/my-campaigns" aria-current={['my-campaigns', 'edit-campaign'].includes(route.name) ? 'page' : undefined}>My campaigns</a>
+            <a href="/my-participation" aria-current={route.name === 'my-participation' ? 'page' : undefined}>My participation</a>
+          </> : null}
+          {token && role === 'business_owner' ? <>
+            <a href="/business/profile" aria-current={route.name === 'business-profile' ? 'page' : undefined}>Business profile</a>
+            <a href="/business/enquiries" aria-current={route.name === 'business-enquiries' ? 'page' : undefined}>Enquiries</a>
+          </> : null}
+          {token && role === 'admin' ? <>
+            <a href="/admin/campaigns" aria-current={['admin-campaigns', 'admin-review'].includes(route.name) ? 'page' : undefined}>Review campaigns</a>
+            <a href="/admin/users" aria-current={route.name === 'admin-users' ? 'page' : undefined}>Manage users</a>
+          </> : null}
+          {token ? <a href="/logout">Logout</a> : <><a href="/login">Login</a><a href="/register">Register</a></>}
+        </nav>
+      </div>
+    </header>
+    <main id="main-content" key={token || 'guest'}>
+      {route.name === 'home' ? <HomePage /> : null}
+      {route.name === 'campaign-details' ? <CampaignDetailsPage {...sessionProps} campaignId={route.campaignId} /> : null}
+      {route.name === 'register' ? <RegistrationPage /> : null}
+      {route.name === 'login' ? <LoginPage /> : null}
+      {route.name === 'logout' ? <LogoutPage /> : null}
+      {route.name === 'create-campaign' ? <CreateCampaignPage {...sessionProps} /> : null}
+      {route.name === 'business-campaign' ? <CreateCampaignPage {...sessionProps} mode="business" /> : null}
+      {route.name === 'business-profile' ? <BusinessProfilePage {...sessionProps} /> : null}
+      {route.name === 'my-campaigns' ? <MyCampaignsPage {...sessionProps} /> : null}
+      {route.name === 'edit-campaign' ? <EditCampaignPage {...sessionProps} campaignId={route.campaignId} /> : null}
+      {route.name === 'my-participation' ? <MyParticipationPage {...sessionProps} /> : null}
+      {route.name === 'business-enquiries' ? <BusinessEnquiriesPage {...sessionProps} /> : null}
+      {route.name === 'admin-users' ? <AdminUsersPage {...sessionProps} currentUserId={user?.id} /> : null}
+      {route.name === 'admin-campaigns' ? <AdminCampaignsPage {...sessionProps} /> : null}
+      {route.name === 'admin-review' ? <AdminCampaignReviewPage {...sessionProps} campaignId={route.campaignId} /> : null}
+      {route.name === 'campaign-draft' && CreateCampaignDraft ? <Suspense fallback={<p className="content-width">Loading frontend draft…</p>}><CreateCampaignDraft /></Suspense> : null}
+      {route.name === 'not-found' ? <section className="not-found-page content-width" aria-labelledby="not-found-title">
+        <h1 id="not-found-title">Page not found</h1><p>The page you requested is not available.</p><a className="text-link" href="/">Return to the homepage</a>
+      </section> : null}
+    </main>
+    <footer className="site-footer"><div className="site-footer__inner"><p className="site-footer__name">CauseConnect</p><p>Raise awareness. Create change.</p></div></footer>
+  </div>
 }

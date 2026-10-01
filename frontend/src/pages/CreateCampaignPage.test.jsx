@@ -1,6 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import App from '../App.jsx'
 import CreateCampaignPage from './CreateCampaignPage.jsx'
 import { loadCampaignCategories } from '../services/campaignSubmissionService.js'
 import { validateCampaignSubmission } from '../services/campaignSubmissionValidation.js'
@@ -43,21 +42,19 @@ afterEach(() => {
 })
 
 describe('Campaign submission', () => {
-  it('opens the real creation route in production before the campaign ID route', async () => {
-    vi.stubEnv('DEV', false)
-    render(<App pathname="/campaigns/new" />)
+  it('loads the public campaign form and optional photo field', async () => {
+    render(<CreateCampaignPage />)
     await readyForm()
     expect(screen.getByRole('heading', { name: 'Create a campaign' })).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Create campaign' }).getAttribute('aria-current')).toBe('page')
     expect(fetch).toHaveBeenCalledWith('/api/campaigns/categories', expect.objectContaining({ signal: expect.any(AbortSignal) }))
     expect(screen.queryByLabelText('Sample account')).toBeNull()
-    expect(screen.queryByLabelText(/Campaign photo/)).toBeNull()
+    expect(screen.getByLabelText(/Campaign photo/)).toBeTruthy()
     expect(fetch).toHaveBeenCalledTimes(1)
   })
 
   it('asks guests to log in without loading categories or showing a form', () => {
     localStorage.removeItem('token')
-    render(<App pathname="/campaigns/new/" />)
+    render(<CreateCampaignPage />)
     expect(screen.getByRole('link', { name: 'Log in' }).getAttribute('href')).toBe('/login')
     expect(screen.queryByRole('form')).toBeNull()
     expect(screen.queryByRole('link', { name: 'Create campaign' })).toBeNull()
@@ -139,7 +136,6 @@ describe('Campaign submission', () => {
   it.each([
     [401, 'Your session has expired. Please log in again.'],
     [403, 'Only public users can submit social-cause campaigns.'],
-    [500, 'The campaign could not be saved. Please try again.'],
   ])('shows the server message for HTTP %s and preserves the form', async (status, message) => {
     fetch.mockResolvedValueOnce(json({ code: 'REQUEST_FAILED', message }, status))
     render(<CreateCampaignPage />)
@@ -174,6 +170,7 @@ describe('Campaign submission', () => {
     await screen.findByText(/could not confirm whether your campaign was saved/)
     expect(screen.queryByRole('heading', { name: 'Campaign submitted' })).toBeNull()
     expect(screen.getByLabelText('Description').value).toBe(values.description)
+    expect(submitButton().disabled).toBe(true)
   })
 
   it.each([
@@ -190,6 +187,7 @@ describe('Campaign submission', () => {
     await screen.findByText(/server did not confirm the saved campaign/)
     expect(screen.queryByRole('heading', { name: 'Campaign submitted' })).toBeNull()
     expect(screen.getByLabelText('Campaign title').value).toBe(values.title)
+    expect(submitButton().disabled).toBe(true)
   })
 
   it('aborts a pending submission on unmount', async () => {
@@ -216,6 +214,143 @@ describe('Campaign submission', () => {
     await waitFor(() => expect(submitButton().disabled).toBe(false))
     await act(async () => { resolvePost(json(saved, 201)) })
     expect(screen.queryByText('Campaign submitted')).toBeNull()
+  })
+
+  it('blocks a mismatched role without loading data', () => {
+    render(<CreateCampaignPage role="admin" />)
+    expect(screen.getByText(/public-user account is needed/)).toBeTruthy()
+    expect(screen.queryByRole('form')).toBeNull()
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('requires a business profile before allowing business campaign submission', async () => {
+    fetch.mockResolvedValueOnce(json({ business: null }))
+    render(<CreateCampaignPage mode="business" role="business_owner" />)
+    expect(await screen.findByRole('link', { name: 'Set up business profile' })).toBeTruthy()
+    expect(screen.queryByRole('form')).toBeNull()
+  })
+
+  it('posts a business campaign with no client-selected business, user, type or status', async () => {
+    fetch.mockResolvedValueOnce(json({ business: { id: 3, businessName: 'Local shop' } })).mockResolvedValueOnce(json(saved, 201))
+    render(<CreateCampaignPage mode="business" role="business_owner" />)
+    await screen.findByRole('heading', { name: 'Create a business campaign' })
+    await readyForm()
+    expect(screen.getByText('Local shop')).toBeTruthy()
+    fireEvent.click(submitButton())
+    await screen.findByRole('heading', { name: 'Campaign submitted' })
+    expect(JSON.parse(fetch.mock.calls[2][1].body)).toEqual({ title: values.title, description: values.description, categoryId: 7, startDate: values.startDate, endDate: values.endDate })
+  })
+
+  it('uploads a photo before posting and reuses it after a field validation failure', async () => {
+    fetch.mockResolvedValueOnce(json({ imageId: 'img_123', contentType: 'image/png', sizeBytes: 5, expiresAt: '2099-01-01T00:00:00.000Z' }, 201))
+      .mockResolvedValueOnce(json({ message: 'Check details.', fieldErrors: { categoryId: 'Choose another category.' } }, 422))
+      .mockResolvedValueOnce(json(saved, 201))
+    render(<CreateCampaignPage />)
+    await readyForm()
+    const file = new File(['photo'], 'garden.png', { type: 'image/png' })
+    fireEvent.change(screen.getByLabelText(/Campaign photo/), { target: { files: [file] } })
+    fireEvent.click(submitButton())
+    await screen.findByText('Choose another category.')
+    expect(fetch.mock.calls[1][0]).toBe('/api/campaign-images')
+    expect(fetch.mock.calls[1][1].body.get('file')).toBe(file)
+    expect(fetch.mock.calls[1][1].headers).not.toHaveProperty('Content-Type')
+    expect(JSON.parse(fetch.mock.calls[2][1].body).imageId).toBe('img_123')
+    fireEvent.change(screen.getByLabelText('Category'), { target: { value: '12' } })
+    fireEvent.click(submitButton())
+    await screen.findByRole('heading', { name: 'Campaign submitted' })
+    expect(fetch.mock.calls.filter(([url]) => url === '/api/campaign-images')).toHaveLength(1)
+    expect(JSON.parse(fetch.mock.calls[3][1].body).imageId).toBe('img_123')
+    expect(screen.getByRole('link', { name: 'My campaigns' }).getAttribute('href')).toBe('/my-campaigns')
+  })
+
+  it('preserves the form and does not post the campaign when the image upload fails', async () => {
+    fetch.mockResolvedValueOnce(json({ message: 'Photo upload is unavailable.' }, 503))
+    render(<CreateCampaignPage />)
+    await readyForm()
+    fireEvent.change(screen.getByLabelText(/Campaign photo/), { target: { files: [new File(['photo'], 'garden.png', { type: 'image/png' })] } })
+    fireEvent.click(submitButton())
+    await screen.findByText('Photo upload is unavailable.')
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(screen.getByLabelText('Campaign title').value).toBe(values.title)
+    expect(screen.queryByRole('heading', { name: 'Campaign submitted' })).toBeNull()
+    expect(screen.queryByRole('checkbox', { name: /duplicate risk/ })).toBeNull()
+    expect(submitButton().disabled).toBe(false)
+  })
+
+  it.each(['network', 'server', 'invalid-response'])('requires explicit acknowledgement before retrying an uncertain %s campaign POST', async (failure) => {
+    if (failure === 'network') fetch.mockRejectedValueOnce(new TypeError('Network down'))
+    else if (failure === 'server') fetch.mockResolvedValueOnce(json({ message: 'The campaign could not be saved.' }, 500))
+    else fetch.mockResolvedValueOnce(json({}, 201))
+    let resolveRetry
+    fetch.mockReturnValueOnce(new Promise(resolve => { resolveRetry = resolve }))
+    render(<CreateCampaignPage />)
+    await readyForm()
+    fireEvent.click(submitButton())
+    const acknowledgement = await screen.findByRole('checkbox', { name: /duplicate risk/ })
+    expect(submitButton().disabled).toBe(true)
+    expect(screen.getByRole('link', { name: /Check My campaigns/ }).getAttribute('target')).toBe('_blank')
+    fireEvent.change(screen.getByLabelText('Campaign title'), { target: { value: 'Updated title' } })
+    expect(screen.getByText(/campaign may already have been saved/)).toBeTruthy()
+    fireEvent.submit(screen.getByRole('form'))
+    expect(fetch).toHaveBeenCalledTimes(2)
+    fireEvent.click(acknowledgement)
+    expect(submitButton().disabled).toBe(false)
+    fireEvent.submit(screen.getByRole('form'))
+    fireEvent.submit(screen.getByRole('form'))
+    expect(fetch).toHaveBeenCalledTimes(3)
+    await act(async () => resolveRetry(json({ campaign: { ...saved.campaign, title: 'Updated title' } }, 201)))
+    expect(await screen.findByRole('heading', { name: 'Campaign submitted' })).toBeTruthy()
+    expect(screen.queryByRole('checkbox', { name: /duplicate risk/ })).toBeNull()
+  })
+
+  it('retains the uploaded image after an uncertain campaign write and requires a fresh acknowledgement for another uncertain retry', async () => {
+    fetch.mockResolvedValueOnce(json({ imageId: 'img_123', contentType: 'image/png', sizeBytes: 5, expiresAt: '2099-01-01T00:00:00.000Z' }, 201))
+      .mockRejectedValueOnce(new TypeError('Lost first receipt'))
+      .mockResolvedValueOnce(json({ message: 'Unavailable' }, 503))
+      .mockResolvedValueOnce(json(saved, 201))
+    render(<CreateCampaignPage />)
+    await readyForm()
+    fireEvent.change(screen.getByLabelText(/Campaign photo/), { target: { files: [new File(['photo'], 'garden.png', { type: 'image/png' })] } })
+    fireEvent.click(submitButton())
+    fireEvent.click(await screen.findByRole('checkbox', { name: /duplicate risk/ }))
+    fireEvent.click(submitButton())
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: /duplicate risk/ }).checked).toBe(false))
+    expect(submitButton().disabled).toBe(true)
+    expect(fetch.mock.calls.filter(([url]) => url === '/api/campaign-images')).toHaveLength(1)
+    fireEvent.click(screen.getByRole('checkbox', { name: /duplicate risk/ }))
+    fireEvent.click(submitButton())
+    await screen.findByRole('heading', { name: 'Campaign submitted' })
+    expect(fetch.mock.calls.filter(([url]) => url === '/api/campaigns').map(([, options]) => JSON.parse(options.body).imageId)).toEqual(['img_123', 'img_123', 'img_123'])
+  })
+
+  it('blocks an unsupported photo and allows the user to replace it', async () => {
+    render(<CreateCampaignPage />)
+    await readyForm()
+    fireEvent.change(screen.getByLabelText(/Campaign photo/), { target: { files: [new File(['vector'], 'garden.svg', { type: 'image/svg+xml' })] } })
+    fireEvent.click(submitButton())
+    expect(screen.getByText('Choose a JPG, PNG or WebP photo.')).toBeTruthy()
+    expect(document.activeElement).toBe(screen.getByLabelText(/Campaign photo/))
+    expect(fetch).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Remove photo' }))
+    expect(screen.queryByText('Choose a JPG, PNG or WebP photo.')).toBeNull()
+    fetch.mockResolvedValueOnce(json(saved, 201))
+    fireEvent.click(submitButton())
+    await screen.findByRole('heading', { name: 'Campaign submitted' })
+    expect(JSON.parse(fetch.mock.calls[1][1].body)).not.toHaveProperty('imageId')
+  })
+
+  it.each([
+    { imageId: '', contentType: 'image/png', sizeBytes: 5, expiresAt: '2099-01-01T00:00:00.000Z' },
+    { imageId: 'img_123', contentType: 'image/png', sizeBytes: 5, expiresAt: '2000-01-01T00:00:00.000Z' },
+  ])('does not submit when the image reference is invalid or already expired', async (upload) => {
+    fetch.mockResolvedValueOnce(json(upload, 201))
+    render(<CreateCampaignPage />)
+    await readyForm()
+    fireEvent.change(screen.getByLabelText(/Campaign photo/), { target: { files: [new File(['photo'], 'garden.png', { type: 'image/png' })] } })
+    fireEvent.click(submitButton())
+    await screen.findByText('The photo upload was not confirmed. Please try uploading the photo again.')
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(screen.queryByRole('heading', { name: 'Campaign submitted' })).toBeNull()
   })
 })
 

@@ -1,3 +1,5 @@
+import { apiRequest } from './apiClient.js'
+
 export class CampaignRequestError extends Error {
   constructor(code, message) {
     super(message)
@@ -6,101 +8,84 @@ export class CampaignRequestError extends Error {
   }
 }
 
-const seededCampaignPresentation = {
-  'Books for Kids': {
-    imageUrl: '/images/campaigns/books-for-kids.jpg',
-    type: 'cause',
-  },
-  'Community Food Drive': {
-    imageUrl: '/images/campaigns/community-food-drive.jpg',
-    type: 'cause',
-  },
-  'Mindful Mornings': {
-    imageUrl: '/images/campaigns/mindful-mornings.jpg',
-    type: 'business',
-  },
-  'Zero-Waste Week': {
-    imageUrl: '/images/campaigns/zero-waste-week.jpg',
-    type: 'business',
-  },
+function invalidResponse() {
+  return new CampaignRequestError('INVALID_RESPONSE', 'The campaign response could not be read. Please try again.')
+}
+
+function validId(value) {
+  return /^[1-9]\d*$/.test(String(value)) && Number.isSafeInteger(Number(value))
 }
 
 function normalizeCampaign(campaign) {
-  const presentation = seededCampaignPresentation[campaign.title] ?? {}
-
+  if (!campaign || !validId(campaign.id)
+    || typeof campaign.title !== 'string' || !campaign.title.trim()
+    || typeof campaign.description !== 'string') throw invalidResponse()
+  for (const field of ['imageUrl', 'category', 'startDate', 'endDate', 'targetAudience', 'createdAt', 'details']) {
+    if (campaign[field] != null && typeof campaign[field] !== 'string') throw invalidResponse()
+  }
+  if (campaign.business != null && (typeof campaign.business !== 'object'
+    || typeof campaign.business.businessName !== 'string')) throw invalidResponse()
+  if (campaign.goals != null && (!Array.isArray(campaign.goals)
+    || campaign.goals.some((goal) => typeof goal !== 'string'))) throw invalidResponse()
   return {
     ...campaign,
     id: String(campaign.id),
-    imageUrl: campaign.imageUrl || presentation.imageUrl || '/campaign-placeholder.svg',
-    type: campaign.type ?? presentation.type ?? null,
+    category: campaign.category?.trim() || 'Uncategorised',
+    imageUrl: campaign.imageUrl?.trim() || '/campaign-placeholder.svg',
+    type: ['business', 'cause'].includes(campaign.type) ? campaign.type : null,
   }
-}
-
-async function readJson(response) {
-  const body = await response.json().catch(() => null)
-
-  if (!response.ok) {
-    throw new CampaignRequestError(
-      response.status === 404 ? 'NOT_FOUND' : (body?.code ?? 'REQUEST_FAILED'),
-      body?.message ?? 'The campaign request failed.',
-    )
-  }
-
-  return body
 }
 
 export function selectPublicCampaigns(campaigns) {
-  return campaigns
-    .filter(({ status }) => status === 'approved')
-    .map(normalizeCampaign)
-    .toSorted((left, right) => (
-      right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id)
-    ))
+  if (!Array.isArray(campaigns) || campaigns.some((campaign) => !campaign
+    || !['approved', 'pending', 'rejected'].includes(campaign.status))) throw invalidResponse()
+  // The API supplies the ordered page. Preserve that order, including numeric-ID ties.
+  return campaigns.filter(({ status }) => status === 'approved').map(normalizeCampaign)
 }
 
-export async function listCampaigns({ signal } = {}) {
-  let response
-
-  try {
-    response = await fetch('/api/campaigns?page=1&pageSize=100', { signal })
-  } catch (error) {
-    if (error?.name === 'AbortError') {
-      throw new CampaignRequestError('ABORTED', 'The campaign request was cancelled.')
-    }
-
-    throw new CampaignRequestError('NETWORK_ERROR', 'The campaign API could not be reached.')
-  }
-
-  const body = await readJson(response)
-  const items = selectPublicCampaigns(Array.isArray(body?.campaigns) ? body.campaigns : [])
-
+export async function listCampaigns({ signal, page = 1, pageSize = 20, search = '', category = '' } = {}) {
+  const query = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
+  if (search.trim()) query.set('search', search.trim())
+  if (category) query.set('category', String(category))
+  const body = await apiRequest(`/api/campaigns?${query}`, { signal, expectedStatus: 200 })
+  if (!body || !Array.isArray(body.campaigns)
+    || !Number.isSafeInteger(body.page) || body.page < 1
+    || !Number.isSafeInteger(body.pageSize) || body.pageSize < 1
+    || (body.total !== undefined && (!Number.isSafeInteger(body.total) || body.total < 0))) throw invalidResponse()
   return {
-    items,
-    page: body?.page ?? 1,
-    pageSize: body?.pageSize ?? items.length,
-    total: body?.total ?? items.length,
+    items: selectPublicCampaigns(body.campaigns),
+    page: body.page,
+    pageSize: body.pageSize,
+    ...(body.total !== undefined ? { total: body.total } : {}),
+    hasNext: body.total !== undefined
+      ? body.page * body.pageSize < body.total
+      : body.campaigns.length === body.pageSize,
   }
+}
+
+export async function loadPublicCategories({ signal } = {}) {
+  const body = await apiRequest('/api/campaigns/categories', { signal, expectedStatus: 200 })
+  if (!Array.isArray(body?.categories) || body.categories.some((category) => (
+    !Number.isSafeInteger(category?.id) || category.id < 1
+    || typeof category.name !== 'string' || !category.name.trim()
+  ))) throw invalidResponse()
+  return body.categories
 }
 
 export async function getCampaignById(id, { signal } = {}) {
-  let response
-
+  if (!validId(id)) throw new CampaignRequestError('NOT_FOUND', 'The campaign could not be found.')
+  let body
   try {
-    response = await fetch(`/api/campaigns/${encodeURIComponent(id)}`, { signal })
+    body = await apiRequest(`/api/campaigns/${id}`, { signal, expectedStatus: 200 })
   } catch (error) {
-    if (error?.name === 'AbortError') {
-      throw new CampaignRequestError('ABORTED', 'The campaign request was cancelled.')
-    }
-
-    throw new CampaignRequestError('NETWORK_ERROR', 'The campaign API could not be reached.')
+    if (error?.status === 404) throw new CampaignRequestError('NOT_FOUND', 'The campaign could not be found.')
+    throw error
   }
-
-  const body = await readJson(response)
   const campaign = body?.campaign ?? body
-
-  if (!campaign?.id) {
+  if (campaign && ['pending', 'rejected'].includes(campaign.status)) {
     throw new CampaignRequestError('NOT_FOUND', 'The campaign could not be found.')
   }
-
+  if (!campaign || campaign.status !== 'approved') throw invalidResponse()
+  if (String(campaign.id) !== String(id)) throw invalidResponse()
   return { campaign: normalizeCampaign(campaign) }
 }

@@ -1,6 +1,6 @@
 # Current authentication API
 
-**Reference:** Implemented code on main at `0146365c`. Examples describe existing responses; they are not a claim that all invalid-input or security cases have been tested.
+**Reference:** The checked-out backend authentication service/controllers, inherited from reviewed main `0146365c`. Examples describe existing responses; they are not a claim that all invalid-input or security cases have been tested.
 
 ## Register
 
@@ -27,6 +27,8 @@ Accepted fields are `name`, `email`, `password` and `accountType`. `user` maps t
 ```
 
 Registration does not return a token or create a business profile. Controller errors include `409 EMAIL_EXISTS` and `422 VALIDATION_FAILED`, using `status`, `code`, `message` and `fieldErrors`. Comprehensive server-side field/type/length validation remains work to complete.
+
+The frontend limits the trimmed name to 100 characters and email to 150, matching the existing user columns. It confirms registration only when the returned role matches the submitted account type. These browser checks do not replace server-side validation.
 
 ## Login
 

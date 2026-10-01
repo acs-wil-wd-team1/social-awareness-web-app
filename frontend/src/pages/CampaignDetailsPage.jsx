@@ -1,5 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useCallback } from 'react'
 import { getCampaignById } from '../services/campaignService.js'
+import useLiveRefresh from '../hooks/useLiveRefresh.js'
+import CampaignParticipation from '../components/CampaignParticipation.jsx'
+import CampaignEnquiryForm from '../components/CampaignEnquiryForm.jsx'
+
+const isUnavailable = (error) => error?.code === 'NOT_FOUND' || error?.status === 404
 
 const categoryClassNames = {
   Community: 'campaign-details--community',
@@ -8,17 +13,21 @@ const categoryClassNames = {
 }
 
 function hideBrokenImage(event) {
-  event.currentTarget.hidden = true
+  if (event.currentTarget.dataset.fallback) event.currentTarget.hidden = true
+  else {
+    event.currentTarget.dataset.fallback = 'true'
+    event.currentTarget.src = '/campaign-placeholder.svg'
+  }
 }
 
 function formatCampaignType(type) {
   if (type === 'business') return 'Small business'
   if (type === 'cause') return 'Social cause'
-  return 'Not specified'
+  return null
 }
 
 function formatPublishedDate(createdAt) {
-  if (!createdAt) return 'Not specified'
+  if (!createdAt || !Number.isFinite(Date.parse(createdAt))) return 'Not provided'
 
   return new Intl.DateTimeFormat('en-AU', {
     day: 'numeric',
@@ -30,47 +39,24 @@ function formatPublishedDate(createdAt) {
 
 export default function CampaignDetailsPage({
   campaignId,
+  token,
+  role,
   campaignLoader = getCampaignById,
 }) {
-  const [campaign, setCampaign] = useState(null)
-  const [requestState, setRequestState] = useState('loading')
-  const [errorCode, setErrorCode] = useState(null)
-  const [retryKey, setRetryKey] = useState(0)
+  const loadCampaign = useCallback(({ signal }) => campaignLoader(campaignId, { signal }), [campaignId, campaignLoader])
+  const live = useLiveRefresh(loadCampaign, { resourceKey: String(campaignId), isUnavailable })
+  const campaign = live.data?.campaign
 
-  useEffect(() => {
-    const controller = new AbortController()
-
-    setCampaign(null)
-    setErrorCode(null)
-    setRequestState('loading')
-
-    campaignLoader(campaignId, { signal: controller.signal })
-      .then(({ campaign: nextCampaign }) => {
-        if (!controller.signal.aborted) {
-          setCampaign(nextCampaign)
-          setRequestState('success')
-        }
-      })
-      .catch((error) => {
-        if (!controller.signal.aborted && error?.code !== 'ABORTED') {
-          setErrorCode(error?.code ?? 'UNKNOWN')
-          setRequestState('error')
-        }
-      })
-
-    return () => controller.abort()
-  }, [campaignId, campaignLoader, retryKey])
-
-  if (requestState === 'loading') {
+  if (live.isLoading) {
     return (
       <section className="details-state content-width" aria-live="polite">
-        <p>Loading campaign…</p>
+        <p>{live.paused === 'offline' ? 'You’re offline. Connect to the internet to load this campaign.' : 'Loading campaign…'}</p>
       </section>
     )
   }
 
-  if (requestState === 'error') {
-    const isNotFound = errorCode === 'NOT_FOUND'
+  if (live.error && !campaign) {
+    const isNotFound = isUnavailable(live.error)
 
     return (
       <section className="details-state content-width" aria-labelledby="details-error-title">
@@ -83,7 +69,7 @@ export default function CampaignDetailsPage({
             : 'Please try again.'}
         </p>
         {isNotFound ? null : (
-          <button type="button" onClick={() => setRetryKey((current) => current + 1)}>
+          <button type="button" onClick={live.refresh}>
             Try again
           </button>
         )}
@@ -102,10 +88,19 @@ export default function CampaignDetailsPage({
         ← Back to campaigns
       </a>
 
+      <div className="public-campaign-filter-notice">
+        {live.updatedAt ? <p>Last updated <time dateTime={live.updatedAt.toISOString()}>{live.updatedAt.toLocaleTimeString('en-AU')}</time>. Updates automatically while this page is open.</p> : null}
+        <button type="button" onClick={live.refresh} disabled={live.refreshing || live.paused === 'offline'}>Refresh campaign</button>
+        {live.refreshing ? <p role="status">Checking for campaign updates…</p> : null}
+        {live.paused === 'offline' ? <p role="status">You’re offline. Campaign updates will resume when you reconnect.</p> : null}
+        {live.error ? <p role="alert">Campaign updates could not be loaded. Showing the last loaded campaign. <button type="button" onClick={live.refresh}>Retry updates</button></p> : null}
+      </div>
+
       <article className={`campaign-details ${categoryClassName}`}>
         <div className="campaign-details__media">
           <img
-            src={campaign.imageUrl}
+            key={`${campaign.id}:${campaign.imageUrl || ''}`}
+            src={campaign.imageUrl || '/campaign-placeholder.svg'}
             alt=""
             decoding="async"
             onError={hideBrokenImage}
@@ -142,17 +137,35 @@ export default function CampaignDetailsPage({
               <dt>Category</dt>
               <dd>{campaign.category ?? 'Not specified'}</dd>
             </div>
-            <div>
+            {formatCampaignType(campaign.type) ? <div>
               <dt>Campaign type</dt>
               <dd>{formatCampaignType(campaign.type)}</dd>
-            </div>
+            </div> : null}
+            {campaign.business?.businessName ? <div>
+              <dt>Business</dt>
+              <dd>{campaign.business.businessName}</dd>
+            </div> : null}
+            {campaign.startDate ? <div>
+              <dt>Starts</dt>
+              <dd>{formatPublishedDate(campaign.startDate)}</dd>
+            </div> : null}
+            {campaign.endDate ? <div>
+              <dt>Ends</dt>
+              <dd>{formatPublishedDate(campaign.endDate)}</dd>
+            </div> : null}
+            {campaign.targetAudience ? <div>
+              <dt>Who can take part</dt>
+              <dd>{campaign.targetAudience}</dd>
+            </div> : null}
             <div>
-              <dt>Published</dt>
+              <dt>Created</dt>
               <dd>{formatPublishedDate(campaign.createdAt)}</dd>
             </div>
           </dl>
         </aside>
       </div>
+      {campaign.type === 'cause' ? <CampaignParticipation key={campaign.id} campaign={campaign} token={token} role={role} /> : null}
+      {campaign.type === 'business' ? <CampaignEnquiryForm key={campaign.id} campaign={campaign} token={token} role={role} /> : null}
     </section>
   )
 }

@@ -5,7 +5,11 @@ const categoryClassNames = {
 }
 
 function hideBrokenImage(event) {
-  event.currentTarget.hidden = true
+  if (event.currentTarget.dataset.fallback) event.currentTarget.hidden = true
+  else {
+    event.currentTarget.dataset.fallback = 'true'
+    event.currentTarget.src = '/campaign-placeholder.svg'
+  }
 }
 
 export default function CampaignCard({ campaign }) {
@@ -16,7 +20,8 @@ export default function CampaignCard({ campaign }) {
       <article>
         <div className="campaign-card__media">
           <img
-            src={campaign.imageUrl}
+            key={`${campaign.id}:${campaign.imageUrl || ''}`}
+            src={campaign.imageUrl || '/campaign-placeholder.svg'}
             alt=""
             loading="lazy"
             decoding="async"

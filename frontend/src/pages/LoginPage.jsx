@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { apiRequest } from '../services/apiClient.js'
+import { safeReturnPath, storeSession } from '../services/authSession.js'
 
 const initialValues = {
   email: '',
@@ -63,39 +65,25 @@ export default function LoginPage() {
     setIsSubmitting(true)
 
     try {
-      const response = await fetch('/api/auth/login', {
+      const body = await apiRequest('/api/auth/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: formValues.email,
+        expectedStatus: 200,
+        body: {
+          email: formValues.email.trim(),
           password: formValues.password,
-        }),
+        },
       })
 
-      const body = await response.json().catch(() => null)
-
-      if (!response.ok) {
-        setErrors((currentErrors) => ({
-          ...currentErrors,
-          ...(body?.fieldErrors ?? {}),
-        }))
-
-        setApiError(body?.message ?? 'Login failed. Please try again.')
+      if (typeof body?.token !== 'string' || !body.token.trim() || !Number.isSafeInteger(body.user?.id) || body.user.id <= 0 || !['public', 'business_owner', 'admin'].includes(body.user?.role)) {
+        setApiError('The server did not return a valid login session. Please try again.')
         return
       }
 
-      if (!body?.token) {
-        setApiError('Login succeeded, but no authentication token was returned.')
-        return
-      }
-
-      localStorage.setItem('token', body.token)
-
-      window.location.href = '/'
-    } catch {
-      setApiError('The login service could not be reached.')
+      storeSession(body.token, body.user)
+      window.location.href = safeReturnPath(new URLSearchParams(window.location.search).get('returnTo'))
+    } catch (error) {
+      setErrors(current => ({ ...current, ...error.fieldErrors }))
+      setApiError(error.message || 'The login service could not be reached.')
     } finally {
       setIsSubmitting(false)
     }
@@ -113,6 +101,7 @@ export default function LoginPage() {
               id="login-email"
               name="email"
               type="email"
+              autoComplete="username"
               value={formValues.email}
               onChange={handleChange}
               placeholder="e.g. kim@example.com"
@@ -129,6 +118,7 @@ export default function LoginPage() {
               id="login-password"
               name="password"
               type="password"
+              autoComplete="current-password"
               value={formValues.password}
               onChange={handleChange}
               placeholder="Password"

@@ -1,0 +1,1762 @@
+{
+  "info": {
+    "name": "CauseConnect — Stage 3 API handoff",
+    "description": "Importable contract checks, not a backend implementation. Existing routes and proposed Stage 3 targets are labelled separately. Remote hosts and redirects are blocked; writes need a disposable local database acknowledgement and exact one-request arming. Read README.md before running. No requests have been executed as proof by this collection.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Requires Postman Desktop with pm.execution.skipRequest support. Never follows redirects.",
+          "const stop = (message) => {",
+          "  pm.execution.skipRequest();",
+          "  throw new Error(message);",
+          "};",
+          "const base = String(pm.environment.get('baseUrl') || '');",
+          "const match = /^http:\\/\\/(localhost|127\\.0\\.0\\.1):([1-9][0-9]{0,4})$/.exec(base);",
+          "if (!match || Number(match[2]) > 65535) stop('Set baseUrl to an explicit localhost HTTP port; remote hosts are blocked.');",
+          "const url = pm.variables.replaceIn(pm.request.url.toString());",
+          "if (!url.startsWith(base + '/') || /[\\r\\n]/.test(url)) stop('Request must stay on the selected local API.');",
+          "const needsWrite = !['GET', 'HEAD', 'OPTIONS'].includes(pm.request.method);",
+          "if (needsWrite) {",
+          "  if (pm.environment.get('allowWrites') !== 'true' ||",
+          "      pm.environment.get('isolatedFixtureAcknowledgement') !== 'I created a disposable local database') {",
+          "    stop('Writes are disabled. Verify the backend uses a disposable database, then enable the local write guard.');",
+          "  }",
+          "  if (pm.environment.get('armedWriteRequest') !== pm.info.requestName) {",
+          "    stop('Arm only this exact request name in armedWriteRequest. Whole-collection mutation runs are blocked.');",
+          "  }",
+          "  pm.environment.unset('armedWriteRequest'); // consumed even when the later request fails",
+          "}",
+          "const unresolved = /{{[^}]+}}/;",
+          "if (unresolved.test(url)) stop('Set the fixture IDs needed by this request.');",
+          "for (const part of url.split(/[/?=&]/)) {",
+          "  if (/Id$/.test(part)) stop('An unresolved fixture ID remains.');",
+          "}",
+          "const authorization = pm.request.headers.get('Authorization');",
+          "if (authorization) {",
+          "  const resolved = pm.variables.replaceIn(authorization);",
+          "  if (!/^Bearer [^\\s]+$/.test(resolved) || unresolved.test(resolved)) stop('Run the matching fixture login or set its private local token value.');",
+          "}",
+          "if (!pm.variables.get('startDate')) pm.variables.set('startDate', new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10));",
+          "if (!pm.variables.get('endDate')) pm.variables.set('endDate', new Date(Date.now() + 8 * 86400000).toISOString().slice(0, 10));",
+          "if (pm.request.body && pm.request.body.mode === 'raw') {",
+          "  const body = pm.variables.replaceIn(pm.request.body.raw);",
+          "  if (unresolved.test(body)) stop('Set the fixture values needed by this JSON request.');",
+          "  try { JSON.parse(body); } catch { stop('Resolved request body is not valid JSON. Check blank numeric IDs and versions.'); }",
+          "}",
+          "if (pm.request.body && pm.request.body.mode === 'formdata' &&",
+          "    pm.request.body.formdata.find((part) => part.type === 'file' && (!part.src || (Array.isArray(part.src) && part.src.length === 0)))) {",
+          "  stop('Select one local disposable JPEG/PNG/WebP file before uploading.');",
+          "}"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const spec = JSON.parse(pm.collectionVariables.get('contractChecks'))[pm.info.requestName];",
+          "let valid = true;",
+          "function check(name, fn) { pm.test(name, () => { try { fn(); } catch (error) { valid = false; throw error; } }); }",
+          "function object(v) { pm.expect(v).to.be.an('object'); pm.expect(Array.isArray(v)).to.equal(false); }",
+          "function id(v) { pm.expect(Number.isSafeInteger(v) && v > 0).to.equal(true); }",
+          "function str(v) { pm.expect(v).to.be.a('string'); }",
+          "function nullableText(v) { if (v !== null) str(v); }",
+          "function stamp(v) { str(v); pm.expect(/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(v)).to.equal(true); pm.expect(new Date(v).toISOString()).to.equal(v); }",
+          "function oneOf(v, values) { pm.expect(values).to.include(v); }",
+          "function noPrivate(v) { for (const key of ['password', 'passwordHash', 'password_hash', 'token', 'sessions', 'UserSessions', 'storage_key']) pm.expect(v).not.to.have.property(key); }",
+          "function review(v) { object(v); id(v.id); id(v.campaignId); id(v.adminId); oneOf(v.action, ['approved','rejected']); nullableText(v.comments); stamp(v.reviewedAt); }",
+          "function campaign(v, expanded, version) {",
+          "  object(v); id(v.id); str(v.title); pm.expect(v.title.trim().length).to.be.above(0); str(v.description);",
+          "  oneOf(v.status, ['pending','approved','rejected']); stamp(v.createdAt); noPrivate(v);",
+          "  if (expanded) {",
+          "    id(v.categoryId); str(v.category); oneOf(v.type, ['cause','business']); nullableText(v.imageUrl);",
+          "    nullableText(v.targetAudience); for (const key of ['startDate','endDate']) if(v[key] !== null) { str(v[key]); pm.expect(/^\\d{4}-\\d{2}-\\d{2}$/.test(v[key])).to.equal(true); }",
+          "    id(v.createdBy);",
+          "    if(v.type === 'cause') pm.expect(v.businessId).to.equal(null); else id(v.businessId);",
+          "    if (v.business !== undefined && v.business !== null) { object(v.business); id(v.business.id); pm.expect(v.business.id).to.equal(v.businessId); str(v.business.businessName); nullableText(v.business.website); }",
+          "  }",
+          "  if(version) stamp(v.updatedAt);",
+          "}",
+          "function profile(v) { object(v); id(v.id); str(v.businessName); pm.expect(v.businessName.trim().length).to.be.above(0); ['abn','website','description'].forEach(k => nullableText(v[k])); }",
+          "function user(v) { object(v); pm.expect(Object.keys(v).sort()).to.deep.equal(['id','name','email','role','status','createdAt'].sort()); id(v.id); str(v.name); str(v.email); oneOf(v.role,['public','business_owner','admin']); oneOf(v.status,['active','suspended']); stamp(v.createdAt); }",
+          "function participation(v) { object(v); id(v.id); id(v.campaignId); oneOf(v.status,['joined','withdrawn']); stamp(v.participatedAt); }",
+          "function enquiry(v) { object(v); ['id','campaignId','businessId'].forEach(k=>id(v[k])); ['name','email','message'].forEach(k=>str(v[k])); nullableText(v.phone); stamp(v.createdAt); noPrivate(v); }",
+          "function summary(v, campaignId) { if (v === null) return; object(v); id(v.id); pm.expect(v.id).to.equal(campaignId); str(v.title); oneOf(v.status,['pending','approved','rejected']); noPrivate(v); pm.expect(v).not.to.have.property('review'); }",
+          "function page(body, key, validate, totalRequired = true) {",
+          "  object(body); pm.expect(body[key]).to.be.an('array'); pm.expect(body.page).to.equal(1); pm.expect(body.pageSize).to.equal(10);",
+          "  pm.expect(body[key].length).to.be.at.most(10);",
+          "  if(totalRequired || body.total !== undefined) { pm.expect(Number.isSafeInteger(body.total) && body.total >= 0).to.equal(true); pm.expect(body.total).to.be.at.least(body[key].length); }",
+          "  const ids = new Set(); body[key].forEach(v => { validate(v); pm.expect(ids.has(v.id)).to.equal(false); ids.add(v.id); });",
+          "}",
+          "check('Exact HTTP status', () => pm.expect(pm.response.code).to.equal(spec.status));",
+          "let body;",
+          "if (spec.status === 204) {",
+          "  check('204 has no body', () => pm.expect(pm.response.text()).to.equal(''));",
+          "} else {",
+          "  check('JSON response, never an SPA document', () => { pm.expect(pm.response.headers.get('Content-Type') || '').to.match(/application\\/json/i); body = pm.response.json(); object(body); });",
+          "}",
+          "if (body !== undefined && pm.response.code === spec.status) {",
+          "  check('Contract envelope, field types and requested state', () => {",
+          "    const resolvedBody = pm.request.body && pm.request.body.mode === 'raw' ? JSON.parse(pm.variables.replaceIn(pm.request.body.raw)) : null;",
+          "    switch(spec.kind) {",
+          "      case 'login':",
+          "        object(body.user); id(body.user.id); str(body.user.name); str(body.user.email); pm.expect(body.user.role).to.equal(spec.role); noPrivate(body.user);",
+          "        str(body.token); pm.expect(body.token).to.match(/^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$/); break;",
+          "      case 'categories':",
+          "        pm.expect(body.categories).to.be.an('array'); body.categories.forEach(c=>{ object(c); id(c.id); str(c.name); }); break;",
+          "      case 'campaignList':",
+          "        page(body,'campaigns',c=>campaign(c,!!spec.expanded,false),!!spec.expanded);",
+          "        if(spec.public) body.campaigns.forEach(c=>{ pm.expect(c.status).to.equal('approved'); pm.expect(c).not.to.have.property('review'); });",
+          "        break;",
+          "      case 'campaignDetail':",
+          "        campaign(body,!!spec.expanded,!!spec.version);",
+          "        pm.expect(body.id).to.equal(Number(pm.variables.get(spec.idVariable)));",
+          "        if(spec.public) { pm.expect(body.status).to.equal('approved'); pm.expect(body).not.to.have.property('review'); }",
+          "        break;",
+          "      case 'campaignCreate':",
+          "      case 'campaignUpdate':",
+          "        campaign(body.campaign,!!spec.expanded,!!spec.version); pm.expect(body.campaign.status).to.equal('pending');",
+          "        pm.expect(body.campaign.title).to.equal(resolvedBody.title.trim());",
+          "        pm.expect(body.campaign.createdBy).to.equal(Number(pm.variables.get(spec.role + 'UserId')));",
+          "        if(spec.role === 'business') { pm.expect(body.campaign.type).to.equal('business'); id(body.campaign.businessId); }",
+          "        else { pm.expect(body.campaign.type).to.equal('cause'); pm.expect(body.campaign.businessId).to.equal(null); }",
+          "        if(spec.kind === 'campaignUpdate') { pm.expect(body.campaign.id).to.equal(Number(pm.variables.get('ownerCampaignId'))); pm.expect(Date.parse(body.campaign.updatedAt)).to.be.above(Date.parse(resolvedBody.expectedUpdatedAt)); }",
+          "        break;",
+          "      case 'profile': if(body.business !== null) profile(body.business); if(spec.saved) { profile(body.business); pm.expect(body.business.businessName).to.equal(resolvedBody.businessName.trim()); } break;",
+          "      case 'image':",
+          "        str(body.imageId); pm.expect(body.imageId.trim().length).to.be.above(0); oneOf(body.contentType,['image/jpeg','image/png','image/webp']);",
+          "        pm.expect(Number.isInteger(body.sizeBytes) && body.sizeBytes > 0 && body.sizeBytes <= 5000000).to.equal(true);",
+          "        stamp(body.expiresAt); pm.expect(Date.parse(body.expiresAt)).to.be.above(Date.now()); break;",
+          "      case 'decision':",
+          "      case 'publication':",
+          "        object(body.campaign); pm.expect(body.campaign.id).to.equal(Number(pm.variables.get('adminCampaignId'))); pm.expect(body.campaign.status).to.equal(resolvedBody.status);",
+          "        stamp(body.campaign.updatedAt); pm.expect(Date.parse(body.campaign.updatedAt)).to.be.above(Date.parse(resolvedBody.expectedUpdatedAt));",
+          "        if(spec.kind === 'decision') { review(body.review); pm.expect(body.review.campaignId).to.equal(body.campaign.id); pm.expect(body.review.adminId).to.equal(Number(pm.variables.get('adminUserId'))); pm.expect(body.review.action).to.equal(resolvedBody.status); }",
+          "        break;",
+          "      case 'reviews': page(body,'reviews',r=>{ review(r); pm.expect(r.campaignId).to.equal(Number(pm.variables.get('adminCampaignId'))); }); break;",
+          "      case 'users': page(body,'users',user); break;",
+          "      case 'userStatus': user(body.user); pm.expect(body.user.id).to.equal(Number(pm.variables.get('targetUserId'))); pm.expect(body.user.status).to.equal(resolvedBody.status); pm.expect(body.user.role).not.to.equal('admin'); break;",
+          "      case 'participation':",
+          "        if(body.participation !== null) { participation(body.participation); pm.expect(body.participation.campaignId).to.equal(Number(pm.variables.get('approvedCauseId'))); }",
+          "        if(resolvedBody) { participation(body.participation); pm.expect(body.participation.status).to.equal(resolvedBody.status); } break;",
+          "      case 'participations': page(body,'participations',p=>{ participation(p); summary(p.campaign,p.campaignId); }); break;",
+          "      case 'enquiry':",
+          "        enquiry(body.enquiry); pm.expect(body.enquiry.campaignId).to.equal(Number(pm.variables.get('approvedBusinessId')));",
+          "        for(const key of ['name','message']) pm.expect(body.enquiry[key]).to.equal(resolvedBody[key].trim());",
+          "        pm.expect(body.enquiry.email).to.equal(resolvedBody.email.trim().toLowerCase()); pm.expect(body.enquiry.phone).to.equal(resolvedBody.phone ? resolvedBody.phone.trim() : null); break;",
+          "      case 'enquiries': page(body,'enquiries',e=>{ enquiry(e); summary(e.campaign,e.campaignId); }); break;",
+          "      case 'error':",
+          "        pm.expect(body.status).to.equal(spec.status); oneOf(body.code,spec.codes); str(body.message);",
+          "        if(body.fieldErrors !== null) { object(body.fieldErrors); Object.values(body.fieldErrors).forEach(str); }",
+          "        break;",
+          "      default: throw new Error('No contract assertion defined for ' + spec.kind);",
+          "    }",
+          "  });",
+          "}",
+          "if(valid && spec.status !== 204 && body !== undefined) {",
+          "  // Run-local only: no token/password is written to the shared environment or collection.",
+          "  if(spec.kind === 'login') { pm.variables.set((spec.tokenPrefix || spec.role) + 'Token',body.token); pm.variables.set((spec.tokenPrefix || spec.role) + 'UserId',body.user.id); }",
+          "  if(spec.kind === 'categories' && body.categories.length) pm.variables.set('categoryId',body.categories[0].id);",
+          "  if(spec.kind === 'campaignCreate') { pm.variables.set('ownerCampaignId',body.campaign.id); pm.variables.set('pendingCampaignId',body.campaign.id); if(body.campaign.updatedAt) pm.variables.set('ownerVersion',body.campaign.updatedAt); }",
+          "  if(spec.kind === 'campaignDetail' && spec.version) pm.variables.set(spec.idVariable === 'ownerCampaignId' ? 'ownerVersion' : 'adminVersion',body.updatedAt);",
+          "  if(['campaignUpdate','decision','publication'].includes(spec.kind)) pm.variables.set(spec.kind === 'campaignUpdate' ? 'ownerVersion' : 'adminVersion',body.campaign.updatedAt);",
+          "  if(spec.kind === 'image') pm.variables.set('imageId',body.imageId);",
+          "}",
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "contractChecks",
+      "value": "{\"Login public fixture (creates session)\":{\"status\":200,\"kind\":\"login\",\"role\":\"public\"},\"Login business fixture (creates session)\":{\"status\":200,\"kind\":\"login\",\"role\":\"business_owner\",\"tokenPrefix\":\"business\"},\"Login admin fixture (creates session)\":{\"status\":200,\"kind\":\"login\",\"role\":\"admin\"},\"Logout public fixture (invalidates session)\":{\"status\":204,\"kind\":\"empty\"},\"Categories (existing)\":{\"status\":200,\"kind\":\"categories\"},\"Public campaigns (existing core)\":{\"status\":200,\"kind\":\"campaignList\",\"public\":true},\"Public campaign detail (existing core)\":{\"status\":200,\"kind\":\"campaignDetail\",\"public\":true,\"idVariable\":\"approvedCauseId\"},\"Public campaigns (Stage 3 target)\":{\"status\":200,\"kind\":\"campaignList\",\"public\":true,\"expanded\":true},\"Admin campaigns (Stage 3 target)\":{\"status\":200,\"kind\":\"campaignList\",\"expanded\":true},\"Admin campaign detail (loads version)\":{\"status\":200,\"kind\":\"campaignDetail\",\"expanded\":true,\"version\":true,\"idVariable\":\"adminCampaignId\"},\"Get own business profile\":{\"status\":200,\"kind\":\"profile\"},\"Save own business profile\":{\"status\":200,\"kind\":\"profile\",\"saved\":true},\"Upload one campaign photo\":{\"status\":201,\"kind\":\"image\"},\"Create text-only public campaign (existing branch)\":{\"status\":201,\"kind\":\"campaignCreate\",\"role\":\"public\",\"expanded\":true},\"Create public campaign with uploaded photo\":{\"status\":201,\"kind\":\"campaignCreate\",\"role\":\"public\",\"expanded\":true},\"Create business campaign\":{\"status\":201,\"kind\":\"campaignCreate\",\"role\":\"business\",\"expanded\":true},\"List own campaigns\":{\"status\":200,\"kind\":\"campaignList\",\"expanded\":true},\"Load own campaign (loads version)\":{\"status\":200,\"kind\":\"campaignDetail\",\"expanded\":true,\"version\":true,\"idVariable\":\"ownerCampaignId\"},\"Edit own campaign and resubmit\":{\"status\":200,\"kind\":\"campaignUpdate\",\"role\":\"public\",\"expanded\":true,\"version\":true},\"Soft-delete own fixture campaign\":{\"status\":204,\"kind\":\"empty\"},\"Approve fixture campaign\":{\"status\":200,\"kind\":\"decision\"},\"Reject fixture campaign\":{\"status\":200,\"kind\":\"decision\"},\"Campaign review history\":{\"status\":200,\"kind\":\"reviews\"},\"Unpublish approved fixture campaign\":{\"status\":200,\"kind\":\"publication\"},\"Admin soft-delete fixture campaign\":{\"status\":204,\"kind\":\"empty\"},\"List accounts\":{\"status\":200,\"kind\":\"users\"},\"Suspend disposable non-admin account\":{\"status\":200,\"kind\":\"userStatus\"},\"Reactivate disposable non-admin account\":{\"status\":200,\"kind\":\"userStatus\"},\"Read my participation\":{\"status\":200,\"kind\":\"participation\"},\"Join or rejoin approved cause\":{\"status\":200,\"kind\":\"participation\"},\"Withdraw from approved cause\":{\"status\":200,\"kind\":\"participation\"},\"My participation history\":{\"status\":200,\"kind\":\"participations\"},\"Send fixture business enquiry\":{\"status\":201,\"kind\":\"enquiry\"},\"Own business enquiry inbox\":{\"status\":200,\"kind\":\"enquiries\"},\"Pending campaign is not public\":{\"status\":404,\"kind\":\"error\",\"codes\":[\"CAMPAIGN_NOT_FOUND\"]},\"Other owner campaign stays private\":{\"status\":404,\"kind\":\"error\",\"codes\":[\"CAMPAIGN_NOT_FOUND\"]},\"Guest cannot read own campaigns\":{\"status\":401,\"kind\":\"error\",\"codes\":[\"AUTH_REQUIRED\",\"INVALID_TOKEN\"]},\"Public account cannot read admin users\":{\"status\":403,\"kind\":\"error\",\"codes\":[\"FORBIDDEN\"]},\"Stale owner edit is rejected\":{\"status\":409,\"kind\":\"error\",\"codes\":[\"CAMPAIGN_CHANGED\"]},\"Forged campaign ownership is rejected\":{\"status\":422,\"kind\":\"error\",\"codes\":[\"VALIDATION_FAILED\"]},\"Invalid participation state is rejected\":{\"status\":422,\"kind\":\"error\",\"codes\":[\"VALIDATION_FAILED\"]}}",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1 — Authentication (existing routes)",
+      "description": "Select one fixture login deliberately. Logins create sessions, so the write guard applies.",
+      "item": [
+        {
+          "name": "Login public fixture (creates session)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/login",
+            "description": "Existing route. Use a fixture account provisioned in the disposable database. Token is captured only in the current run; do not export credentials.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{publicEmail}}\",\n  \"password\": \"{{publicPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const required = [\"publicEmail\",\"publicPassword\"];",
+                  "for (const key of required) {",
+                  "  const value = pm.variables.get(key);",
+                  "  if (value === undefined || value === null || String(value).trim() === '' || (key !== 'imageId' && /Id$/.test(key) && !/^[1-9][0-9]*$/.test(String(value))) || (/Version$/.test(key) && !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(String(value)))) {",
+                  "    pm.execution.skipRequest(); throw new Error('Set the disposable fixture value: ' + key);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login business fixture (creates session)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/login",
+            "description": "Existing route. Use a fixture account provisioned in the disposable database. Token is captured only in the current run; do not export credentials.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{businessEmail}}\",\n  \"password\": \"{{businessPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const required = [\"businessEmail\",\"businessPassword\"];",
+                  "for (const key of required) {",
+                  "  const value = pm.variables.get(key);",
+                  "  if (value === undefined || value === null || String(value).trim() === '' || (key !== 'imageId' && /Id$/.test(key) && !/^[1-9][0-9]*$/.test(String(value))) || (/Version$/.test(key) && !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(String(value)))) {",
+                  "    pm.execution.skipRequest(); throw new Error('Set the disposable fixture value: ' + key);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login admin fixture (creates session)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/login",
+            "description": "Existing route. Use a fixture account provisioned in the disposable database. Token is captured only in the current run; do not export credentials.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const required = [\"adminEmail\",\"adminPassword\"];",
+                  "for (const key of required) {",
+                  "  const value = pm.variables.get(key);",
+                  "  if (value === undefined || value === null || String(value).trim() === '' || (key !== 'imageId' && /Id$/.test(key) && !/^[1-9][0-9]*$/.test(String(value))) || (/Version$/.test(key) && !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(String(value)))) {",
+                  "    pm.execution.skipRequest(); throw new Error('Set the disposable fixture value: ' + key);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout public fixture (invalidates session)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{publicToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/logout",
+            "description": "Existing route. Run deliberately at the end; subsequent use of this token should fail.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": []
+        }
+      ]
+    },
+    {
+      "name": "2 — Categories and campaign reads",
+      "description": "Core read routes exist; the expanded serializers/version fields remain backend work.",
+      "item": [
+        {
+          "name": "Categories (existing)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/campaigns/categories",
+            "description": "Existing branch endpoint; captures first category ID in the current run only.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": []
+        },
+        {
+          "name": "Public campaigns (existing core)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/campaigns?page=1&pageSize=10",
+            "description": "Checks existing core fields; not evidence of expanded Stage 3 fields.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": []
+        },
+        {
+          "name": "Public campaign detail (existing core)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/campaigns/{{approvedCauseId}}",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const required = [\"approvedCauseId\"];",
+                  "for (const key of required) {",
+                  "  const value = pm.variables.get(key);",
+                  "  if (value === undefined || value === null || String(value).trim() === '' || (key !== 'imageId' && /Id$/.test(key) && !/^[1-9][0-9]*$/.test(String(value))) || (/Version$/.test(key) && !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(String(value)))) {",
+                  "    pm.execution.skipRequest(); throw new Error('Set the disposable fixture value: ' + key);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Public campaigns (Stage 3 target)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/campaigns?page=1&pageSize=10",
+            "description": "Stricter target: total plus expanded fields. Existing core-only backend may fail.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": []
+        },
+        {
+          "name": "Admin campaigns (Stage 3 target)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/campaigns/admin?page=1&pageSize=10&status=pending",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": []
+        },
+        {
+          "name": "Admin campaign detail (loads version)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/campaigns/admin/{{adminCampaignId}}",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const required = [\"adminCampaignId\"];",
+                  "for (const key of required) {",
+                  "  const value = pm.variables.get(key);",
+                  "  if (value === undefined || value === null || String(value).trim() === '' || (key !== 'imageId' && /Id$/.test(key) && !/^[1-9][0-9]*$/.test(String(value))) || (/Version$/.test(key) && !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(String(value)))) {",
+                  "    pm.execution.skipRequest(); throw new Error('Set the disposable fixture value: ' + key);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3 — Business profile (pending implementation)",
+      "item": [
+        {
+          "name": "Get own business profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{businessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/business/me",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": []
+        },
+        {
+          "name": "Save own business profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{businessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/business/me",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"businessName\": \"Disposable fixture repairs\",\n  \"abn\": \"\",\n  \"website\": \"https://example.test\",\n  \"description\": \"Local integration fixture only.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": []
+        }
+      ]
+    },
+    {
+      "name": "4 — Posting and owner management",
+      "description": "All except text-only public creation require the proposed backend. Each write requires fresh one-request arming.",
+      "item": [
+        {
+          "name": "Upload one campaign photo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{publicToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/campaign-images",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": [],
+                  "description": "Choose one disposable local JPEG/PNG/WebP <= 5,000,000 bytes; no file is selected by default."
+                }
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": []
+        },
+        {
+          "name": "Create text-only public campaign (existing branch)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{publicToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/campaigns",
+            "description": "Existing text-only slice. Capture generated ID from response; never assume fixture ID 1.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Disposable contract fixture\",\n  \"description\": \"Created only in the disposable local integration database.\",\n  \"categoryId\": {{categoryId}},\n  \"targetAudience\": \"Fixture users\",\n  \"startDate\": \"{{startDate}}\",\n  \"endDate\": \"{{endDate}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const required = [\"categoryId\",\"publicUserId\"];",
+                  "for (const key of required) {",
+                  "  const value = pm.variables.get(key);",
+                  "  if (value === undefined || value === null || String(value).trim() === '' || (key !== 'imageId' && /Id$/.test(key) && !/^[1-9][0-9]*$/.test(String(value))) || (/Version$/.test(key) && !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(String(value)))) {",
+                  "    pm.execution.skipRequest(); throw new Error('Set the disposable fixture value: ' + key);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create public campaign with uploaded photo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{publicToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/campaigns",
+            "description": "Proposed image extension. Requires a fresh owned, unattached upload reference.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Disposable contract fixture\",\n  \"description\": \"Created only in the disposable local integration database.\",\n  \"categoryId\": {{categoryId}},\n  \"targetAudience\": \"Fixture users\",\n  \"startDate\": \"{{startDate}}\",\n  \"endDate\": \"{{endDate}}\",\n  \"imageId\": \"{{imageId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const required = [\"categoryId\",\"publicUserId\",\"imageId\"];",
+                  "for (const key of required) {",
+                  "  const value = pm.variables.get(key);",
+                  "  if (value === undefined || value === null || String(value).trim() === '' || (key !== 'imageId' && /Id$/.test(key) && !/^[1-9][0-9]*$/.test(String(value))) || (/Version$/.test(key) && !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(String(value)))) {",
+                  "    pm.execution.skipRequest(); throw new Error('Set the disposable fixture value: ' + key);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create business campaign",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{businessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/campaigns",
+            "description": "Proposed extension; create the fixture business profile first. Server derives businessId and type.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Disposable contract fixture\",\n  \"description\": \"Created only in the disposable local integration database.\",\n  \"categoryId\": {{categoryId}},\n  \"targetAudience\": \"Fixture users\",\n  \"startDate\": \"{{startDate}}\",\n  \"endDate\": \"{{endDate}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const required = [\"categoryId\",\"businessUserId\"];",
+                  "for (const key of required) {",
+                  "  const value = pm.variables.get(key);",
+                  "  if (value === undefined || value === null || String(value).trim() === '' || (key !== 'imageId' && /Id$/.test(key) && !/^[1-9][0-9]*$/.test(String(value))) || (/Version$/.test(key) && !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(String(value)))) {",
+                  "    pm.execution.skipRequest(); throw new Error('Set the disposable fixture value: ' + key);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List own campaigns",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{publicToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/campaigns/mine?page=1&pageSize=10",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": []
+        },
+        {
+          "name": "Load own campaign (loads version)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{publicToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/campaigns/mine/{{ownerCampaignId}}",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const required = [\"ownerCampaignId\"];",
+                  "for (const key of required) {",
+                  "  const value = pm.variables.get(key);",
+                  "  if (value === undefined || value === null || String(value).trim() === '' || (key !== 'imageId' && /Id$/.test(key) && !/^[1-9][0-9]*$/.test(String(value))) || (/Version$/.test(key) && !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(String(value)))) {",
+                  "    pm.execution.skipRequest(); throw new Error('Set the disposable fixture value: ' + key);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Edit own campaign and resubmit",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{publicToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/campaigns/mine/{{ownerCampaignId}}",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Disposable contract fixture\",\n  \"description\": \"Created only in the disposable local integration database.\",\n  \"categoryId\": {{categoryId}},\n  \"targetAudience\": \"Fixture users\",\n  \"startDate\": \"{{startDate}}\",\n  \"endDate\": \"{{endDate}}\",\n  \"expectedUpdatedAt\": \"{{ownerVersion}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const required = [\"ownerCampaignId\",\"ownerVersion\",\"categoryId\",\"publicUserId\"];",
+                  "for (const key of required) {",
+                  "  const value = pm.variables.get(key);",
+                  "  if (value === undefined || value === null || String(value).trim() === '' || (key !== 'imageId' && /Id$/.test(key) && !/^[1-9][0-9]*$/.test(String(value))) || (/Version$/.test(key) && !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(String(value)))) {",
+                  "    pm.execution.skipRequest(); throw new Error('Set the disposable fixture value: ' + key);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Soft-delete own fixture campaign",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{publicToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/campaigns/mine/{{ownerCampaignId}}",
+            "description": "Recoverable deletion, but still a mutation. Deliberately arm this exact request; use only your disposable fixture.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"expectedUpdatedAt\":\"{{ownerVersion}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const required = [\"ownerCampaignId\",\"ownerVersion\"];",
+                  "for (const key of required) {",
+                  "  const value = pm.variables.get(key);",
+                  "  if (value === undefined || value === null || String(value).trim() === '' || (key !== 'imageId' && /Id$/.test(key) && !/^[1-9][0-9]*$/.test(String(value))) || (/Version$/.test(key) && !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(String(value)))) {",
+                  "    pm.execution.skipRequest(); throw new Error('Set the disposable fixture value: ' + key);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5 — Admin moderation and management (pending)",
+      "item": [
+        {
+          "name": "Approve fixture campaign",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/campaigns/admin/{{adminCampaignId}}/status",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"approved\",\n  \"comments\": null,\n  \"expectedUpdatedAt\": \"{{adminVersion}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const required = [\"adminCampaignId\",\"adminVersion\",\"adminUserId\"];",
+                  "for (const key of required) {",
+                  "  const value = pm.variables.get(key);",
+                  "  if (value === undefined || value === null || String(value).trim() === '' || (key !== 'imageId' && /Id$/.test(key) && !/^[1-9][0-9]*$/.test(String(value))) || (/Version$/.test(key) && !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(String(value)))) {",
+                  "    pm.execution.skipRequest(); throw new Error('Set the disposable fixture value: ' + key);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject fixture campaign",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/campaigns/admin/{{adminCampaignId}}/status",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"rejected\",\n  \"comments\": \"Fixture rejection: include the event location.\",\n  \"expectedUpdatedAt\": \"{{adminVersion}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const required = [\"adminCampaignId\",\"adminVersion\",\"adminUserId\"];",
+                  "for (const key of required) {",
+                  "  const value = pm.variables.get(key);",
+                  "  if (value === undefined || value === null || String(value).trim() === '' || (key !== 'imageId' && /Id$/.test(key) && !/^[1-9][0-9]*$/.test(String(value))) || (/Version$/.test(key) && !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(String(value)))) {",
+                  "    pm.execution.skipRequest(); throw new Error('Set the disposable fixture value: ' + key);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Campaign review history",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/campaigns/admin/{{adminCampaignId}}/reviews?page=1&pageSize=10",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const required = [\"adminCampaignId\"];",
+                  "for (const key of required) {",
+                  "  const value = pm.variables.get(key);",
+                  "  if (value === undefined || value === null || String(value).trim() === '' || (key !== 'imageId' && /Id$/.test(key) && !/^[1-9][0-9]*$/.test(String(value))) || (/Version$/.test(key) && !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(String(value)))) {",
+                  "    pm.execution.skipRequest(); throw new Error('Set the disposable fixture value: ' + key);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unpublish approved fixture campaign",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/campaigns/admin/{{adminCampaignId}}/publication",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"pending\",\n  \"reason\": \"Disposable contract test.\",\n  \"expectedUpdatedAt\": \"{{adminVersion}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const required = [\"adminCampaignId\",\"adminVersion\"];",
+                  "for (const key of required) {",
+                  "  const value = pm.variables.get(key);",
+                  "  if (value === undefined || value === null || String(value).trim() === '' || (key !== 'imageId' && /Id$/.test(key) && !/^[1-9][0-9]*$/.test(String(value))) || (/Version$/.test(key) && !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(String(value)))) {",
+                  "    pm.execution.skipRequest(); throw new Error('Set the disposable fixture value: ' + key);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin soft-delete fixture campaign",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/campaigns/admin/{{adminCampaignId}}",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Disposable contract test.\",\n  \"expectedUpdatedAt\": \"{{adminVersion}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const required = [\"adminCampaignId\",\"adminVersion\"];",
+                  "for (const key of required) {",
+                  "  const value = pm.variables.get(key);",
+                  "  if (value === undefined || value === null || String(value).trim() === '' || (key !== 'imageId' && /Id$/.test(key) && !/^[1-9][0-9]*$/.test(String(value))) || (/Version$/.test(key) && !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(String(value)))) {",
+                  "    pm.execution.skipRequest(); throw new Error('Set the disposable fixture value: ' + key);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List accounts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/admin/users?page=1&pageSize=10",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": []
+        },
+        {
+          "name": "Suspend disposable non-admin account",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/admin/users/{{targetUserId}}/status",
+            "description": "Use a separate disposable non-admin account, not your own login or another teammate. Suspension expires its sessions.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"status\":\"suspended\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const required = [\"targetUserId\"];",
+                  "for (const key of required) {",
+                  "  const value = pm.variables.get(key);",
+                  "  if (value === undefined || value === null || String(value).trim() === '' || (key !== 'imageId' && /Id$/.test(key) && !/^[1-9][0-9]*$/.test(String(value))) || (/Version$/.test(key) && !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(String(value)))) {",
+                  "    pm.execution.skipRequest(); throw new Error('Set the disposable fixture value: ' + key);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reactivate disposable non-admin account",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/admin/users/{{targetUserId}}/status",
+            "description": "Use a separate disposable non-admin account, not your own login or another teammate. Suspension expires its sessions.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"status\":\"active\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const required = [\"targetUserId\"];",
+                  "for (const key of required) {",
+                  "  const value = pm.variables.get(key);",
+                  "  if (value === undefined || value === null || String(value).trim() === '' || (key !== 'imageId' && /Id$/.test(key) && !/^[1-9][0-9]*$/.test(String(value))) || (/Version$/.test(key) && !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(String(value)))) {",
+                  "    pm.execution.skipRequest(); throw new Error('Set the disposable fixture value: ' + key);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6 — Participation and enquiries (pending)",
+      "item": [
+        {
+          "name": "Read my participation",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{publicToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/campaigns/{{approvedCauseId}}/participation",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const required = [\"approvedCauseId\"];",
+                  "for (const key of required) {",
+                  "  const value = pm.variables.get(key);",
+                  "  if (value === undefined || value === null || String(value).trim() === '' || (key !== 'imageId' && /Id$/.test(key) && !/^[1-9][0-9]*$/.test(String(value))) || (/Version$/.test(key) && !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(String(value)))) {",
+                  "    pm.execution.skipRequest(); throw new Error('Set the disposable fixture value: ' + key);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Join or rejoin approved cause",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{publicToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/campaigns/{{approvedCauseId}}/participation",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"status\":\"joined\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const required = [\"approvedCauseId\"];",
+                  "for (const key of required) {",
+                  "  const value = pm.variables.get(key);",
+                  "  if (value === undefined || value === null || String(value).trim() === '' || (key !== 'imageId' && /Id$/.test(key) && !/^[1-9][0-9]*$/.test(String(value))) || (/Version$/.test(key) && !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(String(value)))) {",
+                  "    pm.execution.skipRequest(); throw new Error('Set the disposable fixture value: ' + key);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Withdraw from approved cause",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{publicToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/campaigns/{{approvedCauseId}}/participation",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"status\":\"withdrawn\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const required = [\"approvedCauseId\"];",
+                  "for (const key of required) {",
+                  "  const value = pm.variables.get(key);",
+                  "  if (value === undefined || value === null || String(value).trim() === '' || (key !== 'imageId' && /Id$/.test(key) && !/^[1-9][0-9]*$/.test(String(value))) || (/Version$/.test(key) && !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(String(value)))) {",
+                  "    pm.execution.skipRequest(); throw new Error('Set the disposable fixture value: ' + key);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "My participation history",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{publicToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/participations/mine?page=1&pageSize=10",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": []
+        },
+        {
+          "name": "Send fixture business enquiry",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{publicToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/campaigns/{{approvedBusinessId}}/enquiries",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Disposable Fixture\",\n  \"email\": \"fixture@example.test\",\n  \"message\": \"Local test enquiry only; no email delivery expected.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const required = [\"approvedBusinessId\"];",
+                  "for (const key of required) {",
+                  "  const value = pm.variables.get(key);",
+                  "  if (value === undefined || value === null || String(value).trim() === '' || (key !== 'imageId' && /Id$/.test(key) && !/^[1-9][0-9]*$/.test(String(value))) || (/Version$/.test(key) && !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(String(value)))) {",
+                  "    pm.execution.skipRequest(); throw new Error('Set the disposable fixture value: ' + key);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Own business enquiry inbox",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{businessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/business/me/enquiries?page=1&pageSize=10",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": []
+        }
+      ]
+    },
+    {
+      "name": "7 — Deliberate negative probes",
+      "description": "Proposed shared error envelopes. Old middleware may fail these assertions until upgraded. These are selected probes, not exhaustive security/concurrency tests.",
+      "item": [
+        {
+          "name": "Pending campaign is not public",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/campaigns/{{pendingCampaignId}}",
+            "description": "Set to a known pending fixture, not an arbitrary nonexistent ID.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const required = [\"pendingCampaignId\"];",
+                  "for (const key of required) {",
+                  "  const value = pm.variables.get(key);",
+                  "  if (value === undefined || value === null || String(value).trim() === '' || (key !== 'imageId' && /Id$/.test(key) && !/^[1-9][0-9]*$/.test(String(value))) || (/Version$/.test(key) && !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(String(value)))) {",
+                  "    pm.execution.skipRequest(); throw new Error('Set the disposable fixture value: ' + key);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Other owner campaign stays private",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{publicToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/campaigns/mine/{{otherOwnerCampaignId}}",
+            "description": "Known pending fixture owned by a different account.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const required = [\"otherOwnerCampaignId\"];",
+                  "for (const key of required) {",
+                  "  const value = pm.variables.get(key);",
+                  "  if (value === undefined || value === null || String(value).trim() === '' || (key !== 'imageId' && /Id$/.test(key) && !/^[1-9][0-9]*$/.test(String(value))) || (/Version$/.test(key) && !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(String(value)))) {",
+                  "    pm.execution.skipRequest(); throw new Error('Set the disposable fixture value: ' + key);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Guest cannot read own campaigns",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/campaigns/mine?page=1&pageSize=10",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": []
+        },
+        {
+          "name": "Public account cannot read admin users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{publicToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/admin/users?page=1&pageSize=10",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": []
+        },
+        {
+          "name": "Stale owner edit is rejected",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{publicToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/campaigns/mine/{{ownerCampaignId}}",
+            "description": "Keep a real earlier saved version, make another change, then deliberately send this request. A status test alone does not prove rollback; verify the DB and reread.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Disposable contract fixture\",\n  \"description\": \"Created only in the disposable local integration database.\",\n  \"categoryId\": {{categoryId}},\n  \"targetAudience\": \"Fixture users\",\n  \"startDate\": \"{{startDate}}\",\n  \"endDate\": \"{{endDate}}\",\n  \"expectedUpdatedAt\": \"{{staleVersion}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const required = [\"ownerCampaignId\",\"staleVersion\",\"categoryId\"];",
+                  "for (const key of required) {",
+                  "  const value = pm.variables.get(key);",
+                  "  if (value === undefined || value === null || String(value).trim() === '' || (key !== 'imageId' && /Id$/.test(key) && !/^[1-9][0-9]*$/.test(String(value))) || (/Version$/.test(key) && !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(String(value)))) {",
+                  "    pm.execution.skipRequest(); throw new Error('Set the disposable fixture value: ' + key);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Forged campaign ownership is rejected",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{publicToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/campaigns",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Disposable contract fixture\",\n  \"description\": \"Created only in the disposable local integration database.\",\n  \"categoryId\": {{categoryId}},\n  \"targetAudience\": \"Fixture users\",\n  \"startDate\": \"{{startDate}}\",\n  \"endDate\": \"{{endDate}}\",\n  \"createdBy\": 2147483647\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const required = [\"categoryId\"];",
+                  "for (const key of required) {",
+                  "  const value = pm.variables.get(key);",
+                  "  if (value === undefined || value === null || String(value).trim() === '' || (key !== 'imageId' && /Id$/.test(key) && !/^[1-9][0-9]*$/.test(String(value))) || (/Version$/.test(key) && !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(String(value)))) {",
+                  "    pm.execution.skipRequest(); throw new Error('Set the disposable fixture value: ' + key);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Invalid participation state is rejected",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{publicToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/campaigns/{{approvedCauseId}}/participation",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"status\":\"invalid\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const required = [\"approvedCauseId\"];",
+                  "for (const key of required) {",
+                  "  const value = pm.variables.get(key);",
+                  "  if (value === undefined || value === null || String(value).trim() === '' || (key !== 'imageId' && /Id$/.test(key) && !/^[1-9][0-9]*$/.test(String(value))) || (/Version$/.test(key) && !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(String(value)))) {",
+                  "    pm.execution.skipRequest(); throw new Error('Set the disposable fixture value: ' + key);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,38 +1,41 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import CampaignCard from '../components/CampaignCard.jsx'
-import { listCampaigns } from '../services/campaignService.js'
+import { listCampaigns, loadPublicCategories } from '../services/campaignService.js'
+import useLiveRefresh from '../hooks/useLiveRefresh.js'
+import '../styles/public-browsing.css'
 
 const emptyResult = { items: [], page: 1, pageSize: 20, total: 0 }
 
-export default function HomePage({ campaignLoader = listCampaigns }) {
-  const [result, setResult] = useState(emptyResult)
-  const [requestState, setRequestState] = useState('loading')
-  const [retryKey, setRetryKey] = useState(0)
+export default function HomePage({ campaignLoader = listCampaigns, categoryLoader = loadPublicCategories }) {
+  const [page, setPage] = useState(1)
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
+  const [category, setCategory] = useState('')
+  const [categories, setCategories] = useState([])
+  const [categoryState, setCategoryState] = useState('loading')
+  const [categoryRetry, setCategoryRetry] = useState(0)
 
   useEffect(() => {
     const controller = new AbortController()
-
-    setRequestState('loading')
-    setResult(emptyResult)
-
-    campaignLoader({ signal: controller.signal })
-      .then((nextResult) => {
-        if (!controller.signal.aborted) {
-          setResult(nextResult)
-          setRequestState('success')
-        }
-      })
-      .catch((error) => {
-        if (!controller.signal.aborted && error?.code !== 'ABORTED') {
-          setRequestState('error')
-        }
-      })
-
+    setCategoryState('loading')
+    categoryLoader({ signal: controller.signal }).then((response) => {
+      if (controller.signal.aborted) return
+      setCategories(response)
+      setCategoryState('success')
+    }).catch(() => {
+      if (!controller.signal.aborted) setCategoryState('error')
+    })
     return () => controller.abort()
-  }, [campaignLoader, retryKey])
+  }, [categoryLoader, categoryRetry])
 
-  const isLoading = requestState === 'loading'
-  const hasError = requestState === 'error'
+  const loadCampaigns = useCallback(({ signal }) => campaignLoader({ signal, page, pageSize: 20, search, category }),
+    [campaignLoader, page, search, category])
+  const live = useLiveRefresh(loadCampaigns, { resourceKey: JSON.stringify([page, search, category]) })
+  const result = live.data ?? emptyResult
+  const isLoading = live.isLoading
+  const hasError = Boolean(live.error && !live.data)
+  const hasNext = result.hasNext ?? (typeof result.total === 'number'
+    ? result.page * result.pageSize < result.total : result.items.length === result.pageSize)
 
   return (
     <section className="homepage" aria-labelledby="page-title">
@@ -46,9 +49,42 @@ export default function HomePage({ campaignLoader = listCampaigns }) {
       <section className="campaign-section" id="campaigns" aria-labelledby="campaigns-title">
         <div className="content-width">
           <h2 className="visually-hidden" id="campaigns-title">Current campaigns</h2>
+          <form className="public-campaign-filters" onSubmit={(event) => {
+            event.preventDefault()
+            setSearch(searchInput.trim())
+            setPage(1)
+          }}>
+            <div>
+              <label htmlFor="public-campaign-search">Find a campaign</label>
+              <input id="public-campaign-search" type="search" placeholder="Search by title" maxLength={200}
+                value={searchInput} onChange={(event) => setSearchInput(event.target.value)} />
+            </div>
+            <div>
+              <label htmlFor="public-campaign-category">Category</label>
+              <select id="public-campaign-category" value={category} disabled={categoryState !== 'success'} onChange={(event) => {
+                setCategory(event.target.value)
+                setPage(1)
+              }}>
+                <option value="">{categoryState === 'loading' ? 'Loading categories…' : 'All categories'}</option>
+                {categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+              </select>
+            </div>
+            <button type="submit">Search</button>
+            {search || category ? <button type="button" className="public-campaign-filters__clear" onClick={() => {
+              setSearchInput(''); setSearch(''); setCategory(''); setPage(1)
+            }}>Clear filters</button> : null}
+          </form>
+          {categoryState === 'error' ? <p className="public-campaign-filter-notice">Categories could not be loaded. You can still browse or search. <button type="button" onClick={() => setCategoryRetry((value) => value + 1)}>Retry categories</button></p> : null}
+          <div className="public-campaign-filter-notice">
+            {live.updatedAt ? <p>Last updated <time dateTime={live.updatedAt.toISOString()}>{live.updatedAt.toLocaleTimeString('en-AU')}</time>. Updates automatically while this page is open.</p> : null}
+            {live.data ? <button type="button" onClick={live.refresh} disabled={live.refreshing || live.paused === 'offline'}>Refresh campaigns</button> : null}
+            {live.refreshing && live.data ? <p role="status">Checking for campaign updates…</p> : null}
+            {live.paused === 'offline' ? <p role="status">You’re offline. Campaign updates will resume when you reconnect.</p> : null}
+            {live.error && live.data ? <p role="alert">Campaign updates could not be loaded. Showing the last loaded campaigns. <button type="button" onClick={live.refresh}>Retry updates</button></p> : null}
+          </div>
           {!isLoading && !hasError ? (
             <p className="visually-hidden" role="status">
-              {result.total} campaign{result.total === 1 ? '' : 's'}
+              {result.items.length} campaign{result.items.length === 1 ? '' : 's'} on page {result.page}
             </p>
           ) : null}
 
@@ -56,7 +92,7 @@ export default function HomePage({ campaignLoader = listCampaigns }) {
             <div className="campaign-state campaign-state--error" role="alert">
               <h3>Campaigns could not be loaded</h3>
               <p>Please try again.</p>
-              <button type="button" onClick={() => setRetryKey((current) => current + 1)}>Try again</button>
+              <button type="button" onClick={live.refresh}>Try again</button>
             </div>
           ) : (
             <ul className="campaign-grid" aria-busy={isLoading} aria-label="Campaigns">
@@ -66,18 +102,23 @@ export default function HomePage({ campaignLoader = listCampaigns }) {
 
               {isLoading ? (
                 <li className="campaign-state" role="status">
-                  <p>Loading campaigns…</p>
+                  <p>{live.paused === 'offline' ? 'Connect to the internet to load campaigns.' : 'Loading campaigns…'}</p>
                 </li>
               ) : null}
 
               {!isLoading && result.items.length === 0 ? (
                 <li className="campaign-state">
-                  <h3>No campaigns are available yet</h3>
-                  <p>Please check again later.</p>
+                  <h3>{search || category ? 'No matching campaigns' : page > 1 ? 'No more campaigns on this page' : 'No campaigns are available yet'}</h3>
+                  <p>{search || category ? 'Try another search or clear the filters.' : page > 1 ? 'Use Previous to return to the last page.' : 'Please check again later.'}</p>
                 </li>
               ) : null}
             </ul>
           )}
+          <nav className="public-campaign-pagination" aria-label="Public campaign pages">
+            <button type="button" disabled={isLoading || page <= 1} onClick={() => setPage((value) => value - 1)}>Previous</button>
+            <span>Page {page}</span>
+            <button type="button" disabled={isLoading || hasError || !hasNext} onClick={() => setPage((value) => value + 1)}>Next</button>
+          </nav>
         </div>
       </section>
     </section>

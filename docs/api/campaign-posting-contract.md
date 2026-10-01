@@ -2,9 +2,9 @@
 
 This branch adds category lookup and text-only campaign submission for a signed-in public user. These are branch changes, not a claim that the routes have been merged into `main`.
 
-The working frontend uses `/campaigns/new`. The separate `/draft/campaigns/new` development preview still uses sample data and does not save anything.
+The frontend uses `/campaigns/new`. Text-only public submission works against the backend in this branch. The frontend also supports the proposed photo and business workflows below, but their backend endpoints still need implementation.
 
-Business posting, image uploads and admin approval writes are outside this implementation. Their [future proposal](campaign-posting-future-proposal.md) and [admin contract](admin-campaign-moderation-contract.md) remain separate.
+For Kim and Raj's next work, use the [business posting and image extension](campaign-posting-future-proposal.md), [business profile contract](business-profile-contract.md), [campaign read contract](campaign-read-contract.md) and [admin contract](admin-campaign-moderation-contract.md). The [implementation handoff](../handoff/stage3-api-handoff.md) puts those changes in build order.
 
 ## Category choices
 
@@ -136,7 +136,7 @@ The response confirms a database save, but a pending campaign is not public:
 - `GET /api/campaigns/:id` returns `404` for that pending ID.
 - Existing authenticated admin reads can inspect it.
 
-Do not change its status manually to make the public page look successful. Approval/rejection writes and an owner-submissions page are later work. The form's success view is the confirmation available in this slice.
+Do not change its status manually to make the public page look successful. The frontend now links to `/my-campaigns`; its proposed owner-read endpoint still needs implementation. Until then, the confirmed creation response proves the save, while the owner list is not a live backend feature.
 
 ## Integration checks
 

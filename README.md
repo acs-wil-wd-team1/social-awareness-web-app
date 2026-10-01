@@ -6,18 +6,20 @@ The application will help people discover campaigns supporting social causes and
 
 ## Current stage
 
-**Stage 2 — Prototype 1**
+**Stage 3 — campaign frontend and API integration work**
 
-Due: **Sunday 20 September 2026, 11:59 pm**
+The Stage 2 prototype provided public campaign browsing, registration and login/logout. Its submission deadline was Sunday 20 September 2026.
 
-The Stage 2 prototype includes:
+This branch adds frontend screens for:
 
-1. Campaign homepage available without logging in
-2. Account registration
-3. Login
-4. Logout
+1. Public-user and business campaign posting, business profiles and campaign photos
+2. My campaigns, owner edits/resubmission, photo replacement/removal and soft deletion
+3. Social-cause participation: join, withdraw, rejoin and personal history
+4. Business enquiries and the business owner's private inbox
+5. Admin approval/rejection, review history, content removal and user suspension/reactivation
+6. Automatic updates on the public campaign list/detail and owner submission status
 
-Campaign creation, participation, administrator approval and live campaign updates are planned for Stage 3.
+These are frontend implementations, not a claim that all their backend APIs are ready. Category lookup and text-only public submission are implemented in this branch's backend. Other new endpoints, image storage and the final integrated cloud deployment remain pending; the AWS sample frontend is already available. See the [feature coverage](docs/handoff/stage3-feature-coverage.md), [frontend README](frontend/README.md), [API handoff](docs/handoff/stage3-api-handoff.md) and [deployment preparation](infra/README.md).
 
 ## Looking ahead to Stage 3
 
@@ -32,7 +34,7 @@ Stage 3 is due **Sunday 25 October 2026, 11:59 pm**. It extends the running Stag
 - Cloud IaaS deployment
 - User, developer and testing documentation
 
-The Stage 3 folders are included now so the project has one structure from the beginning. They are clearly marked as reserved and do not mean that Stage 3 work has started or been assigned.
+The list above is the overall Stage 3 scope. This branch provides the application frontend and API handoff; real backend integration, cloud testing, manuals and the final recording remain separate deliverables. Jira remains the place for team task allocation. There is no public admin signup, role-promotion screen, payment system or full CRM.
 
 ## Why this repository was created
 
@@ -67,7 +69,7 @@ Additional implementation tools are listed in [`docs/project/tools.md`](docs/pro
 - `docs/evidence/` — Stage 2 submission-evidence checklist
 - `docs/development-log/` — records created as development work is completed
 - `docs/manuals/` — reserved for the Stage 3 User Manual and Developers Manual
-- `infra/` — reserved for approved Stage 3 deployment files
+- `infra/` — Stage 3 deployment preparation and release checks
 
 ## Design handoff
 
@@ -111,6 +113,6 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) before making changes.
 
 ## Current status
 
-Repository foundation prepared for team review.
+The Stage 3 frontend and API handoff are prepared in this branch, including the original team logo. The [AWS sample preview](https://d10e86f5qx46up.cloudfront.net) is available for interface review; use **Preview as** to explore the roles. It uses disposable browser data, not the real backend. New backend features, final backend/cloud deployment and real integration testing remain open. Technical notes for the manual/demo owner are in [the frontend handoff](docs/handoff/stage3-frontend-notes.md).
 
 No feature should be described as complete until its implementation and evidence are present.
