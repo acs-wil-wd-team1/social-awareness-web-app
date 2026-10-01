@@ -187,6 +187,27 @@ describe('sample participation and enquiries', () => {
     await expect(demoRequest('/api/participations/mine?page=-1', { token: publicToken() })).rejects.toMatchObject({ status: 422 })
   })
 
+  it.each(['owner edit', 'unpublish', 'rejection', 'soft deletion'])('allows own-record reconciliation and withdrawal after %s without exposing campaign content', async change => {
+    const { participation } = await join(1)
+    if (change === 'owner edit') await edit(1, (await ownerDetail(1)).updatedAt, { title: 'Private revised title' })
+    else if (change === 'soft deletion') await demoRequest('/api/campaigns/mine/1', { method: 'DELETE', token: publicToken(), body: { expectedUpdatedAt: (await ownerDetail(1)).updatedAt } })
+    else {
+      await unpublish(1)
+      if (change === 'rejection') await review(1, { status: 'rejected', comments: 'Private review feedback' })
+    }
+    expect((await demoRequest('/api/participations/mine', { token: publicToken() })).participations).toEqual([{ ...participation, campaign: null }])
+    expect(await demoRequest('/api/campaigns/1/participation', { token: publicToken() })).toEqual({ participation })
+    const withdrawn = { ...participation, status: 'withdrawn' }
+    expect(await join(1, 'withdrawn')).toEqual({ participation: withdrawn })
+    expect(await join(1, 'withdrawn')).toEqual({ participation: withdrawn })
+    expect(await demoRequest('/api/campaigns/1/participation', { token: publicToken() })).toEqual({ participation: withdrawn })
+    await expect(join(1)).rejects.toMatchObject({ status: 404, code: 'CAMPAIGN_NOT_FOUND' })
+    await expect(demoRequest('/api/campaigns/1/participation', { token: businessToken() })).rejects.toMatchObject({ status: 404, code: 'CAMPAIGN_NOT_FOUND' })
+    await expect(join(1, 'withdrawn', businessToken())).rejects.toMatchObject({ status: 404, code: 'CAMPAIGN_NOT_FOUND' })
+    await expect(join(999, 'withdrawn', businessToken())).rejects.toMatchObject({ status: 404, code: 'CAMPAIGN_NOT_FOUND' })
+    expect((await demoRequest('/api/participations/mine', { token: businessToken() })).total).toBe(0)
+  })
+
   it('saves normalised enquiry details privately for the business and supports blank phone', async () => {
     const { enquiry } = await sendEnquiry()
     expect(enquiry).toMatchObject({ campaignId: 3, businessId: 501, name: 'Alex Example', email: 'alex@example.test', phone: '0400000000', message: 'Please tell me more.' })

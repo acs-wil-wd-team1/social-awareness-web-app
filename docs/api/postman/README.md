@@ -45,6 +45,8 @@ Do not run the whole collection expecting a setup/cleanup sequence. Unarmed writ
 
 The tests deliberately do not treat a missing endpoint, wrong wrapper, mismatched ID, HTML response or malformed successful response as success. Responses are captured only after their assertions pass. Follow up logout/suspension with a protected request using the old token and verify rejection; reactivation must require a fresh login.
 
+For the participation lifecycle check, the public fixture first joins an approved cause. The `approvedCauseId` variable then keeps that same campaign ID while an owner edit, admin unpublish/rejection or soft deletion makes it unavailable. **Read my participation** and **Withdraw own participation** must still return only that fixture user's existing record. History must contain `campaign: null`, repeated withdrawal must retain the record ID and first-join date, and join/rejoin must fail until approval is restored. A different fixture user with no participation must receive the same `404 CAMPAIGN_NOT_FOUND` for that private ID and a missing ID. These lifecycle and cross-account checks require actual backend responses; the offline collection validator cannot prove them.
+
 ## What still needs real backend/browser tests
 
 This is not exhaustive. SQL persistence/rollback, concurrent writes, all-session revocation, cross-account visibility, private image access/expiry/cleanup, CORS, browser state, refresh, uploads and final AWS integration must be tested with the real implementation. Postman is not a browser and cannot prove CORS works. An empty successful list cannot prove that row-level permissions are correct. Record failures honestly and rerun with meaningful fixtures.

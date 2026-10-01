@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { apiRequest, ApiError } from '../services/apiClient.js'
+import { authPagePath } from '../services/authSession.js'
 
 const initialValues = {
   name: '',
@@ -10,6 +11,7 @@ const initialValues = {
 }
 
 export default function RegistrationPage() {
+  const loginPath = authPagePath('/login', new URLSearchParams(window.location.search).get('returnTo'))
   const [formValues, setFormValues] = useState(initialValues)
   const [errors, setErrors] = useState({})
   const [isSubmitted, setIsSubmitted] = useState(false)
@@ -184,13 +186,13 @@ export default function RegistrationPage() {
 
           {isSubmitted && !Object.values(errors).some(Boolean) ? (
             <p className="auth-form__status" role="status">
-              Registration successful. <a href="/login">Continue to login</a>
+              Registration successful. <a href={loginPath}>Continue to login</a>
             </p>
           ) : null}
         </form>
 
         <p className="auth-switch">
-          <a href="/login">Already have an account? Login</a>
+          <a href={loginPath}>Already have an account? Login</a>
         </p>
       </div>
     </section>

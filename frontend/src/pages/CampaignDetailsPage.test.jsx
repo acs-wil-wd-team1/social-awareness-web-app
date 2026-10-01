@@ -235,6 +235,29 @@ describe('CauseConnect campaign details', () => {
     expect(screen.getByText('Local families')).toBeTruthy()
   })
 
+  it.each(['https://greenleaf.example/menu?day=saturday#hours', 'http://greenleaf.example/'])('links to a public business website from the API: %s', async (website) => {
+    fetch.mockResolvedValue(new Response(JSON.stringify({ ...backendCampaigns[0], type: 'business',
+      business: { id: 2, businessName: 'Green Leaf Cafe', website },
+    }), { status: 200 }))
+    render(<CampaignDetailsPage campaignId="3" />)
+    expect((await screen.findByRole('link', { name: 'Visit business website' })).getAttribute('href')).toBe(website)
+    expect(screen.getByText('Green Leaf Cafe')).toBeTruthy()
+  })
+
+  it.each([
+    null, '', { url: 'https://greenleaf.example' }, 'javascript:alert(1)', 'data:text/html,hello',
+    '//greenleaf.example', 'https://user:password@greenleaf.example', 'https://user@greenleaf.example',
+    'https://', 'https://greenleaf.example\\other', 'https://greenleaf.\nexample',
+  ])('omits an invalid business website while retaining the campaign: %j', async (website) => {
+    fetch.mockResolvedValue(new Response(JSON.stringify({ ...backendCampaigns[0], type: 'business',
+      business: { id: 2, businessName: 'Green Leaf Cafe', website },
+    }), { status: 200 }))
+    render(<CampaignDetailsPage campaignId="3" />)
+    expect(await screen.findByRole('heading', { name: 'Community Food Drive' })).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Visit business website' })).toBeNull()
+    expect(screen.queryByText('Website')).toBeNull()
+  })
+
   it('does not expose a pending campaign even if a public API returns it', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ ...backendCampaigns[0], status: 'pending' }), { status: 200 })))
     await expect(getCampaignById('3')).rejects.toMatchObject({ code: 'NOT_FOUND' })

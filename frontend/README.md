@@ -2,7 +2,7 @@
 
 React frontend for CauseConnect. It includes campaign browsing and posting, business profiles, owner edits, participation, business enquiries, admin campaign/account management and registration/login/logout.
 
-The layout follows the CauseConnect storyboard and web design standards. The Stage 3 frontend calls the [API contracts](../docs/api/api-contract.md). Categories and text-only public submission are implemented in this branch's backend; the remaining new endpoints still need backend work. The [API handoff](../docs/handoff/stage3-api-handoff.md) lists the connections and [feature coverage](../docs/handoff/stage3-feature-coverage.md) separates frontend work from live integration.
+The layout follows the CauseConnect storyboard and web design standards. The Stage 3 frontend calls the [API contracts](../docs/api/api-contract.md). Authentication, categories, text-only public submission and the frontend/API contracts are merged into `main` at `4e24bae`; the remaining endpoint extensions still need backend work. The [API integration guide](../docs/handoff/stage3-api-handoff.md) lists the connections and [feature coverage](../docs/handoff/stage3-feature-coverage.md) records remaining integration work.
 
 ## Run locally
 
@@ -47,15 +47,15 @@ For the existing API/database flows, use `npm run test:real-backend`. It runs th
 |---|---|---|
 | `/` | Campaign homepage | Loads approved campaigns from `GET /api/campaigns` |
 | `/campaigns/:campaignId` | Public campaign details | Loads the selected campaign from `GET /api/campaigns/:id` |
-| `/login` | Login | Calls `POST /api/auth/login` and stores the returned token |
-| `/register` | Registration | Calls `POST /api/auth/register` for a public or business-owner account |
-| `/logout` | Logout | Calls `PUT /api/auth/logout`, then removes the local token |
+| `/login` | Login | Calls `POST /api/auth/login`, stores the returned token and resumes a validated local `returnTo` destination |
+| `/register` | Registration | Calls `POST /api/auth/register` for a public or business-owner account; preserves `returnTo` in the login links |
+| `/logout` | Logout | Clears the browser session immediately, calls `PUT /api/auth/logout` and offers retry if server revocation is unconfirmed |
 | `/campaigns/new` | Public-user campaign posting | GET categories; optional POST `/api/campaign-images`; POST `/api/campaigns` |
 | `/business/profile` | Business profile | GET/PUT `/api/business/me` |
 | `/business/campaigns/new` | Business campaign posting | GET profile/categories; optional image upload; POST campaign |
 | `/my-campaigns` | Own submissions and review feedback | GET `/api/campaigns/mine`, with pagination and status filter |
 | `/my-campaigns/:id/edit` | Edit/resubmit or soft-delete an owned campaign | GET/PATCH/DELETE `/api/campaigns/mine/:id`; optional image upload |
-| `/my-participation` | Joined/withdrawn social-cause campaigns | GET `/api/participations/mine` |
+| `/my-participation` | Own participation history and withdrawal, including unavailable campaigns | GET `/api/participations/mine`; GET/PUT `/api/campaigns/:id/participation` for existing own records |
 | `/business/enquiries` | Private enquiry inbox | GET `/api/business/me/enquiries` |
 | `/admin/campaigns` | Admin review queue | GET `/api/campaigns/admin`, with pagination, search and status filter |
 | `/admin/campaigns/:id` | Review, history and content management | GET detail/reviews; PATCH status/publication; DELETE for soft deletion |
@@ -68,7 +68,7 @@ The campaign form only confirms a saved pending campaign after a valid `201` res
 
 Campaign owners can edit/resubmit their own campaigns, replace/remove the photo or confirm soft deletion. Saving edited content returns it to pending review; changes use the saved `updatedAt` value to detect stale edits. Admins can inspect previous decisions, return approved content to pending or soft-delete it with a reason. Admin account controls cannot change the current admin or any other admin account.
 
-Approved social-cause details offer join/withdraw/rejoin to signed-in public users and business owners. Approved business details offer a contact enquiry form; messages appear only in the owning business's inbox. These are participation and lead capture, not payments, chat or a CRM.
+Approved social-cause details offer join/withdraw/rejoin to signed-in public users and business owners. My participation also allows withdrawal of an existing own record after its campaign becomes unavailable. The API must retain that record, return `campaign:null` for non-public or soft-deleted campaign content, and reject new joins/rejoins until the campaign is approved and available. Approved business details show a valid HTTP(S) business website when supplied and offer a contact enquiry form; messages appear only in the owning business's inbox. Payments, chat and CRM features are outside this scope.
 
 The homepage, public details and My campaigns refresh from their read endpoints every 30 seconds while the page is visible and online, and on window focus/reconnection. They also provide manual refresh. This is polling, not a WebSocket service. A failed background refresh is shown without silently presenting stale data as current; unavailable public details are cleared. Other management/history lists provide explicit refresh or reload after changes.
 
@@ -79,15 +79,17 @@ Campaign image and type values come from API responses. The live UI does not inf
 ## Current design decisions
 
 - The shared colours, typography and responsive layout follow the current Stage 2 web design standards.
-- `Campaigns` moves to the list on the homepage.
+- Primary navigation contains **Home**, **Campaigns**, and **Create campaign** for authors or **Review campaigns** for admins. Guests see **Login** and **Register**.
+- The **Account** dropdown groups My campaigns, My participation, Business profile, Enquiries, Manage users and Logout according to the current role.
+- **Campaigns** moves to the homepage list. The hero offers **Explore campaigns** and an account-appropriate signup, posting or review action. Campaign cards keep equal widths within the responsive grid.
 - Each `View campaign` link opens the matching public campaign details route. Admin search and owner/admin status filters are available on their respective pages.
-- The header uses the current session role to show posting, business profile or admin review links.
+- Login and registration preserve a validated local destination, including its query string and fragment. External and malformed return destinations fall back to the homepage.
 - Campaign images use empty alternative text because the adjacent title and description already provide the campaign meaning. Unknown campaigns without an image still use the local CauseConnect placeholder.
 
 ## Team logo and deployment
 
-The original team logo PNG is included at `public/images/brand/causeconnect-logo.png` and used by the header. It matches the design document's team-logo handoff; it is not a WhatsApp screenshot.
+The original team logo PNG is included at `public/images/brand/causeconnect-logo.png` and used by the shared header.
 
-The [AWS sample preview](https://d10e86f5qx46up.cloudfront.net) is hosted using private S3 and CloudFront. Use **Preview as** to switch roles; changes are disposable and stay in the browser tab. It is not the live integrated application. A live release still needs the real backend/database/image storage, API origin, CORS, HTTPS and full browser integration checks. Deployment instructions are in [infra](../infra/README.md). AWS free-tier eligibility or credits do not guarantee zero charges; review the approved resource plan and actual usage.
+The [AWS sample preview](https://d10e86f5qx46up.cloudfront.net) is hosted using private S3 and CloudFront. **Preview as** switches roles; changes are disposable and stay in the browser tab. Local interface refinements require a separate deployment before they appear there. A live integrated release still needs the real backend/database/image storage, API origin, CORS, HTTPS and full browser integration checks. Deployment instructions are in [infra](../infra/README.md). AWS free-tier eligibility or credits do not guarantee zero charges; review the approved resource plan and actual usage.
 
 Notes for the developers manual and demonstration are in [the frontend handoff](../docs/handoff/stage3-frontend-notes.md).

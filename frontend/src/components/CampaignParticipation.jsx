@@ -52,7 +52,7 @@ export default function CampaignParticipation({ campaign, token, role }) {
   if (!eligible) return null
   return <section className="engagement-panel" aria-labelledby="participation-title">
     <h2 id="participation-title">Support this campaign</h2>
-    <p>Join to show your support. You can withdraw your participation at any time.</p>
+    <p>Join to show your support. You can withdraw here or from My participation, including when the campaign is no longer public.</p>
     {!token ? <a className="text-link" href={loginHref}>Log in to join</a>
       : !allowed ? <p>Public users and business owners can join social-cause campaigns.</p>
         : <>

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { apiRequest } from '../services/apiClient.js'
-import { safeReturnPath, storeSession } from '../services/authSession.js'
+import { authPagePath, safeReturnPath, storeSession } from '../services/authSession.js'
 
 const initialValues = {
   email: '',
@@ -8,6 +8,7 @@ const initialValues = {
 }
 
 export default function LoginPage() {
+  const returnTo = safeReturnPath(new URLSearchParams(window.location.search).get('returnTo'))
   const [formValues, setFormValues] = useState(initialValues)
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -80,7 +81,7 @@ export default function LoginPage() {
       }
 
       storeSession(body.token, body.user)
-      window.location.href = safeReturnPath(new URLSearchParams(window.location.search).get('returnTo'))
+      window.location.href = returnTo
     } catch (error) {
       setErrors(current => ({ ...current, ...error.fieldErrors }))
       setApiError(error.message || 'The login service could not be reached.')
@@ -141,7 +142,7 @@ export default function LoginPage() {
         </form>
 
         <p className="auth-switch">
-          <a href="/register">
+          <a href={authPagePath('/register', returnTo)}>
             Don't have an account? Register
           </a>
         </p>

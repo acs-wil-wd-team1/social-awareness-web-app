@@ -131,6 +131,18 @@ describe('campaign list background refresh', () => {
 })
 
 describe('CauseConnect campaign homepage', () => {
+  it.each([
+    [undefined, undefined, 'Create an account', '/register'],
+    ['public-token', 'public', 'Start a campaign', '/campaigns/new'],
+    ['business-token', 'business_owner', 'Start a campaign', '/business/campaigns/new'],
+    ['admin-token', 'admin', 'Review campaigns', '/admin/campaigns'],
+  ])('offers a useful next action for the %s session', async (token, role, label, href) => {
+    render(<HomePage token={token} role={role} />)
+    expect(screen.getByRole('link', { name: 'Explore campaigns' }).getAttribute('href')).toBe('#campaigns')
+    expect(screen.getByRole('link', { name: label }).getAttribute('href')).toBe(href)
+    expect(await screen.findByRole('heading', { name: 'Books for Kids' })).toBeTruthy()
+  })
+
   it('renders the guest homepage structure without Stage 3 actions', async () => {
     render(<App />)
 

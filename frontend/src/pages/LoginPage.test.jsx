@@ -47,6 +47,19 @@ describe('CauseConnect login page', () => {
     expect(fetch).not.toHaveBeenCalled()
   })
 
+  it.each(['/campaigns/3', '/campaigns/3?source=community&topic=Green%20space#enquiry'])('keeps the destination when switching to registration: %s', (destination) => {
+    window.history.replaceState({}, '', `/login?returnTo=${encodeURIComponent(destination)}`)
+    render(<LoginPage />)
+    const link = screen.getByRole('link', { name: "Don't have an account? Register" })
+    expect(link.getAttribute('href')).toBe(`/register?returnTo=${encodeURIComponent(destination)}`)
+  })
+
+  it.each(['https://evil.test', '//evil.test', '/\\evil.test'])('drops an unsafe destination from registration links: %s', (destination) => {
+    window.history.replaceState({}, '', `/login?returnTo=${encodeURIComponent(destination)}`)
+    render(<LoginPage />)
+    expect(screen.getByRole('link', { name: "Don't have an account? Register" }).getAttribute('href')).toBe('/register')
+  })
+
   it('posts login credentials and stores the returned user and token after HTTP 200', async () => {
     vi.mocked(fetch).mockResolvedValue(response(200, validBody))
     const changed = vi.fn()

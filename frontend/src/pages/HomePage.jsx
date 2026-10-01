@@ -6,7 +6,7 @@ import '../styles/public-browsing.css'
 
 const emptyResult = { items: [], page: 1, pageSize: 20, total: 0 }
 
-export default function HomePage({ campaignLoader = listCampaigns, categoryLoader = loadPublicCategories }) {
+export default function HomePage({ campaignLoader = listCampaigns, categoryLoader = loadPublicCategories, token, role }) {
   const [page, setPage] = useState(1)
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
@@ -14,6 +14,7 @@ export default function HomePage({ campaignLoader = listCampaigns, categoryLoade
   const [categories, setCategories] = useState([])
   const [categoryState, setCategoryState] = useState('loading')
   const [categoryRetry, setCategoryRetry] = useState(0)
+  const startPath = role === 'business_owner' ? '/business/campaigns/new' : '/campaigns/new'
 
   useEffect(() => {
     const controller = new AbortController()
@@ -44,11 +45,21 @@ export default function HomePage({ campaignLoader = listCampaigns, categoryLoade
           <span>Raise awareness.</span>
           <span>Create change.</span>
         </h1>
+        <p className="page-intro__description">Find community causes and local business initiatives. Get involved in a campaign, or share one of your own.</p>
+        <div className="page-intro__actions">
+          <a className="page-intro__primary" href="#campaigns">Explore campaigns</a>
+          {token && role === 'admin' ? <a className="text-link" href="/admin/campaigns">Review campaigns <span aria-hidden="true">→</span></a>
+            : token && ['public', 'business_owner'].includes(role) ? <a className="text-link" href={startPath}>Start a campaign <span aria-hidden="true">→</span></a>
+              : !token ? <a className="text-link" href="/register">Create an account <span aria-hidden="true">→</span></a> : null}
+        </div>
       </header>
 
       <section className="campaign-section" id="campaigns" aria-labelledby="campaigns-title">
         <div className="content-width">
-          <h2 className="visually-hidden" id="campaigns-title">Current campaigns</h2>
+          <div className="campaign-section__heading">
+            <h2 id="campaigns-title">Current campaigns</h2>
+            <p>Find something you care about.</p>
+          </div>
           <form className="public-campaign-filters" onSubmit={(event) => {
             event.preventDefault()
             setSearch(searchInput.trim())
@@ -75,9 +86,11 @@ export default function HomePage({ campaignLoader = listCampaigns, categoryLoade
             }}>Clear filters</button> : null}
           </form>
           {categoryState === 'error' ? <p className="public-campaign-filter-notice">Categories could not be loaded. You can still browse or search. <button type="button" onClick={() => setCategoryRetry((value) => value + 1)}>Retry categories</button></p> : null}
-          <div className="public-campaign-filter-notice">
-            {live.updatedAt ? <p>Last updated <time dateTime={live.updatedAt.toISOString()}>{live.updatedAt.toLocaleTimeString('en-AU')}</time>. Updates automatically while this page is open.</p> : null}
-            {live.data ? <button type="button" onClick={live.refresh} disabled={live.refreshing || live.paused === 'offline'}>Refresh campaigns</button> : null}
+          <div className="public-campaign-filter-notice public-campaign-updates">
+            <div className="public-campaign-updates__summary">
+              {live.updatedAt ? <p>Last updated <time dateTime={live.updatedAt.toISOString()}>{live.updatedAt.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' })}</time><span className="visually-hidden">. Updates automatically while this page is open.</span></p> : null}
+              {live.data ? <button type="button" onClick={live.refresh} disabled={live.refreshing || live.paused === 'offline'}>Refresh campaigns</button> : null}
+            </div>
             {live.refreshing && live.data ? <p role="status">Checking for campaign updates…</p> : null}
             {live.paused === 'offline' ? <p role="status">You’re offline. Campaign updates will resume when you reconnect.</p> : null}
             {live.error && live.data ? <p role="alert">Campaign updates could not be loaded. Showing the last loaded campaigns. <button type="button" onClick={live.refresh}>Retry updates</button></p> : null}

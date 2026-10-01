@@ -1,10 +1,10 @@
 # Campaign submission API
 
-This branch adds category lookup and text-only campaign submission for a signed-in public user. These are branch changes, not a claim that the routes have been merged into `main`.
+Category lookup and text-only campaign submission for a signed-in public user are implemented and merged into `main` through PR #12.
 
-The frontend uses `/campaigns/new`. Text-only public submission works against the backend in this branch. The frontend also supports the proposed photo and business workflows below, but their backend endpoints still need implementation.
+The frontend uses `/campaigns/new` for the implemented text-only public submission flow. Photo and business posting controls are also present, but their backend extensions still need implementation.
 
-For Kim and Raj's next work, use the [business posting and image extension](campaign-posting-future-proposal.md), [business profile contract](business-profile-contract.md), [campaign read contract](campaign-read-contract.md) and [admin contract](admin-campaign-moderation-contract.md). The [implementation handoff](../handoff/stage3-api-handoff.md) puts those changes in build order.
+The remaining work is defined in the [business posting and image extension](campaign-posting-future-proposal.md), [business profile contract](business-profile-contract.md), [campaign read contract](campaign-read-contract.md) and [admin contract](admin-campaign-moderation-contract.md). The [API integration guide](../handoff/stage3-api-handoff.md) gives the build order.
 
 ## Category choices
 

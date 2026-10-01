@@ -3,11 +3,11 @@
   align-items: end;
   flex-wrap: wrap;
   gap: 16px;
-  margin-bottom: 28px;
+  margin-bottom: 12px;
   padding: 20px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--surface-muted);
+  background: var(--surface);
 }
 
 .public-campaign-filters > div {
@@ -80,6 +80,12 @@
   text-decoration: underline;
   cursor: pointer;
 }
+
+.public-campaign-updates { margin-bottom: 18px; }
+.public-campaign-updates__summary { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 16px; }
+.public-campaign-updates__summary p { margin: 0; }
+.public-campaign-updates button { min-height: 44px; }
+.public-campaign-updates button:disabled { cursor: not-allowed; opacity: .6; }
 
 .public-campaign-filters :is(button, input, select):focus-visible,
 .public-campaign-pagination button:focus-visible,
