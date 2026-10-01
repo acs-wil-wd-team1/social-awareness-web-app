@@ -68,3 +68,8 @@ export function useSession() {
 export function safeReturnPath(value) {
   return typeof value === 'string' && /^\/(?!\/)/.test(value) && !/[\\\x00-\x20\x7f]/.test(value) ? value : '/'
 }
+
+export function authPagePath(page, returnTo) {
+  const destination = safeReturnPath(returnTo)
+  return `${page}${destination === '/' ? '' : `?returnTo=${encodeURIComponent(destination)}`}`
+}

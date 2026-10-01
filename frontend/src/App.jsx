@@ -13,6 +13,7 @@ import EditCampaignPage from './pages/EditCampaignPage.jsx'
 import MyParticipationPage from './pages/MyParticipationPage.jsx'
 import BusinessEnquiriesPage from './pages/BusinessEnquiriesPage.jsx'
 import AdminUsersPage from './pages/AdminUsersPage.jsx'
+import SiteNavigation from './components/SiteNavigation.jsx'
 import { useSession } from './services/authSession.js'
 import './styles/stage3-shell.css'
 
@@ -41,7 +42,6 @@ export default function App({ pathname = window.location.pathname }) {
   const route = getRoute(pathname)
   const { token, user } = useSession()
   const role = user?.role
-  const owner = role === 'public' || role === 'business_owner'
   const sessionProps = { token, role }
   const createPath = role === 'business_owner' ? '/business/campaigns/new' : '/campaigns/new'
   return <div className="site-shell">
@@ -52,29 +52,12 @@ export default function App({ pathname = window.location.pathname }) {
         <a className="site-name" href="/" aria-label="CauseConnect home">
           {hasTeamLogo ? <img className="site-logo" src="/images/brand/causeconnect-logo.png" alt="CauseConnect — Connect people. Create change." /> : 'CauseConnect'}
         </a>
-        <nav aria-label="Primary navigation">
-          <a href="/" aria-current={route.name === 'home' ? 'page' : undefined}>Home</a>
-          <a href="/#campaigns">Campaigns</a>
-          {token && owner ? <>
-            <a href={createPath} aria-current={['create-campaign', 'business-campaign'].includes(route.name) ? 'page' : undefined}>Create campaign</a>
-            <a href="/my-campaigns" aria-current={['my-campaigns', 'edit-campaign'].includes(route.name) ? 'page' : undefined}>My campaigns</a>
-            <a href="/my-participation" aria-current={route.name === 'my-participation' ? 'page' : undefined}>My participation</a>
-          </> : null}
-          {token && role === 'business_owner' ? <>
-            <a href="/business/profile" aria-current={route.name === 'business-profile' ? 'page' : undefined}>Business profile</a>
-            <a href="/business/enquiries" aria-current={route.name === 'business-enquiries' ? 'page' : undefined}>Enquiries</a>
-          </> : null}
-          {token && role === 'admin' ? <>
-            <a href="/admin/campaigns" aria-current={['admin-campaigns', 'admin-review'].includes(route.name) ? 'page' : undefined}>Review campaigns</a>
-            <a href="/admin/users" aria-current={route.name === 'admin-users' ? 'page' : undefined}>Manage users</a>
-          </> : null}
-          {token ? <a href="/logout">Logout</a> : <><a href="/login">Login</a><a href="/register">Register</a></>}
-        </nav>
+        <SiteNavigation key={`${token || 'guest'}:${role}:${route.name}`} {...sessionProps} route={route} createPath={createPath} />
       </div>
     </header>
     {/* Logout must retain its in-memory revocation token after clearing browser storage. */}
     <main id="main-content" key={route.name === 'logout' ? 'logout' : token || 'guest'}>
-      {route.name === 'home' ? <HomePage /> : null}
+      {route.name === 'home' ? <HomePage {...sessionProps} /> : null}
       {route.name === 'campaign-details' ? <CampaignDetailsPage {...sessionProps} campaignId={route.campaignId} /> : null}
       {route.name === 'register' ? <RegistrationPage /> : null}
       {route.name === 'login' ? <LoginPage /> : null}
@@ -94,6 +77,18 @@ export default function App({ pathname = window.location.pathname }) {
         <h1 id="not-found-title">Page not found</h1><p>The page you requested is not available.</p><a className="text-link" href="/">Return to the homepage</a>
       </section> : null}
     </main>
-    <footer className="site-footer"><div className="site-footer__inner"><p className="site-footer__name">CauseConnect</p><p>Raise awareness. Create change.</p></div></footer>
+    <footer className="site-footer">
+      <div className="site-footer__inner">
+        <div className="site-footer__brand">
+          <p className="site-footer__name">CauseConnect</p>
+          <p>Raise awareness. Create change.</p>
+        </div>
+        <nav className="site-footer__links" aria-label="Footer navigation">
+          <a href="/">Home</a>
+          <a href="/#campaigns">Campaigns</a>
+        </nav>
+        <p className="site-footer__copyright">© 2026 CauseConnect</p>
+      </div>
+    </footer>
   </div>
 }

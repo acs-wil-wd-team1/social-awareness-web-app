@@ -52,6 +52,27 @@ describe('CauseConnect registration page', () => {
     expect(fetch).not.toHaveBeenCalled()
   })
 
+  it.each(['/campaigns/3', '/campaigns/3?source=community&topic=Green%20space#enquiry'])('keeps the destination in both login links after signup: %s', async (destination) => {
+    window.history.replaceState({}, '', `/register?returnTo=${encodeURIComponent(destination)}`)
+    vi.mocked(fetch).mockResolvedValue(response(201, { user: publicUser }))
+    render(<RegistrationPage />)
+    const loginPath = `/login?returnTo=${encodeURIComponent(destination)}`
+    expect(screen.getByRole('link', { name: 'Already have an account? Login' }).getAttribute('href')).toBe(loginPath)
+    fillRegistration()
+    fireEvent.click(screen.getByRole('button', { name: 'Register' }))
+    expect((await screen.findByRole('link', { name: 'Continue to login' })).getAttribute('href')).toBe(loginPath)
+  })
+
+  it.each(['https://evil.test', '//evil.test', '/\\evil.test'])('does not forward an unsafe destination after signup: %s', async (destination) => {
+    window.history.replaceState({}, '', `/register?returnTo=${encodeURIComponent(destination)}`)
+    vi.mocked(fetch).mockResolvedValue(response(201, { user: publicUser }))
+    render(<RegistrationPage />)
+    expect(screen.getByRole('link', { name: 'Already have an account? Login' }).getAttribute('href')).toBe('/login')
+    fillRegistration()
+    fireEvent.click(screen.getByRole('button', { name: 'Register' }))
+    expect((await screen.findByRole('link', { name: 'Continue to login' })).getAttribute('href')).toBe('/login')
+  })
+
   it('accepts trimmed name and email at the database length limits', async () => {
     const name = 'N'.repeat(100)
     const email = `alex@${'b'.repeat(63)}.${'c'.repeat(63)}.${'d'.repeat(12)}.test`

@@ -1,6 +1,6 @@
 # Stage 3 frontend notes for the manual and demonstration
 
-These notes describe the frontend work in this branch and the remaining integration steps. They are source material for the team members assembling the developers manual, user manual and video; they are not those finished submission documents.
+These notes describe the repository's frontend and the remaining integration steps. They provide source material for the developers manual, user manual and video; final submission documents remain separate deliverables.
 
 ## Agreed delivery split
 
@@ -50,7 +50,7 @@ The page components call service modules in `frontend/src/services/`. `apiClient
 
 The browser never chooses the campaign creator, business owner or initial status. It sends editable fields. The backend must resolve ownership from the signed-in account and save pending status. The client uploads an image first, receives an opaque reference, then includes only that reference in the campaign request. Actual file storage and privacy are backend responsibilities.
 
-The exact calls, bodies, response shapes and database mappings are in the [Kim/Rajita handoff](stage3-api-handoff.md) and [API index](../api/api-contract.md). Use those documents when writing the developers manual instead of copying sample data as if it were production configuration.
+The exact calls, bodies, response shapes and database mappings are in the [API integration guide](stage3-api-handoff.md) and [API index](../api/api-contract.md). Use those documents when writing the developers manual instead of copying sample data as if it were production configuration.
 
 ## Preview versus API testing
 

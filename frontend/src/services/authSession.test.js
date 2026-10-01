@@ -1,7 +1,7 @@
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { useLayoutEffect } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { clearSession, getSession, safeReturnPath, storeSession, useSession } from './authSession.js'
+import { authPagePath, clearSession, getSession, safeReturnPath, storeSession, useSession } from './authSession.js'
 
 const jwt = (claims) => `header.${btoa(JSON.stringify(claims)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')}.signature`
 const token = jwt({ id: 7, role: 'public', exp: 9999999999 })
@@ -134,5 +134,17 @@ describe('login return destinations', () => {
   })
   it.each([null, undefined, '', 'https://evil.test', '//evil.test', '///evil.test', 'javascript:alert(1)', '/\\evil.test', '/\r/evil.test', '/\n/evil.test', '/\t/evil.test'])('rejects an external or malformed route: %s', (path) => {
     expect(safeReturnPath(path)).toBe('/')
+  })
+
+  it.each(['/login', '/register'])('preserves one encoded destination, including its query and fragment, through %s', (page) => {
+    const destination = '/campaigns/4?source=community&topic=Green%20space#enquiry'
+    const url = new URL(authPagePath(page, destination), 'https://causeconnect.test')
+    expect(url.pathname).toBe(page)
+    expect([...url.searchParams]).toEqual([['returnTo', destination]])
+  })
+
+  it.each([null, '', '/', 'https://evil.test', '//evil.test', '/\\evil.test', '/\n/evil.test'])('does not forward an unsafe or default auth destination: %j', (path) => {
+    expect(authPagePath('/login', path)).toBe('/login')
+    expect(authPagePath('/register', path)).toBe('/register')
   })
 })

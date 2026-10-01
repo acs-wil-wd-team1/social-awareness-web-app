@@ -10,21 +10,23 @@ Follow the [shared conventions](shared-conventions.md), [campaign read contract]
 
 | Request | Access | Success |
 |---|---|---|
-| `GET /api/campaigns/:id/participation` | Active `public` or `business_owner`; approved cause | `200 {participation: record or null}` |
-| `PUT /api/campaigns/:id/participation` | Same; current user's record only | `200 {participation: record}` |
+| `GET /api/campaigns/:id/participation` | Active `public` or `business_owner`; own existing record regardless of campaign visibility, or approved cause when no record exists | `200 {participation: record or null}` |
+| `PUT /api/campaigns/:id/participation` | Same active roles; `joined` requires an approved cause; `withdrawn` requires the current user's existing record regardless of campaign visibility | `200 {participation: record}` |
 | `GET /api/participations/mine?page=1&pageSize=10` | Active `public` or `business_owner`; own history only | `200 {participations, page, pageSize, total}` |
 | `POST /api/campaigns/:id/enquiries` | Active `public` or `business_owner`; approved business campaign | `201 {enquiry: record}` |
 | `GET /api/business/me/enquiries?page=1&pageSize=10` | Active `business_owner`; their own business only | `200 {enquiries, page, pageSize, total}` |
 
 All require `Authorization: Bearer <token>`. Recheck the active session and current database user role/status. An admin cannot use these participant/contact forms or the business-owner inbox. Do not accept a client-supplied user, owner or business ID.
 
-Before a campaign-specific action, resolve an approved campaign. Derive `cause` from a null business association and `business` from a non-null association; do not trust a submitted type. Missing, pending or rejected campaigns return `404 CAMPAIGN_NOT_FOUND`. A visible campaign of the wrong type returns `409 CAMPAIGN_TYPE_MISMATCH`.
+New joins, rejoins and enquiries require a current approved, non-deleted campaign. The server derives `cause` from a null business association and `business` from a non-null association; a submitted type is not authoritative. Missing, pending, rejected or soft-deleted campaigns return `404 CAMPAIGN_NOT_FOUND` for these actions. A visible campaign of the wrong type returns `409 CAMPAIGN_TYPE_MISMATCH`.
+
+Reading or withdrawing an existing participation has a different authority: the record must belong to the active authenticated user. Both remain available after owner edits, rejection, unpublishing or soft deletion. These responses expose only the user's participation fields, never private campaign content. Without an own record, a private or missing campaign produces the same `404 CAMPAIGN_NOT_FOUND` response; another user's participation cannot establish access or reveal whether a private campaign exists.
 
 Register these campaign subroutes explicitly, with literal campaign routes such as `/categories`, `/mine` and `/admin` ahead of `/:id`. Keep API routes before any frontend SPA fallback.
 
 ## Join or withdraw from a cause
 
-`GET /api/campaigns/4/participation` returns `200 {"participation": null}` when this user has no record. Otherwise it returns the same wrapper used by PUT:
+`GET /api/campaigns/4/participation` first resolves the authenticated user's own record by campaign ID. An existing record returns the wrapper below even when the campaign is no longer public. If no record exists, an approved cause returns `200 {"participation": null}`; a private, deleted or missing campaign returns `404 CAMPAIGN_NOT_FOUND` with no participation or campaign details.
 
 ```json
 {
@@ -47,15 +49,15 @@ Register these campaign subroutes explicitly, with literal campaign routes such 
 
 Implementation rules:
 
-1. Resolve the user from the verified session and the approved cause from the path.
-2. Find the one row for this user and campaign. The existing unique constraint on `(user_id, campaign_id)` is the authority.
-3. For `joined`, create the row when absent or change an existing withdrawn row back to joined. Repeating `joined` on a joined row returns that same row.
-4. For `withdrawn`, update an existing row. Repeating `withdrawn` on a withdrawn row returns the same row. With no previous participation, return `409 PARTICIPATION_NOT_FOUND`; do not invent a first-join date for someone who never joined.
+1. The server resolves the active user from the verified session and validates the path ID and body.
+2. It finds and locks the one row for this user and campaign. The existing unique constraint on `(user_id, campaign_id)` is the authority; a different user's row never grants permission.
+3. For `joined`, the current approved, non-deleted cause is required, including when the user's row already exists. The server creates the row when absent or changes an existing withdrawn row back to joined. Repeating `joined` on a joined row returns that same row only while the campaign remains eligible.
+4. For `withdrawn`, an existing own row is sufficient: the server updates it without requiring public campaign access. Repeating `withdrawn` returns the same row. With no previous participation, an approved cause returns `409 PARTICIPATION_NOT_FOUND`; a private, deleted or missing campaign returns the same `404 CAMPAIGN_NOT_FOUND`. No withdrawal request creates a row or first-join date.
 5. Return the persisted row after the write commits. The response status must match the requested status.
 
-Use a transaction and the unique constraint to handle concurrent first joins without duplicate records. The campaign's approved state must still hold when committing; coordinate with moderation's transaction/locking approach. `participatedAt` records the first join and stays unchanged on withdrawal or rejoining. Do not write `updated_at` to this table: that column does not exist.
+Transactions and the unique constraint handle concurrent first joins without duplicate records. For join/rejoin, the campaign's approved and non-deleted state must still hold when committing; this shares moderation's transaction/locking approach. Withdrawal locks and changes only the authenticated user's existing participation and remains valid during a campaign visibility change. `participatedAt` records the first join and stays unchanged on withdrawal or rejoining. The table has no `updated_at` column.
 
-The browser blocks duplicate clicks. If a write times out, returns an unreadable response or fails with a server error, it does not assume success or failure: further changes remain blocked until GET successfully checks the current participation. PUT is idempotent, but do not depend on a browser timeout proving the write did not happen.
+The browser blocks duplicate clicks. If a write times out, returns an unreadable response or fails with a server error, it does not assume success or failure: further changes remain blocked until GET successfully checks the current participation. This reconciliation GET must work for an existing own record even when the campaign has become private. PUT is idempotent; a browser timeout does not prove that the write failed.
 
 ## My participation history
 
@@ -85,7 +87,9 @@ The browser blocks duplicate clicks. If a write times out, returns an unreadable
 
 Include both joined and withdrawn records, scoped by the authenticated `user_id` before counting/pagination. Sort by `participated_at DESC`, then `participation_id DESC`. The campaign ID in a non-null summary must match the participation's campaign ID.
 
-Historical records may remain when a campaign is no longer publicly accessible. Return `campaign: null` when its summary cannot be disclosed or is unavailable. If policy allows a minimal historical summary, it may contain `status: "pending"` or `"rejected"`, but must not contain private campaign content or review notes. The frontend links only to approved campaigns and shows an unavailable label when the summary is null. Ownership of a participation is not permission to read a campaign's private detail endpoint.
+Historical records remain when a campaign is no longer publicly accessible. A pending, rejected, soft-deleted or otherwise unavailable campaign has `campaign: null`; its current title may contain an unapproved owner edit and must not be disclosed. Only approved, non-deleted campaigns have public summaries and links. Participation ownership grants access to the user's own record, not to private campaign details or review notes.
+
+My participation provides withdrawal for each joined record, including rows with a null campaign summary. The action uses that record's `campaignId` with the existing PUT route and sends only `{"status":"withdrawn"}`. The page does not offer direct join/rejoin actions: an approved public campaign detail supplies those controls. A confirmed response updates the row; uncertain writes require a successful status check or history reload. Refresh and pagination are disabled while an action is in flight, and a session or role change cancels pending requests and removes the previous account's rows.
 
 ## Send an enquiry to a business
 
@@ -209,12 +213,13 @@ Required checks:
 - User A cannot read/change user B's participation; business A cannot read business B's enquiries, including forged IDs and query parameters.
 - Pending/rejected/missing campaign cannot receive joins or enquiries. Wrong campaign type is rejected. Check concurrent campaign-status changes.
 - First join, repeated join, withdrawal, repeated withdrawal, rejoin and concurrent first joins reuse one record and preserve its first timestamp.
+- A joined user can read and withdraw the same own record after owner editing, admin unpublishing/rejection or soft deletion. Join/rejoin still fails while unavailable. A different user receives the same private/missing-campaign error and cannot read or withdraw that record.
 - GET after an uncertain participation write returns the real state; the browser does not claim success prematurely.
 - Enquiry required fields, invalid email, exact length boundaries, optional phone, unexpected JSON types and forged ownership fields are checked server-side.
 - A confirmed enquiry is stored in `leads` and appears only in its business owner's inbox, with matching receipt fields.
 - No successful booking, payment, notification or email-delivery claim is made by creating an enquiry.
 - Lists cover empty results, multiple pages, past-end pages, deterministic ordering and mandatory filtered totals.
-- Null/non-approved historical campaign summaries have no public link and disclose no private campaign detail.
+- Non-approved historical campaigns return null summaries, have no public link and disclose no changed title, description or review detail. Existing participation still permits withdrawal.
 - Error/retry states preserve appropriate form input, require acknowledgement for uncertain enquiry retries, and clear private data after an account change/logout.
 
 Frontend test entry points: `engagementService.test.js`, `CampaignParticipation.test.jsx`, `CampaignEnquiryForm.test.jsx`, `MyParticipationPage.test.jsx` and `BusinessEnquiriesPage.test.jsx`.

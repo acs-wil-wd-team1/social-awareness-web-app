@@ -66,6 +66,7 @@ describe('Local campaign frontend draft', () => {
   it('keeps the sample out of navigation while linking to real campaign creation', () => {
     storeSession('existing-token', { id: 3, name: 'Test user', role: 'public' })
     render(<App pathname="/login" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Account' }))
     expect(screen.getByRole('link', { name: 'Logout' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Create campaign' }).getAttribute('href')).toBe('/campaigns/new')
     expect(fetch).not.toHaveBeenCalled()

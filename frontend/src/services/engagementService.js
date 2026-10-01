@@ -37,6 +37,7 @@ function readCampaignSummary(campaign, campaignId, causeOnly) {
   if (campaign === null) return null
   if (!positiveId(campaign?.id) || campaign.id !== campaignId || !text(campaign.title, 150)
     || !['approved', 'pending', 'rejected'].includes(campaign.status) || (causeOnly && campaign.type !== 'cause')) throw invalidResponse()
+  if (causeOnly && campaign.status !== 'approved') return null
   return campaign
 }
 
@@ -53,8 +54,7 @@ function readPage(body, key, reader, { page, pageSize }, causeOnly = false) {
     || body.total < body[key].length) throw invalidResponse()
   const records = body[key].map((item) => {
     reader(item)
-    readCampaignSummary(item.campaign, item.campaignId, causeOnly)
-    return item
+    return { ...item, campaign: readCampaignSummary(item.campaign, item.campaignId, causeOnly) }
   })
   if (new Set(records.map(({ id }) => id)).size !== records.length) throw invalidResponse()
   return { [key]: records, page, pageSize, total: body.total }

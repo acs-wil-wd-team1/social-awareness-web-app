@@ -2,7 +2,7 @@
 
 **Status:** Proposed for Stage 3. These rules are not a claim that every current route already implements them.
 
-The public-user submission backend in this branch has its implemented request and error rules in the [campaign contract](campaign-posting-contract.md). The expanded frontend uses the [Stage 3 handoff](../handoff/stage3-api-handoff.md). In particular, oversized JSON uses `413 REQUEST_TOO_LARGE`; upload codes and the other new endpoints remain backend proposals.
+The implemented public-user submission backend has its request and error rules in the [campaign contract](campaign-posting-contract.md). The [Stage 3 API integration guide](../handoff/stage3-api-handoff.md) maps the remaining extensions. Oversized JSON uses `413 REQUEST_TOO_LARGE`; upload codes and the other new endpoints remain backend proposals.
 
 ## Requests and permissions
 

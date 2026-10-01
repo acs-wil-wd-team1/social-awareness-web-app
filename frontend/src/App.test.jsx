@@ -41,6 +41,21 @@ describe('application routing', () => {
   })
 })
 
+describe('site footer', () => {
+  it.each(['/', '/campaigns/42', '/missing'])('keeps public footer links usable from %s', (pathname) => {
+    render(<App pathname={pathname} />)
+    const footer = within(screen.getByRole('contentinfo'))
+    const links = within(footer.getByRole('navigation', { name: 'Footer navigation' }))
+    expect(footer.getByText('CauseConnect', { exact: true })).toBeTruthy()
+    expect(footer.getByText('Raise awareness. Create change.')).toBeTruthy()
+    expect(footer.getByText('© 2026 CauseConnect')).toBeTruthy()
+    expect(links.getByRole('link', { name: 'Home', exact: true }).getAttribute('href')).toBe('/')
+    expect(links.getByRole('link', { name: 'Campaigns', exact: true }).getAttribute('href')).toBe('/#campaigns')
+    expect(footer.getAllByRole('link')).toHaveLength(2)
+    expect(footer.queryByRole('img')).toBeNull()
+  })
+})
+
 describe('navigation and session updates', () => {
   it('shows public navigation and an accessible skip link for guests', () => {
     render(<App pathname="/" />)
@@ -61,6 +76,8 @@ describe('navigation and session updates', () => {
     render(<App pathname="/" />)
     const nav = within(screen.getByRole('navigation', { name: 'Primary navigation' }))
     expect(nav.getByRole('link', { name: 'Create campaign' }).getAttribute('href')).toBe(createPath)
+    expect(nav.queryByRole('link', { name: 'My campaigns' })).toBeNull()
+    fireEvent.click(nav.getByRole('button', { name: 'Account' }))
     expect(nav.getByRole('link', { name: 'My campaigns' }).getAttribute('href')).toBe('/my-campaigns')
     expect(nav.getByRole('link', { name: 'My participation' }).getAttribute('href')).toBe('/my-participation')
     expect(Boolean(nav.queryByRole('link', { name: 'Enquiries' }))).toBe(role === 'business_owner')
@@ -74,6 +91,7 @@ describe('navigation and session updates', () => {
     render(<App pathname="/" />)
     const nav = within(screen.getByRole('navigation', { name: 'Primary navigation' }))
     expect(nav.getByRole('link', { name: 'Review campaigns' }).getAttribute('href')).toBe('/admin/campaigns')
+    fireEvent.click(nav.getByRole('button', { name: 'Account' }))
     expect(nav.getByRole('link', { name: 'Manage users' }).getAttribute('href')).toBe('/admin/users')
     expect(nav.queryByRole('link', { name: 'My participation' })).toBeNull()
     expect(nav.queryByRole('link', { name: 'Create campaign' })).toBeNull()
@@ -82,13 +100,28 @@ describe('navigation and session updates', () => {
 
   it('updates the header immediately when a user logs in and signs out', () => {
     render(<App pathname="/" />)
-    const nav = within(screen.getByRole('navigation', { name: 'Primary navigation' }))
     act(() => loginAs('public'))
+    const nav = within(screen.getByRole('navigation', { name: 'Primary navigation' }))
+    fireEvent.click(nav.getByRole('button', { name: 'Account' }))
     expect(nav.getByRole('link', { name: 'Logout' })).toBeTruthy()
     expect(nav.queryByRole('link', { name: 'Login' })).toBeNull()
     act(() => clearSession())
-    expect(nav.getByRole('link', { name: 'Login' })).toBeTruthy()
-    expect(nav.queryByRole('link', { name: 'Logout' })).toBeNull()
+    const guestNav = within(screen.getByRole('navigation', { name: 'Primary navigation' }))
+    expect(guestNav.getByRole('link', { name: 'Login' })).toBeTruthy()
+    expect(guestNav.queryByRole('button', { name: 'Account' })).toBeNull()
+    expect(guestNav.queryByRole('link', { name: 'Logout' })).toBeNull()
+  })
+
+  it('closes the old account panel when a different role starts a session', () => {
+    loginAs('business_owner')
+    render(<App pathname="/" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Account' }))
+    expect(screen.getByRole('link', { name: 'Business profile' })).toBeTruthy()
+    act(() => loginAs('public'))
+    expect(screen.getByRole('button', { name: 'Account' }).getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(screen.getByRole('button', { name: 'Account' }))
+    expect(screen.queryByRole('link', { name: 'Business profile' })).toBeNull()
+    expect(screen.getByRole('link', { name: 'My campaigns' })).toBeTruthy()
   })
 
   it('removes protected navigation when the current session is rejected', () => {

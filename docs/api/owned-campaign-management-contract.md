@@ -1,6 +1,6 @@
 # Owner campaign editing and removal
 
-This is the API handoff for the implemented frontend at `/my-campaigns/:id/edit`. The browser screens and sample-data flow are available in this branch; the backend routes below still need implementation. Do not treat a preview save as a database save.
+This contract supports the implemented frontend at `/my-campaigns/:id/edit`. The browser screens and sample-data flow are merged into `main`; the backend routes below still need implementation and database verification.
 
 Both public users and small-business owners can manage their own campaigns. Admin review stays on the separate [admin endpoints](admin-campaign-moderation-contract.md). See the [campaign read contract](campaign-read-contract.md) for the owner list and the [photo extension](campaign-posting-future-proposal.md) for upload references.
 

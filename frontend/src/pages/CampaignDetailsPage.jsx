@@ -26,6 +26,16 @@ function formatCampaignType(type) {
   return null
 }
 
+function businessWebsite(value) {
+  if (typeof value !== 'string') return null
+  const address = value.trim()
+  if (!/^https?:\/\//i.test(address) || /[\\\x00-\x20\x7f]/.test(address)) return null
+  try {
+    const url = new URL(address)
+    return ['http:', 'https:'].includes(url.protocol) && url.hostname && !url.username && !url.password ? url.href : null
+  } catch { return null }
+}
+
 function formatPublishedDate(createdAt) {
   if (!createdAt || !Number.isFinite(Date.parse(createdAt))) return 'Not provided'
 
@@ -81,6 +91,7 @@ export default function CampaignDetailsPage({
   const categoryClassName = categoryClassNames[campaign.category] ?? 'campaign-details--default'
   const hasGoals = campaign.goals?.length > 0
   const hasAboutContent = Boolean(campaign.details || hasGoals)
+  const website = businessWebsite(campaign.business?.website)
 
   return (
     <section className="campaign-details-page content-width" aria-labelledby="campaign-title">
@@ -144,6 +155,10 @@ export default function CampaignDetailsPage({
             {campaign.business?.businessName ? <div>
               <dt>Business</dt>
               <dd>{campaign.business.businessName}</dd>
+            </div> : null}
+            {website ? <div>
+              <dt>Website</dt>
+              <dd><a className="text-link" href={website}>Visit business website</a></dd>
             </div> : null}
             {campaign.startDate ? <div>
               <dt>Starts</dt>

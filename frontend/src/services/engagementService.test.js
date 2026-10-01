@@ -57,6 +57,11 @@ describe('engagement API contracts', () => {
     expect(fetch.mock.calls[0][0]).toBe('/api/participations/mine?page=1&pageSize=10')
   })
 
+  it.each(['pending', 'rejected'])('hides a non-public %s campaign summary in participation history', async status => {
+    fetch.mockResolvedValueOnce(json({ participations: [{ ...participation, campaign: { id: 8, title: 'Private revised title', type: 'cause', status } }], page: 1, pageSize: 10, total: 1 }))
+    expect((await loadMyParticipation({ token: 'user' })).participations[0].campaign).toBeNull()
+  })
+
   it('rejects malformed pagination and mismatched private campaign summaries', async () => {
     fetch.mockResolvedValueOnce(json({ enquiries: [{ ...enquiry, campaign: { id: 99, title: 'Wrong campaign', status: 'approved' } }], page: 1, pageSize: 10, total: 1 }))
     await expect(loadBusinessEnquiries({ token: 'business' })).rejects.toMatchObject({ code: 'INVALID_RESPONSE' })

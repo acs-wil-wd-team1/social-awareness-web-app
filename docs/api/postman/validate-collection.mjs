@@ -167,11 +167,22 @@ test('version, identity, privacy and envelope mismatches fail',()=>{
     ['List accounts',b=>{b.users[0].passwordHash='must-never-leak';}],
     ['Public campaigns (Stage 3 target)',b=>{b.campaigns[0].review=review;}],
     ['My participation history',b=>{b.participations[0].campaign.id=999;}],
+    ['My participation history',b=>{b.participations[0].campaign.status='pending';}],
+    ['My participation history',b=>{b.participations[0].campaign.status='rejected';}],
+    ['Read my participation',b=>{b.participation.campaign={id:31,title:'Private changed title'};}],
+    ['Withdraw own participation',b=>{b.participation.userId=999;}],
     ['Send fixture business enquiry',b=>{b.enquiry.campaignId=999;}],
     ['List own campaigns',b=>{delete b.total;}],
     ['Pending campaign is not public',b=>{b.code='INTERNAL_SERVER_ERROR';}],
   ];
   cases.forEach(([name,mutate])=>{const item=items.find(v=>v.name===name);const body=structuredClone(responseFor(item));mutate(body);const s=sandbox(item,{}, {status:checks[name].status,body});s.runPost();assert.ok(s.failures.length,name);assert.equal(s.local.size,0);});
+});
+test('participation receipts and null history summaries do not require public campaign content',()=>{
+  for(const name of ['Read my participation','Withdraw own participation','My participation history']) {
+    const item=items.find(v=>v.name===name); const body=structuredClone(responseFor(item));
+    if(name==='My participation history') body.participations[0].campaign=null;
+    const s=sandbox(item,{}, {status:200,body}); s.runPost(); assert.deepEqual(s.failures,[],name);
+  }
 });
 test('login token captures are run-local, including business role mapping',()=>{
   for(const name of ['Login public fixture (creates session)','Login business fixture (creates session)','Login admin fixture (creates session)']){

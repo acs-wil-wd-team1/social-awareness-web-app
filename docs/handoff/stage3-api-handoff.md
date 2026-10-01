@@ -1,10 +1,10 @@
-# Stage 3 API handoff — Kim and Rajita
+# Stage 3 API integration guide
 
-The frontend covers public/business campaign posting, photos, owner editing, participation, business enquiries, admin campaign/account management and automatic campaign refresh. This handoff lists what the backend needs to support those screens. The labelled sample preview uses browser data; live mode calls the real endpoints and reports errors when they are unavailable.
+The frontend covers public/business campaign posting, photos, owner editing, participation, business enquiries, admin campaign/account management and automatic campaign refresh. This guide maps those screens to backend routes, validation, database changes and integration checks. The labelled sample preview uses browser data; live mode calls the real endpoints and reports errors when they are unavailable.
 
-The existing branch already contains real category lookup and text-only public submission. Keep that working and extend it. The other new endpoints below are proposals consumed by the frontend, not completed backend work.
+The reviewed `main` baseline, `4e24bae`, includes PR #12 through `48aa32a`: authentication, category lookup, text-only public submission and the frontend/API contracts. The additional endpoints below remain backend work. Extensions must preserve the existing authentication and submission flows.
 
-Start with this page, then open the linked contract for the endpoint you are implementing. The frontend services in `frontend/src/services/` are the actual callers; there is no need to guess field names or add a second API for the same form. Implement and test one complete journey at a time.
+The tables provide a starting point for each API group. Linked contracts define the payloads and rules, and `frontend/src/services/` contains the corresponding callers. Integration proceeds one complete journey at a time.
 
 ## Agreed responsibilities
 
@@ -16,22 +16,22 @@ Start with this page, then open the linked contract for the endpoint you are imp
 | Business campaign-posting API | Kim |
 | Admin campaign-approval API | Kim and Rajita |
 
-Unice's target is **20 October 2026**. Supporting APIs—images, profiles, owner management, participation, enquiries and admin account management—need coordination between Kim and Rajita. The table records agreed assignments; it does not assign each additional endpoint to either person separately.
+**Target: 20 October 2026.** Supporting APIs—images, profiles, owner management, participation, enquiries and admin account management—need coordinated ownership. The table records the agreed assignments; additional endpoint ownership remains to be agreed.
 
-The [AWS frontend preview](https://d10e86f5qx46up.cloudfront.net) is available with sample data. Use **Preview as** to explore each role. It does not call your development API, save real accounts or share sample changes between testers. The real backend, database/image storage and final cloud integration still need implementation and testing. See [verification evidence](../evidence/stage-3/frontend-preview/README.md).
+The [AWS frontend preview](https://d10e86f5qx46up.cloudfront.net) uses sample data. **Preview as** switches between roles. The preview does not call a development API, save real accounts or share sample changes between testers. The remaining backend APIs, database/image storage and final cloud integration still need implementation and testing. Local interface changes require a separate deployment before they appear in the hosted preview. See [verification evidence](../evidence/stage-3/frontend-preview/README.md).
 
-The application will use one dedicated admin account with role `admin`. The frontend detects that role and shows the admin panel link. Creating or promoting administrators through the public registration form or another frontend screen is not part of this work; the backend must enforce admin access independently.
+The application uses one dedicated admin account with role `admin`. Its primary navigation includes **Review campaigns**, with **Manage users** under **Account**. Public registration and account screens do not create or promote administrators; the backend enforces admin access independently.
 
 ## What connects to what
 
 | Frontend page | API calls | Current backend position |
 |---|---|---|
-| `/campaigns/new` | GET categories, optional POST image, POST campaign | Categories and text-only public POST exist in this branch; image support pending |
+| `/campaigns/new` | GET categories, optional POST image, POST campaign | Categories and text-only public POST are merged into `main`; image support pending |
 | `/business/profile` | GET/PUT `/api/business/me` | Routes pending; Business table already exists |
 | `/business/campaigns/new` | GET profile + categories, optional POST image, POST campaign | Profile and business posting extension pending |
 | `/my-campaigns` | GET `/api/campaigns/mine?page=1&pageSize=10&status=pending` | Owner read pending; status parameter omitted for all statuses |
 | `/my-campaigns/:id/edit` | GET/PATCH/DELETE `/api/campaigns/mine/:id` | Owner detail, edit/resubmit and soft-delete pending |
-| Approved cause detail; `/my-participation` | GET/PUT `/api/campaigns/:id/participation`; GET `/api/participations/mine` | Participation endpoints pending; existing Participation table needs safe read/write handling |
+| Approved cause detail; `/my-participation` | GET/PUT `/api/campaigns/:id/participation`; GET `/api/participations/mine` | Endpoints pending; join/rejoin require approval, while existing own records remain readable and withdrawable after the campaign becomes unavailable |
 | Approved business detail; `/business/enquiries` | POST `/api/campaigns/:id/enquiries`; GET `/api/business/me/enquiries` | Enquiry endpoints pending; existing Lead fields already cover the contract |
 | `/admin/campaigns` | GET `/api/campaigns/admin` with page/pageSize/status/search | Existing read; expand its response fields |
 | `/admin/campaigns/:id` | GET admin detail/reviews; PATCH status/publication; DELETE `/api/campaigns/admin/:id` | Existing detail; decision/history/unpublish/soft-delete endpoints pending |
@@ -47,7 +47,7 @@ The application will use one dedicated admin account with role `admin`. The fron
 5. **Add admin decisions.** Admin detail must include canonical ISO-millisecond `updatedAt`. Every decision sends it as `expectedUpdatedAt`; lock and compare it before saving status plus one review. An owner edit after the admin loaded the page must also cause `409`, even if the row is still pending. Return the advanced version with the confirmed status. Rejection needs comments. [Admin contract](../api/admin-campaign-moderation-contract.md).
 6. **Add image storage and attachment.** Add the documented upload metadata migration. Upload one multipart `file` privately, return an opaque reference and expiry, then attach it in the campaign-create transaction. Owner/admin image URLs are signed; public delivery requires approval. [Image contract and migration design](../api/campaign-posting-future-proposal.md#upload-one-campaign-image).
 7. **Add owner editing/resubmission and soft deletion.** Use the authenticated owner and saved `updatedAt` value, not a client creator ID. An edit returns the campaign to pending; preserve previous reviews. Share deletion metadata with admin management rather than adding duplicate columns. [Owner-management contract](../api/owned-campaign-management-contract.md).
-8. **Add participation and business enquiries.** Join/withdraw/rejoin are scoped to the signed-in account and approved cause campaigns. Enquiries target approved business campaigns; only the linked business owner can read the inbox. The existing Participation/Lead tables already contain the contract's fields and participation uniqueness constraint; add routes/services rather than duplicate tables. [Engagement contract](../api/engagement-contract.md).
+8. **Add participation and business enquiries.** Participation is scoped to the signed-in account. Join/rejoin require an approved cause campaign. An existing own participation record remains readable and withdrawable when its campaign is no longer approved or is soft-deleted; private history returns `campaign:null` for unavailable content. Enquiries target approved business campaigns; only the linked business owner can read the inbox. The existing Participation/Lead tables contain the required fields and participation uniqueness constraint. [Engagement contract](../api/engagement-contract.md).
 9. **Add admin account/content management.** Account suspension must revoke active sessions; no changes to any admin account or account roles. Return approval history and record unpublish/soft-delete events without destroying campaign records. These campaign actions also require `expectedUpdatedAt`, checked inside the transaction; unpublish returns the advanced version. [Admin management contract](../api/admin-management-contract.md).
 10. **Test the complete journey against the real API, then connect cloud settings.** The frontend API base and CORS origin must match the hosted backend/frontend. Test with sample mode disabled. Record the endpoints/migrations and test evidence in the PR so frontend integration can be checked directly. Exercise the 30-second campaign refresh as well as button-triggered reads; public removal and account suspension must take effect on subsequent requests.
 
@@ -93,6 +93,8 @@ For all protected calls, send `Authorization: Bearer <login token>`. JSON bodies
 | `GET /api/participations/mine` | `page`, `pageSize` | `200 {participations,page,pageSize,total}`; each record includes safe `campaign` summary or `null` |
 | `POST /api/campaigns/:id/enquiries` | `{name,email,message,phone?}` | `201 {enquiry:{id,campaignId,businessId,name,email,phone,message,createdAt}}` |
 | `GET /api/business/me/enquiries` | `page`, `pageSize` | `200 {enquiries,page,pageSize,total}`; each record includes safe `campaign` summary or `null` |
+
+Participation reads and withdrawal check for the current account's existing record before applying campaign visibility restrictions. New joins/rejoins still require an approved, non-deleted cause campaign. An unavailable campaign must not expose its current title, description or moderation data through participation history.
 
 Optional `?` markers in this table explain fields; they are not literal JSON property names. Use the individual contract's full examples, limits, null rules and error codes. The existing public/admin list and detail paths stay unchanged; expand their serializer rather than replacing `campaigns` with `items` or wrapping bare GET details in `campaign`.
 
@@ -200,7 +202,7 @@ npm run build
 npm run dev
 ```
 
-The development frontend proxies `/api` to `http://127.0.0.1:3000`. Restart it after changing environment settings. The sample AWS URL is for interface review; it does not switch to the real API simply because the backend has been completed. Unice will rebuild/deploy the live frontend with the agreed HTTPS API origin and CORS configuration.
+The development frontend proxies `/api` to `http://127.0.0.1:3000`. Restart it after changing environment settings. Connecting the hosted frontend requires a separate non-demo build and deployment with the agreed HTTPS API origin and CORS configuration.
 
 In each API PR/handoff, include the endpoints implemented, exact migration filenames and order, environment **variable names only**, tests run and their results, and any known limit. Provide one saved request/response example with tokens/private contact data removed. Say which real browser journey passed and which still needs integration; do not call a sample-mode walkthrough a database test.
 
@@ -229,7 +231,7 @@ Resolve a contract mismatch in one agreed place and update its frontend service/
 - Admin approval publishes the campaign; rejection keeps it private and shows the owner its reason. Concurrent decisions yield one `200`, one `409`, and one review. A write failure rolls back both status and review.
 - An owner edit committed before an admin decision/unpublish/delete invalidates the admin's loaded version. All three actions return `409` for that stale version without changing content or history. The admin reloads and deliberately confirms against the new version.
 - Owner A can edit/resubmit or soft-delete A's campaign but cannot change B's. Stale `expectedUpdatedAt` values return `409`; editing approved content removes it publicly until reapproval.
-- Participation joins/withdrawals/rejoins do not create duplicate records; private or deleted campaigns cannot receive new joins. Personal history never leaks another user's records.
+- Participation joins/withdrawals/rejoins do not create duplicate records. Existing own records remain readable and withdrawable after campaign unpublishing or soft deletion; new joins/rejoins are rejected. History returns `campaign:null` for unavailable content and never exposes another user's records.
 - Enquiries save the submitted contact/message fields and appear only in the owning business's inbox. Invalid, unavailable and uncertain requests do not produce fake success or automatic duplicate sends.
 - Admins cannot suspend themselves or any admin account. Suspension revokes all sessions; reactivation requires a new login. Unpublish/delete actions require reasons and retain audit/history records.
 - Public list/detail and owner status refresh reflect API changes, stop polling when hidden/offline and clear inaccessible data. Real permissions still come from the backend, not the polling hook.

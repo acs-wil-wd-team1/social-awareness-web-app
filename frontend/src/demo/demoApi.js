@@ -113,14 +113,20 @@ export async function demoRequest(path, { method = 'GET', body, token, signal } 
   }
   const participation = route.match(/^\/api\/campaigns\/(\d+)\/participation$/)
   if (participation) {
-    const user = userFor(token, ['public', 'business_owner']), campaign = findCampaign(state, participation[1])
-    if (campaign.status !== 'approved') throw new ApiError('This cause is not available for participation.', { status: 404, code: 'CAMPAIGN_NOT_FOUND' })
-    if (campaign.type !== 'cause') throw new ApiError('Only social causes support participation.', { status: 409, code: 'CAMPAIGN_TYPE_MISMATCH' })
-    let record = state.participations.find(p => p.userId === user.id && p.campaignId === campaign.id)
+    const user = userFor(token, ['public', 'business_owner']), campaignId = Number(participation[1])
+    let record = state.participations.find(p => p.userId === user.id && p.campaignId === campaignId)
+    if (method === 'PUT' && (!['joined', 'withdrawn'].includes(body?.status) || Object.keys(body).some(key => key !== 'status'))) {
+      throw new ApiError('Choose a participation status.', { status: 422, code: 'VALIDATION_FAILED' })
+    }
+    // An existing participant may read or withdraw their own record without access to campaign content.
+    if (!record || (method === 'PUT' && body.status === 'joined')) {
+      const campaign = state.campaigns.find(c => c.id === campaignId && !c.deletedAt && c.status === 'approved')
+      if (!campaign) throw new ApiError('This cause is not available for participation.', { status: 404, code: 'CAMPAIGN_NOT_FOUND' })
+      if (campaign.type !== 'cause') throw new ApiError('Only social causes support participation.', { status: 409, code: 'CAMPAIGN_TYPE_MISMATCH' })
+    }
     if (method === 'PUT') {
-      if (!['joined', 'withdrawn'].includes(body?.status) || Object.keys(body).some(key => key !== 'status')) throw new ApiError('Choose a participation status.', { status: 422, code: 'VALIDATION_FAILED' })
       if (!record && body.status === 'withdrawn') throw new ApiError('You have not joined this campaign.', { status: 409, code: 'PARTICIPATION_NOT_FOUND' })
-      if (!record) { record = { id: state.nextId++, userId: user.id, campaignId: campaign.id, status: body.status, participatedAt: new Date().toISOString() }; state.participations.push(record) }
+      if (!record) { record = { id: state.nextId++, userId: user.id, campaignId, status: body.status, participatedAt: new Date().toISOString() }; state.participations.push(record) }
       else record.status = body.status
       save(state)
     }
@@ -128,7 +134,7 @@ export async function demoRequest(path, { method = 'GET', body, token, signal } 
   }
   if (route === '/api/participations/mine') {
     const user = userFor(token, ['public', 'business_owner'])
-    return pageOf(state.participations.filter(p => p.userId === user.id).map(p => ({ ...contactRecord(p), campaign: summary(state.campaigns.find(c => c.id === p.campaignId)) }))
+    return pageOf(state.participations.filter(p => p.userId === user.id).map(p => ({ ...contactRecord(p), campaign: summary(state.campaigns.find(c => c.id === p.campaignId && c.status === 'approved')) }))
       .sort((a, b) => b.participatedAt.localeCompare(a.participatedAt) || b.id - a.id), url, 'participations')
   }
   const enquiry = route.match(/^\/api\/campaigns\/(\d+)\/enquiries$/)
