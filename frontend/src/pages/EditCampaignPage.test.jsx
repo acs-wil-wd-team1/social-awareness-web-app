@@ -74,6 +74,35 @@ describe('owner campaign editing', () => {
     expect(writes()).toHaveLength(0)
   })
 
+  it.each(['client', 'server'])('keeps focus while correcting multiple %s validation errors', async source => {
+    if (source === 'server') handlers.save = () => json({ message: 'Check fields.', fieldErrors: { title: 'Check the title.', description: 'Check the description.' } }, 422)
+    render(page()); await ready()
+    const title = screen.getByLabelText('Campaign title')
+    if (source === 'client') {
+      fireEvent.change(title, { target: { value: '' } })
+      fireEvent.change(screen.getByLabelText('Description'), { target: { value: '' } })
+    }
+    fireEvent.submit(form())
+    await waitFor(() => expect(document.activeElement).toBe(title))
+    fireEvent.change(title, { target: { value: 'B' } })
+    expect(document.activeElement).toBe(title)
+    fireEvent.change(title, { target: { value: 'Better title' } })
+    expect(title.value).toBe('Better title')
+  })
+
+  it('does not steal focus when a photo is invalid, but focuses it after a failed save', async () => {
+    render(page()); await ready()
+    const title = screen.getByLabelText('Campaign title')
+    title.focus()
+    choosePhoto(new File(['svg'], 'image.svg', { type: 'image/svg+xml' }))
+    expect(document.activeElement).toBe(title)
+    fireEvent.change(title, { target: { value: 'Updated title' } })
+    expect(document.activeElement).toBe(title)
+    fireEvent.submit(form())
+    expect(document.activeElement).toBe(screen.getByLabelText(/Campaign photo/))
+    expect(writes()).toHaveLength(0)
+  })
+
   it('deduplicates saves and disables controls while the write is in flight', async () => {
     const pending = deferred(); handlers.save = () => pending.promise
     render(page()); await ready()
@@ -126,7 +155,7 @@ describe('owner campaign editing', () => {
     await screen.findByRole('alert')
     expect(screen.getByLabelText('Campaign title').closest('fieldset').disabled).toBe(true)
     fireEvent.submit(form()); expect(writes()).toHaveLength(1)
-    if (status === 401) expect(screen.getByRole('link', { name: 'Log in again' })).toBeTruthy()
+    if (status === 401) expect(screen.getByRole('link', { name: 'Log in again' }).getAttribute('href')).toBe('/login?returnTo=%2Fmy-campaigns%2F4%2Fedit')
   })
 
   it('uploads the selected photo first and reuses it after a field-validation error', async () => {

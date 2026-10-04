@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { loadCampaignCategories, submitCampaign, uploadCampaignImage } from '../services/campaignSubmissionService.js'
 import { validateCampaignSubmission } from '../services/campaignSubmissionValidation.js'
 import { loadBusinessProfile } from '../services/businessService.js'
+import { authPagePath } from '../services/authSession.js'
 import CampaignImageInput from '../components/CampaignImageInput.jsx'
 import '../styles/campaign-posting.css'
 
@@ -11,6 +12,7 @@ const initialValues = {
 
 export default function CreateCampaignPage({ token = localStorage.getItem('token'), role = 'public', mode = 'cause' }) {
   const isBusiness = mode === 'business'
+  const loginPath = authPagePath('/login', isBusiness ? '/business/campaigns/new' : '/campaigns/new')
   const allowed = role === (isBusiness ? 'business_owner' : 'public')
   const [values, setValues] = useState(initialValues)
   const [errors, setErrors] = useState({})
@@ -192,7 +194,7 @@ export default function CreateCampaignPage({ token = localStorage.getItem('token
         <div className="campaign-form-card">
           <h1 id="campaign-form-title">Create a campaign</h1>
           <p>Log in to submit a {isBusiness ? 'business' : 'social-cause'} campaign for review.</p>
-          <a className="text-link" href="/login">Log in</a>
+          <a className="text-link" href={loginPath}>Log in</a>
         </div>
       </section>
     )
@@ -219,7 +221,7 @@ export default function CreateCampaignPage({ token = localStorage.getItem('token
           <div className="campaign-profile-state" role={businessState === 'error' ? 'alert' : 'status'}>
             {businessState === 'loading' ? <p>Loading your business profile…</p> : null}
             {businessState === 'empty' ? <><h2>Add your business details first</h2><p>Your campaign needs a business profile so people know who is behind it.</p><a className="text-link" href="/business/profile">Set up business profile</a></> : null}
-            {businessState === 'error' ? <><p>{businessError.message}</p>{businessError.status === 401 ? <a className="text-link" href="/login">Log in again</a> : <button className="campaign-secondary-button" type="button" onClick={() => setBusinessRetry((value) => value + 1)}>Retry business profile</button>}</> : null}
+            {businessState === 'error' ? <><p>{businessError.message}</p>{businessError.status === 401 ? <a className="text-link" href={loginPath}>Log in again</a> : <button className="campaign-secondary-button" type="button" onClick={() => setBusinessRetry((value) => value + 1)}>Retry business profile</button>}</> : null}
           </div>
         ) : savedCampaign ? (
           <div ref={success} className="campaign-form-success" role="status" tabIndex="-1">
@@ -292,7 +294,7 @@ export default function CreateCampaignPage({ token = localStorage.getItem('token
               {submissionError ? (
                 <div className="campaign-submission-error" role="alert">
                   {!uncertainSubmission || submissionError.status < 500 ? <p>{submissionError.message}</p> : null}
-                  {submissionError.status === 401 ? <a className="text-link" href="/login">Log in again</a> : null}
+                  {submissionError.status === 401 ? <a className="text-link" href={loginPath}>Log in again</a> : null}
                 </div>
               ) : null}
             </form>

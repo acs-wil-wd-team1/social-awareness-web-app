@@ -275,9 +275,12 @@ describe('sample editing and moderation journeys', () => {
     const seeded = await demoRequest('/api/campaigns/admin/5/reviews', { token: adminToken() })
     expect(seeded.reviews).toEqual([expect.objectContaining({ id: 90, campaignId: 5, adminId: demoUsers.admin.id, action: 'rejected', reviewedAt: expect.any(String) })])
     await edit(5, (await ownerDetail(5)).updatedAt)
-    expect((await ownerDetail(5)).review).toBeUndefined()
+    expect((await ownerDetail(5)).review).toEqual(seeded.reviews[0])
+    expect((await adminDetail(5)).review).toEqual(seeded.reviews[0])
     const approved = await review(5, { status: 'approved', comments: 'Revised details are ready.' })
     await unpublish(5)
+    expect((await ownerDetail(5)).review).toEqual(approved.review)
+    expect((await adminDetail(5)).review).toEqual(approved.review)
     await expect(demoRequest('/api/campaigns/5')).rejects.toMatchObject({ status: 404 })
     await expect(unpublish(5)).rejects.toMatchObject({ status: 409 })
     const history = await demoRequest('/api/campaigns/admin/5/reviews?page=1&pageSize=10', { token: adminToken() })
@@ -286,6 +289,14 @@ describe('sample editing and moderation journeys', () => {
     expect(history.reviews[0].id).toBe(approved.review.id)
     await review(5, { status: 'approved' })
     expect((await demoRequest('/api/campaigns/admin/5/reviews', { token: adminToken() })).total).toBe(3)
+  })
+
+  it('restores latest feedback from history for an existing preview tab saved by an older build', async () => {
+    await edit(5, (await ownerDetail(5)).updatedAt)
+    const saved = JSON.parse(sessionStorage.getItem('causeconnect.preview.v1'))
+    delete saved.campaigns.find(c => c.id === 5).review
+    sessionStorage.setItem('causeconnect.preview.v1', JSON.stringify(saved))
+    expect((await ownerDetail(5)).review).toMatchObject({ id: 90, action: 'rejected' })
   })
 
   it('retains participation history after an owner soft-deletes a cause', async () => {

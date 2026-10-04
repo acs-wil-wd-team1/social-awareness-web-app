@@ -2,7 +2,7 @@
 
 React frontend for CauseConnect. It includes campaign browsing and posting, business profiles, owner edits, participation, business enquiries, admin campaign/account management and registration/login/logout.
 
-The layout follows the CauseConnect storyboard and web design standards. The Stage 3 frontend calls the [API contracts](../docs/api/api-contract.md). Authentication, categories, text-only public submission and the frontend/API contracts are merged into `main` at `4e24bae`; the remaining endpoint extensions still need backend work. The [API integration guide](../docs/handoff/stage3-api-handoff.md) lists the connections and [feature coverage](../docs/handoff/stage3-feature-coverage.md) records remaining integration work.
+The layout follows the CauseConnect storyboard and web design standards. The Stage 3 frontend calls the [API contracts](../docs/api/api-contract.md). The reviewed `main` baseline on 4 October is `cc05f56`, including authentication, categories, text-only public submission and the frontend/API contracts; the remaining endpoint extensions still need backend work. The [API integration guide](../docs/handoff/stage3-api-handoff.md) lists the connections and [feature coverage](../docs/handoff/stage3-feature-coverage.md) records remaining integration work.
 
 ## Run locally
 

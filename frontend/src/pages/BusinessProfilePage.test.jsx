@@ -9,6 +9,17 @@ beforeEach(() => vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(json({ bus
 afterEach(() => { cleanup(); localStorage.clear(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
 
 describe('Business profile', () => {
+  it.each(['load', 'save'])('preserves the profile destination after a rejected %s', async phase => {
+    if (phase === 'load') fetch.mockReset().mockResolvedValueOnce(json({ message: 'Session expired.' }, 401))
+    else fetch.mockResolvedValueOnce(json({ message: 'Session expired.' }, 401))
+    render(<BusinessProfilePage token="test" />)
+    if (phase === 'save') {
+      const name = await screen.findByLabelText('Business name')
+      fireEvent.change(name, { target: { value: values.businessName } })
+      fireEvent.submit(screen.getByRole('form'))
+    }
+    expect((await screen.findByRole('link', { name: 'Log in again' })).getAttribute('href')).toBe('/login?returnTo=%2Fbusiness%2Fprofile')
+  })
   it.each([[null, 'business_owner', /Log in to manage/], ['test', 'public', /business-owner account is needed/]])('blocks inaccessible profiles', (token, role, message) => {
     render(<BusinessProfilePage token={token} role={role} />)
     expect(screen.getByText(message)).toBeTruthy()

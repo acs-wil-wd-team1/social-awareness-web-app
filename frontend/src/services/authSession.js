@@ -35,19 +35,27 @@ export function storeSession(token, user) {
   window.dispatchEvent(new Event(changeEvent))
 }
 
-export function clearSession() {
+export function clearSession(reason) {
   for (const key of ['token', 'causeconnect.user', 'isLoggedIn']) {
     try { localStorage.removeItem(key) } catch { /* Storage may have become blocked since login. */ }
   }
-  window.dispatchEvent(new Event(changeEvent))
+  window.dispatchEvent(new CustomEvent(changeEvent, { detail: { reason } }))
 }
 
 export function useSession() {
   const [session, setSession] = useState(getSession)
   useEffect(() => {
-    const update = () => setSession(getSession())
+    const update = (event) => {
+      const next = getSession()
+      setSession(previous => {
+        const expired = event?.detail?.reason === 'expired'
+          || (!event && previous.token && !next.token && typeof claimsFor(previous.token).exp === 'number' && claimsFor(previous.token).exp * 1000 <= Date.now())
+          || (!event && previous.sessionExpired)
+        return !next.token && expired ? { ...next, sessionExpired: true } : next
+      })
+    }
     const unauthorized = (event) => {
-      if (event.detail?.token && event.detail.token === getSession().token) clearSession()
+      if (event.detail?.token && event.detail.token === getSession().token) clearSession('expired')
     }
     window.addEventListener(changeEvent, update)
     window.addEventListener('storage', update)

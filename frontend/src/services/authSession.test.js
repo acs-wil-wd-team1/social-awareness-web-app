@@ -114,6 +114,9 @@ describe('browser sessions', () => {
     expect(result.current.token).toBe(token)
     act(() => window.dispatchEvent(new CustomEvent('causeconnect:unauthorized', { detail: { token } })))
     expect(result.current.token).toBeNull()
+    expect(result.current.sessionExpired).toBe(true)
+    act(() => storeSession(token, { id: 7, role: 'public' }))
+    expect(result.current.sessionExpired).toBeUndefined()
   })
 
   it('updates an expired session while the page remains open', () => {
@@ -125,6 +128,11 @@ describe('browser sessions', () => {
     expect(result.current.token).toBe(expiring)
     act(() => vi.advanceTimersByTime(30000))
     expect(result.current.token).toBeNull()
+    expect(result.current.sessionExpired).toBe(true)
+    act(() => vi.advanceTimersByTime(30000))
+    expect(result.current.sessionExpired).toBe(true)
+    act(() => clearSession())
+    expect(result.current.sessionExpired).toBeUndefined()
   })
 })
 

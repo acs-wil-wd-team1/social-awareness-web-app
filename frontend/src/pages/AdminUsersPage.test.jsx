@@ -12,6 +12,10 @@ function setup({ loader = vi.fn().mockResolvedValue(result), sender = vi.fn(), c
 afterEach(cleanup)
 
 describe('administrator account management', () => {
+  it('uses singular account copy for one result', async () => {
+    setup({ loader: vi.fn().mockResolvedValue({ ...result, users: [member], total: 1 }) })
+    expect(await screen.findByText('1 account on page 1')).toBeTruthy()
+  })
   it('blocks non-admin users before any account request', () => {
     const loader = vi.fn()
     render(<AdminUsersPage token="a" role="public" userLoader={loader} />)

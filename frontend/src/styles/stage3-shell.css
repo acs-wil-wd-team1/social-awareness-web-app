@@ -37,3 +37,4 @@ button, input, select, textarea, a { -webkit-tap-highlight-color: transparent; }
   .preview-banner > div { flex-basis: 100%; }
   .site-logo { width: 240px; height: 68px; }
 }
+.campaign-details__description { white-space: pre-wrap; overflow-wrap: anywhere; }

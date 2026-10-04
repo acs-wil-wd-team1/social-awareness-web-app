@@ -133,6 +133,33 @@ describe('navigation and session updates', () => {
     expect(nav.getByRole('link', { name: 'Login' })).toBeTruthy()
   })
 
+  it('explains a rejected session, clears private form data and preserves the edit return path', async () => {
+    loginAs('public')
+    fetch.mockImplementation(url => Promise.resolve(new Response(JSON.stringify(String(url).includes('/categories')
+      ? { categories: [{ id: 2, name: 'Environment' }] }
+      : { id: 4, title: 'Saved campaign', description: 'Saved details', categoryId: 2, status: 'pending', updatedAt: '2026-10-01T00:00:00.000Z' }), { status: 200 })))
+    render(<App pathname="/my-campaigns/4/edit" />)
+    const title = await screen.findByLabelText('Campaign title')
+    fireEvent.change(title, { target: { value: 'Private unsaved title' } })
+    act(() => window.dispatchEvent(new CustomEvent('causeconnect:unauthorized', { detail: { token: tokenFor('public') } })))
+    expect(screen.getByRole('alert').textContent).toContain('Unsaved changes were cleared for security')
+    expect(screen.queryByDisplayValue('Private unsaved title')).toBeNull()
+    expect(screen.queryByRole('form')).toBeNull()
+    expect(screen.getByRole('link', { name: 'Sign in again' }).getAttribute('href')).toBe('/login?returnTo=%2Fmy-campaigns%2F4%2Fedit')
+    expect(localStorage.getItem('token')).toBeNull()
+    expect(localStorage.getItem('causeconnect.user')).toBeNull()
+    act(() => loginAs('public'))
+    expect(screen.queryByText('Your session has expired. Please log in again.')).toBeNull()
+    expect(await screen.findByDisplayValue('Saved campaign')).toBeTruthy()
+  })
+
+  it('does not show an expiry warning for an intentional sign-out', () => {
+    loginAs('public')
+    render(<App pathname="/" />)
+    act(() => clearSession())
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
   it('shows the supplied team logo as the accessible home link', () => {
     render(<App pathname="/" />)
     const home = screen.getByRole('link', { name: 'CauseConnect home' })
