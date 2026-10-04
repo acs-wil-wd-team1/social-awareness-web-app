@@ -52,7 +52,7 @@ export async function uploadCampaignImage(file, { token, signal } = {}) {
   if (!token) throw new CampaignSubmissionError('AUTH_REQUIRED', 'Log in before uploading a campaign photo.', { status: 401 })
   const form = new FormData()
   form.append('file', file)
-  const image = await apiRequest('/api/campaign-images', { method: 'POST', body: form, token, signal, expectedStatus: 201 })
+  const image = await apiRequest('/api/campaign-images', { method: 'POST', body: form, token, signal, expectedStatus: 201, timeoutMs: 60000 })
   if (typeof image?.imageId !== 'string' || !image.imageId.trim()
     || !['image/jpeg', 'image/png', 'image/webp'].includes(image.contentType)
     || !Number.isSafeInteger(image.sizeBytes) || image.sizeBytes < 1 || image.sizeBytes > 5000000

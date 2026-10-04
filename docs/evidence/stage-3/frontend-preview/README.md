@@ -161,3 +161,18 @@ The test runner itself had a cleanup defect: a failed server shutdown could skip
 Business/profile/image/owner/engagement/moderation-write/account-management endpoints still need real implementation and browser/database acceptance. Same-origin local tests do not certify cloud CORS, AWS routing, cross-browser behaviour or the final deployment. This is evidence for the checked flows, not a zero-bug guarantee.
 
 New local packages: `infra/dist/causeconnect-demo-0J1huK` and `infra/dist/causeconnect-live-sdrugE`. SHA-256: demo `3c7c6dbe5a9e62290fbd7943cde1893ba28a6f7c11ca40dfc46bdb1624205d6e`; live `798e7647de0ad9d5db51881e3e87b71e5c7ed7f4f98893383d014749cecd62df`. Neither package was uploaded.
+
+## Independent-review fixes — 4 October 2026
+
+The edit form moved focus to another invalid field on every keystroke. Regression tests reproduced the problem before the fix. It now focuses an invalid field only after a failed save, including server validation, and does not steal focus when a photo selection is invalid.
+
+Sign-in links preserve the create/edit/profile destination. Session expiry still clears private page state; the shell now explains the reset and offers sign-in back to that page. It does not carry drafts into another account or automatically retry uncertain writes. The sample API retains latest review feedback on pending resubmissions/unpublished campaigns, matching the read contract, including tabs saved by an older build. Admin version-response diagnostics are no longer hidden behind a generic load error. Photo uploads have a bounded 60-second timeout; ordinary requests retain 15 seconds.
+
+Fresh checks passed:
+
+- 588 frontend tests across 30 files, including the new focus, session warning, return-link, feedback and timeout cases.
+- Four routing tests and 15 offline collection checks covering 41 requests; these do not call unfinished APIs.
+- Real existing-API regression: 10 backend unit, seven HTTP/MySQL and nine frontend/Express/MySQL tests. The disposable database container was removed; existing databases were not used.
+- Chrome sample-mode check: an empty title/description failed validation, then typing a complete title kept focus in the title. Correcting the description and resubmitting returned pending status and retained the previous review note in My campaigns. No Vite error overlay was present; the observed search-analyser console error came from a Chrome extension, not the application.
+
+The guide records the live Jira due date of 17 October separately from the earlier 20 October meeting target. These checks do not certify the pending Stage 3 APIs, final backend deployment, all browsers or zero bugs. The AWS preview needs a separate release update; local checks do not establish that it serves these fixes.

@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { loadBusinessProfile, saveBusinessProfile, validateBusinessProfile } from '../services/businessService.js'
+import { authPagePath } from '../services/authSession.js'
 import '../styles/campaign-posting.css'
 
 const emptyProfile = { businessName: '', abn: '', website: '', description: '' }
+const loginPath = authPagePath('/login', '/business/profile')
 
 export default function BusinessProfilePage({ token = localStorage.getItem('token'), role = 'business_owner' }) {
   const [values, setValues] = useState(emptyProfile)
@@ -112,10 +114,10 @@ export default function BusinessProfilePage({ token = localStorage.getItem('toke
       <div className="campaign-form-card">
         <div className="campaign-form-intro"><p className="campaign-form-eyebrow">Small business</p><h1 id="business-profile-title">Business profile</h1>
           <p>Add the business details that will appear with your campaigns.</p></div>
-        {!token ? <><p>Log in to manage your business profile.</p><a className="text-link" href="/login">Log in</a></>
+        {!token ? <><p>Log in to manage your business profile.</p><a className="text-link" href={loginPath}>Log in</a></>
           : !allowed ? <><p>A business-owner account is needed to manage a business profile.</p><a className="text-link" href="/">Back to home</a></>
             : state === 'loading' ? <p role="status">Loading your business profile…</p>
-              : state === 'error' ? <div role="alert"><p>{error.message}</p>{error.status === 401 ? <a className="text-link" href="/login">Log in again</a> : <button className="campaign-secondary-button" type="button" onClick={() => setRetry((value) => value + 1)}>Retry business profile</button>}</div>
+              : state === 'error' ? <div role="alert"><p>{error.message}</p>{error.status === 401 ? <a className="text-link" href={loginPath}>Log in again</a> : <button className="campaign-secondary-button" type="button" onClick={() => setRetry((value) => value + 1)}>Retry business profile</button>}</div>
                 : <>
                   {saved ? <div ref={success} className="campaign-form-success" role="status" tabIndex="-1"><h2>Business profile saved</h2><p>Your business details are ready to use.</p><a className="text-link" href="/business/campaigns/new">Create a business campaign</a></div> : null}
                   <form ref={form} aria-label="Business profile form" noValidate onSubmit={submit}>
@@ -128,7 +130,7 @@ export default function BusinessProfilePage({ token = localStorage.getItem('toke
                       <div className="campaign-form-actions campaign-form-field--full business-profile-actions"><button type="submit" disabled={isSaving}>{isSaving ? 'Saving…' : 'Save business profile'}</button><a className="text-link" href="/my-campaigns">My campaigns</a></div>
                     </fieldset>
                     {error ? <div role="alert" className="campaign-submission-error"><p>{error.message}</p>
-                      {error.status === 401 ? <a className="text-link" href="/login">Log in again</a> : null}
+                      {error.status === 401 ? <a className="text-link" href={loginPath}>Log in again</a> : null}
                       {['NETWORK_ERROR', 'INVALID_RESPONSE'].includes(error.code) ? <button type="button" className="campaign-secondary-button" onClick={() => setRetry((value) => value + 1)}>Reload business profile</button> : null}
                     </div> : null}
                   </form>

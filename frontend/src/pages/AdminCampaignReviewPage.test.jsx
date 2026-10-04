@@ -19,6 +19,12 @@ async function prepareApproval() {
 afterEach(cleanup)
 
 describe('admin campaign decisions', () => {
+  it('shows the version diagnostic instead of masking an invalid API response', async () => {
+    const message = 'The campaign version could not be read. Reload before making a decision.'
+    setup({ loader: vi.fn().mockRejectedValue(Object.assign(new Error(message), { code: 'INVALID_RESPONSE' })) })
+    expect(await screen.findByText(message)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Review decision' })).toBeNull()
+  })
   it('does not fetch private details for a non-admin user', () => {
     const loader = vi.fn()
     render(<AdminCampaignReviewPage token="owner" role="public" campaignId="12" campaignLoader={loader} />)

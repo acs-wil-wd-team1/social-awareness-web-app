@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import CreateCampaignPage from './CreateCampaignPage.jsx'
-import { loadCampaignCategories } from '../services/campaignSubmissionService.js'
+import { loadCampaignCategories, uploadCampaignImage } from '../services/campaignSubmissionService.js'
 import { validateCampaignSubmission } from '../services/campaignSubmissionValidation.js'
 
 const categories = [{ id: 7, name: 'Local action' }, { id: 12, name: 'Education' }]
@@ -39,9 +39,30 @@ afterEach(() => {
   vi.unstubAllGlobals()
   vi.unstubAllEnvs()
   vi.restoreAllMocks()
+  vi.useRealTimers()
 })
 
 describe('Campaign submission', () => {
+  it('gives a slow photo upload up to 60 seconds without changing the ordinary API timeout', async () => {
+    vi.useFakeTimers()
+    let signal
+    fetch.mockReset().mockImplementation((url, options) => new Promise((resolve, reject) => {
+      signal = options.signal
+      signal.addEventListener('abort', () => reject(new DOMException('Timed out', 'AbortError')), { once: true })
+    }))
+    const pending = uploadCampaignImage(new File(['photo'], 'garden.png', { type: 'image/png' }), { token: 'test' }).catch(error => error)
+    await vi.advanceTimersByTimeAsync(15000)
+    expect(signal.aborted).toBe(false)
+    await vi.advanceTimersByTimeAsync(45000)
+    expect(signal.aborted).toBe(true)
+    expect(await pending).toMatchObject({ code: 'NETWORK_ERROR' })
+  })
+
+  it('returns a guest business author to business posting after sign-in', () => {
+    render(<CreateCampaignPage token={null} role={null} mode="business" />)
+    expect(screen.getByRole('link', { name: 'Log in' }).getAttribute('href')).toBe('/login?returnTo=%2Fbusiness%2Fcampaigns%2Fnew')
+    expect(fetch).not.toHaveBeenCalled()
+  })
   it('loads the public campaign form and optional photo field', async () => {
     render(<CreateCampaignPage />)
     await readyForm()
@@ -55,7 +76,7 @@ describe('Campaign submission', () => {
   it('asks guests to log in without loading categories or showing a form', () => {
     localStorage.removeItem('token')
     render(<CreateCampaignPage />)
-    expect(screen.getByRole('link', { name: 'Log in' }).getAttribute('href')).toBe('/login')
+    expect(screen.getByRole('link', { name: 'Log in' }).getAttribute('href')).toBe('/login?returnTo=%2Fcampaigns%2Fnew')
     expect(screen.queryByRole('form')).toBeNull()
     expect(screen.queryByRole('link', { name: 'Create campaign' })).toBeNull()
     expect(fetch).not.toHaveBeenCalled()
@@ -146,6 +167,7 @@ describe('Campaign submission', () => {
     expect(screen.getByLabelText('Campaign title').value).toBe(values.title)
     await waitFor(() => expect(submitButton().disabled).toBe(false))
     expect(Boolean(screen.queryByRole('link', { name: 'Log in again' }))).toBe(status === 401)
+    if (status === 401) expect(screen.getByRole('link', { name: 'Log in again' }).getAttribute('href')).toBe('/login?returnTo=%2Fcampaigns%2Fnew')
   })
 
   it('shows and focuses server field errors, then allows a corrected submission', async () => {

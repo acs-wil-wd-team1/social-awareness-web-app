@@ -2,7 +2,7 @@
 
 The frontend covers public/business campaign posting, photos, owner editing, participation, business enquiries, admin campaign/account management and automatic campaign refresh. This guide maps those screens to backend routes, validation, database changes and integration checks. The labelled sample preview uses browser data; live mode calls the real endpoints and reports errors when they are unavailable.
 
-The reviewed `main` baseline, `4e24bae`, includes PR #12 through `48aa32a`: authentication, category lookup, text-only public submission and the frontend/API contracts. The additional endpoints below remain backend work. Extensions must preserve the existing authentication and submission flows.
+The reviewed `main` baseline on 4 October is `cc05f56`, including PR #12's authentication, category lookup and text-only public submission, and PR #13's frontend refinements. The additional endpoints below remain backend work. Extensions must preserve the existing authentication and submission flows.
 
 The tables provide a starting point for each API group. Linked contracts define the payloads and rules, and `frontend/src/services/` contains the corresponding callers. Integration proceeds one complete journey at a time.
 
@@ -16,11 +16,13 @@ The tables provide a starting point for each API group. Linked contracts define 
 | Business campaign-posting API | Kim |
 | Admin campaign-approval API | Kim and Rajita |
 
-**Target: 20 October 2026.** Supporting APIs—images, profiles, owner management, participation, enquiries and admin account management—need coordinated ownership. The table records the agreed assignments; additional endpoint ownership remains to be agreed.
+**Current Jira due date: 17 October 2026** for AWT-136, AWT-138, AWT-140 and AWT-142, checked on 4 October. The meeting originally recorded 20 October; Jira currently sets the earlier date. Supporting APIs—images, profiles, owner management, participation, enquiries and admin account management—need coordinated ownership. The table records the agreed assignments; additional endpoint ownership remains to be agreed.
 
 The [AWS frontend preview](https://d10e86f5qx46up.cloudfront.net) uses sample data. **Preview as** switches between roles. The preview does not call a development API, save real accounts or share sample changes between testers. The remaining backend APIs, database/image storage and final cloud integration still need implementation and testing. Local interface changes require a separate deployment before they appear in the hosted preview. See [verification evidence](../evidence/stage-3/frontend-preview/README.md).
 
 The application uses one dedicated admin account with role `admin`. Its primary navigation includes **Review campaigns**, with **Manage users** under **Account**. Public registration and account screens do not create or promote administrators; the backend enforces admin access independently.
+
+When a session expires, private page state is cleared and the frontend offers sign-in back to the same page. Unsaved drafts are not carried into another account. If a save was interrupted, check the saved records after signing in before retrying; the browser does not assume the write failed.
 
 ## What connects to what
 

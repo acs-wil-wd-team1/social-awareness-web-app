@@ -1,6 +1,6 @@
 # Stage 3 feature coverage
 
-This map connects the frontend to the team's Stage 3 functional requirements, Confluence design/use cases and meeting allocation. It includes participation, business enquiries/lead capture, dynamic updates and UC12 user/content management alongside campaign posting and approval. The implemented backend baseline is merged into `main` at `4e24bae`; the remaining API extensions are listed below.
+This map connects the frontend to the team's Stage 3 functional requirements, Confluence design/use cases and meeting allocation. It includes participation, business enquiries/lead capture, dynamic updates and UC12 user/content management alongside campaign posting and approval. The reviewed `main` baseline on 4 October is `cc05f56`; the remaining API extensions are listed below.
 
 **Frontend implemented** means the page, validation, request handling and sample interaction are present. Backend integration and cloud release each require their own evidence. The [API integration guide](stage3-api-handoff.md) has the implementation order; the [API index](../api/api-contract.md) links the exact contracts. Local interface refinements are separate from the currently hosted sample build.
 

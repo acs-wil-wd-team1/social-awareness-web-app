@@ -33,7 +33,9 @@ function readState() {
     const saved = JSON.parse(sessionStorage.getItem(key))
     if (!saved) return initialState()
     const initial = initialState()
-    return { ...initial, ...saved, campaigns: saved.campaigns.map(c => ({ ...c, updatedAt: c.updatedAt || c.createdAt })) }
+    const reviews = saved.reviews || initial.reviews
+    return { ...initial, ...saved, reviews, campaigns: saved.campaigns.map(c => ({ ...c, updatedAt: c.updatedAt || c.createdAt,
+      review: reviews.findLast(review => review.campaignId === c.id) || c.review })) }
   } catch { return initialState() }
 }
 function save(state) {
@@ -178,7 +180,7 @@ export async function demoRequest(path, { method = 'GET', body, token, signal } 
         if (state.images[body.imageId]?.owner !== user.id) throw new ApiError('Please upload the photo again.', { status: 422 })
         campaign.imageUrl = state.images[body.imageId].url
       } else if (body.removeImage) campaign.imageUrl = null
-      campaign.status = 'pending'; delete campaign.review; changedAt(campaign); save(state); return { campaign }
+      campaign.status = 'pending'; changedAt(campaign); save(state); return { campaign }
     }
   }
   const history = route.match(/^\/api\/campaigns\/admin\/(\d+)\/reviews$/)
@@ -192,7 +194,7 @@ export async function demoRequest(path, { method = 'GET', body, token, signal } 
     requireCampaignVersion(campaign, body?.expectedUpdatedAt)
     if (campaign.status !== 'approved') throw new ApiError('This campaign is no longer approved. Reload its status.', { status: 409 })
     if (body?.status !== 'pending' || !body.reason?.trim()) throw new ApiError('Include a reason.', { status: 422 })
-    campaign.status = 'pending'; delete campaign.review; changedAt(campaign); save(state)
+    campaign.status = 'pending'; changedAt(campaign); save(state)
     return { campaign: { id: campaign.id, status: campaign.status, updatedAt: campaign.updatedAt } }
   }
   const adminRemoval = route.match(/^\/api\/campaigns\/admin\/(\d+)$/)

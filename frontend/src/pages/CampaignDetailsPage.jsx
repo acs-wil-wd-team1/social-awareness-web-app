@@ -120,7 +120,7 @@ export default function CampaignDetailsPage({
         <div className="campaign-details__body">
           <p className="campaign-details__category">{campaign.category}</p>
           <h1 id="campaign-title">{campaign.title}</h1>
-          <p>{campaign.description}</p>
+          <p className="campaign-details__description">{campaign.description}</p>
         </div>
       </article>
 

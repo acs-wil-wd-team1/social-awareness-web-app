@@ -1,6 +1,6 @@
 # CauseConnect API contracts
 
-This index separates implemented backend routes from the Stage 3 extensions consumed by the frontend. The reviewed `main` baseline is `4e24bae`, which merged PR #12 through `48aa32a`, including authentication, category lookup, text-only public campaign submission and the frontend/API contracts. The [Stage 3 API integration guide](../handoff/stage3-api-handoff.md) maps the remaining backend work.
+This index separates implemented backend routes from the Stage 3 extensions consumed by the frontend. The reviewed `main` baseline on 4 October is `cc05f56`, including PR #12's authentication, category lookup and text-only public campaign submission, and PR #13's frontend refinements. The [Stage 3 API integration guide](../handoff/stage3-api-handoff.md) maps the remaining backend work.
 
 | Document | Status and purpose |
 |---|---|
@@ -18,7 +18,7 @@ This index separates implemented backend routes from the Stage 3 extensions cons
 
 The [real-backend regression runner](../../infra/real-backend-testing.md) checks existing frontend pages/services against Express and disposable MySQL. It does not certify endpoints that have not been implemented.
 
-## Implemented routes on the reviewed main baseline (`4e24bae`)
+## Implemented routes on the reviewed main baseline (`cc05f56`, 4 October)
 
 | Method | Endpoint | Access | Successful response |
 |---|---|---|---|

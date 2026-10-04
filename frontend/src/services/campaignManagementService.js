@@ -201,5 +201,6 @@ export function managementErrorMessage(error) {
   if (error?.status === 403) return 'Your account does not have access to this page.'
   if (error?.status === 404) return 'The requested campaign or page is unavailable.'
   if (error?.status === 501 || error?.status === 503) return 'This service is temporarily unavailable. Please try again later.'
-  return 'We could not load your campaigns. Please try again.'
+  if (error?.code === 'INVALID_RESPONSE') return error.message
+  return 'We could not load the campaign information. Please try again.'
 }

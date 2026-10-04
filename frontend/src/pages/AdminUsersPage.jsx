@@ -106,7 +106,7 @@ export default function AdminUsersPage({ token, role, currentUserId, userLoader 
         {error?.status === 401 ? <a className="text-link" href="/login?returnTo=%2Fadmin%2Fusers">Log in again</a> : error?.status !== 403 ? <button type="button" onClick={() => setRetry((value) => value + 1)}>Try again</button> : null}
       </div> : null}
       {state === 'success' && result ? <>
-        <p role="status">{result.users.length ? `${result.users.length} accounts on page ${result.page}` : 'No accounts found.'}</p>
+        <p role="status">{result.users.length ? `${result.users.length} ${result.users.length === 1 ? 'account' : 'accounts'} on page ${result.page}` : 'No accounts found.'}</p>
         <ul className="campaign-management__list admin-user-list">{result.users.map((user) => <li key={user.id} className="campaign-management__card">
           <div className="campaign-management__card-top"><span className={`account-status account-status--${user.status}`}>{user.status}</span><span className="campaign-management__meta">Account #{user.id}</span></div>
           <h2>{user.name}</h2><p className="admin-user-email">{user.email}</p>

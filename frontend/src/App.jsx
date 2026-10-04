@@ -14,7 +14,7 @@ import MyParticipationPage from './pages/MyParticipationPage.jsx'
 import BusinessEnquiriesPage from './pages/BusinessEnquiriesPage.jsx'
 import AdminUsersPage from './pages/AdminUsersPage.jsx'
 import SiteNavigation from './components/SiteNavigation.jsx'
-import { useSession } from './services/authSession.js'
+import { authPagePath, useSession } from './services/authSession.js'
 import './styles/stage3-shell.css'
 
 const DemoBanner = import.meta.env.VITE_DEMO_MODE === 'true' ? lazy(() => import('./demo/DemoBanner.jsx')) : null
@@ -40,7 +40,7 @@ export function getRoute(pathname) {
 
 export default function App({ pathname = window.location.pathname }) {
   const route = getRoute(pathname)
-  const { token, user } = useSession()
+  const { token, user, sessionExpired } = useSession()
   const role = user?.role
   const sessionProps = { token, role }
   const createPath = role === 'business_owner' ? '/business/campaigns/new' : '/campaigns/new'
@@ -57,6 +57,11 @@ export default function App({ pathname = window.location.pathname }) {
     </header>
     {/* Logout must retain its in-memory revocation token after clearing browser storage. */}
     <main id="main-content" key={route.name === 'logout' ? 'logout' : token || 'guest'}>
+      {sessionExpired && route.name !== 'logout' ? <div className="content-width campaign-profile-state" role="alert">
+        <p>Your session has expired. Please log in again.</p>
+        {['create-campaign', 'business-campaign', 'business-profile', 'edit-campaign'].includes(route.name) ? <p>Unsaved changes were cleared for security. If you were saving, check your saved records before trying again.</p> : null}
+        <a className="text-link" href={authPagePath('/login', pathname + (pathname === window.location.pathname ? window.location.search + window.location.hash : ''))}>Sign in again</a>
+      </div> : null}
       {route.name === 'home' ? <HomePage {...sessionProps} /> : null}
       {route.name === 'campaign-details' ? <CampaignDetailsPage {...sessionProps} campaignId={route.campaignId} /> : null}
       {route.name === 'register' ? <RegistrationPage /> : null}

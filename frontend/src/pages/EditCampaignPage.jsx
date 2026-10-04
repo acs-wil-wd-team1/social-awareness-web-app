@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { loadOwnedCampaign, saveOwnedCampaign, deleteOwnedCampaign } from '../services/ownedCampaignService.js'
 import { loadCampaignCategories, uploadCampaignImage } from '../services/campaignSubmissionService.js'
 import { validateCampaignSubmission } from '../services/campaignSubmissionValidation.js'
+import { authPagePath } from '../services/authSession.js'
 import CampaignImageInput from '../components/CampaignImageInput.jsx'
 import '../styles/campaign-posting.css'
 
@@ -16,6 +17,8 @@ export default function EditCampaignPage({ campaignId, token, role }) {
   const [file, setFile] = useState(null), [imageError, setImageError] = useState(''), [removeImage, setRemoveImage] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false), [deleteName, setDeleteName] = useState('')
   const request = useRef(null), version = useRef(0), inFlight = useRef(false), uploaded = useRef(null), form = useRef(null), result = useRef(null)
+  const shouldFocusError = useRef(false)
+  const loginPath = authPagePath('/login', `/my-campaigns/${campaignId}/edit`)
   useEffect(() => {
     const current = ++version.current, controller = new AbortController()
     request.current?.abort(); request.current = controller; inFlight.current = false
@@ -33,7 +36,12 @@ export default function EditCampaignPage({ campaignId, token, role }) {
     else setLoading(false)
     return () => { controller.abort(); request.current?.abort(); version.current += 1 }
   }, [campaignId, token, role, allowed, reload])
-  useEffect(() => { form.current?.querySelector('[aria-invalid="true"]')?.focus() }, [errors, imageError])
+  useEffect(() => {
+    if (shouldFocusError.current && !busy) {
+      form.current?.querySelector('[aria-invalid="true"]')?.focus()
+      shouldFocusError.current = false
+    }
+  }, [errors, imageError, busy])
   useEffect(() => { if (outcome) result.current?.focus() }, [outcome])
   const blocked = uncertain || [401, 403, 404].includes(error?.status)
 
@@ -45,6 +53,7 @@ export default function EditCampaignPage({ campaignId, token, role }) {
     if (remove && (!confirmDelete || deleteName !== campaign.title)) return
     if (!remove && confirmDelete) return
     const validation = remove ? {} : validateCampaignSubmission(values, categories)
+    shouldFocusError.current = !remove && (Object.keys(validation).length > 0 || Boolean(imageError))
     setErrors(validation)
     if (Object.keys(validation).length || (!remove && imageError)) return
     const current = version.current, controller = new AbortController()
@@ -73,18 +82,19 @@ export default function EditCampaignPage({ campaignId, token, role }) {
       if (controller.signal.aborted || current !== version.current) return
       setError(failure)
       setErrors(Object.fromEntries(Object.entries(failure.fieldErrors || {}).filter(([key]) => fields.includes(key))))
+      shouldFocusError.current = Boolean(Object.keys(failure.fieldErrors || {}).some(key => fields.includes(key) || ['imageId', 'file'].includes(key)))
       if (failure.fieldErrors?.imageId || failure.fieldErrors?.file) { uploaded.current = null; setImageError(failure.fieldErrors.imageId || failure.fieldErrors.file) }
       if (failure.status === 409 || (writing && (failure.code === 'INVALID_RESPONSE' || !failure.status || failure.status >= 500))) setUncertain(true)
     } finally {
       if (current === version.current) { inFlight.current = false; setBusy(false) }
     }
   }
-  if (!token || !allowed) return <section className="campaign-form-page content-width"><h1>Edit campaign</h1><p>{token ? 'Only campaign authors can use this page.' : 'Log in to manage your campaign.'}</p><a href={token ? '/' : `/login?returnTo=${encodeURIComponent(`/my-campaigns/${campaignId}/edit`)}`}>{token ? 'Back to home' : 'Log in'}</a></section>
+  if (!token || !allowed) return <section className="campaign-form-page content-width"><h1>Edit campaign</h1><p>{token ? 'Only campaign authors can use this page.' : 'Log in to manage your campaign.'}</p><a href={token ? '/' : loginPath}>{token ? 'Back to home' : 'Log in'}</a></section>
   return <section className="campaign-form-page content-width" aria-labelledby="edit-title"><div className="campaign-form-card">
     <a className="text-link" href="/my-campaigns">← My campaigns</a><h1 id="edit-title">Edit campaign</h1>
     {loading ? <p role="status">Loading your campaign…</p> : null}
     {outcome ? <div ref={result} role="status" tabIndex="-1"><h2>{outcome === 'deleted' ? 'Campaign removed' : 'Changes submitted for review'}</h2><p>{outcome === 'deleted' ? 'Your campaign is no longer visible. Its records are retained by the service.' : 'The campaign is pending review and is not publicly visible until approved again.'}</p><a href="/my-campaigns">Back to My campaigns</a></div> : <>
-      {error ? <div role="alert"><p>{error.status === 404 ? 'This campaign is unavailable or does not belong to your account.' : error.message}</p>{uncertain ? <p>We cannot safely apply another change yet. Reload to check the saved version; unsaved edits will be discarded.</p> : null}{error.status === 401 ? <a href="/login">Log in again</a> : <button type="button" disabled={busy} onClick={() => setReload(n => n + 1)}>Reload saved campaign</button>}</div> : null}
+      {error ? <div role="alert"><p>{error.status === 404 ? 'This campaign is unavailable or does not belong to your account.' : error.message}</p>{uncertain ? <p>We cannot safely apply another change yet. Reload to check the saved version; unsaved edits will be discarded.</p> : null}{error.status === 401 ? <a href={loginPath}>Log in again</a> : <button type="button" disabled={busy} onClick={() => setReload(n => n + 1)}>Reload saved campaign</button>}</div> : null}
       {campaign ? <><p>Current status: <strong>{campaign.status}</strong>. Saving any changes submits this campaign for review. An approved campaign will leave the public list until it is approved again.</p>
         {campaign.review?.comments ? <p><strong>Review feedback:</strong> {campaign.review.comments}</p> : null}
         <form ref={form} noValidate aria-label="Edit campaign form" onSubmit={event => { event.preventDefault(); write() }}>
