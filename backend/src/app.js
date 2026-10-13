@@ -18,7 +18,8 @@ app.use("/api/auth", userRoutes);
 app.use("/api/campaigns", campaignRoutes)
 
 app.use((err, req, res, next) => {
-  if (req.method === "POST" && /^\/api\/campaigns\/?$/i.test(req.path)) {
+  // JSON body errors on campaign writes (create and admin review) use the API error envelope.
+  if (["POST", "PATCH"].includes(req.method) && /^\/api\/campaigns(\/|$)/i.test(req.path)) {
     const invalidBody = [400, 415, 422].includes(err.status);
     const status = err.status === 413 ? 413 : invalidBody ? 422 : 500;
     return res.status(status).json({
