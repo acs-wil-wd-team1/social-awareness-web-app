@@ -1,6 +1,6 @@
 # Campaign reads and owner submissions
 
-**Status, 13 October 2026:** Public, admin and owner (`/mine`, `/mine/:id`) reads are implemented. This branch adds shared public projection, private image delivery and soft-delete filtering to the existing expanded owner/admin reads. `campaignQueries.js` and `campaignSerializer.js` supply the fields below and list `total`. Branch implementation is not a claim of merge or cloud verification.
+**Status, 14 October 2026:** Public, admin and owner (`/mine`, `/mine/:id`) reads, including PR #19 public projection, private image delivery and soft-delete filtering, are merged and deployed at [CauseConnect on AWS](https://52.62.2.87). `campaignQueries.js` and `campaignSerializer.js` supply the fields below and list `total`. See the [release evidence](../evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) for the tested revision and scope.
 
 ## Routes and access
 

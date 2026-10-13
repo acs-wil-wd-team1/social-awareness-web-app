@@ -1,8 +1,8 @@
 # Campaign posting and image extension
 
-**Status, 13 October 2026:** Image upload, attachment/replacement/removal and controlled delivery are implemented in `feature/stage3-additional-apis` under AWT-175. They still need merge, deployment and cloud verification. This filename is retained so existing links keep working. Sample-preview responses remain separate from real API evidence.
+**Status, 14 October 2026:** AWT-175 image upload, attachment/replacement/removal and controlled delivery are merged through PR #19 and deployed at [CauseConnect on AWS](https://52.62.2.87). The [release evidence](../evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) records the revision and passed photo/privacy, hosted-browser, paired-backup integrity and restart-persistence checks. This filename is retained so existing links keep working. Sample-preview responses remain separate from real API evidence.
 
-The [current backend contract](campaign-posting-contract.md) accepts public submissions and business submissions linked to the authenticated owner's existing Business row. This branch adds optional `imageId` on that same `POST /api/campaigns` route. GET/PUT business profile remains missing; a new business owner's full browser journey is not yet complete.
+The [current backend contract](campaign-posting-contract.md) accepts public submissions and business submissions linked to the authenticated owner's existing Business row. The same `POST /api/campaigns` route accepts optional `imageId`. GET/PUT business profile remains missing; a new business owner's full browser journey is not yet complete.
 
 ## Business posting
 
@@ -65,11 +65,11 @@ Errors include `413 IMAGE_TOO_LARGE`, `415 UNSUPPORTED_IMAGE_TYPE`, `422 VALIDAT
 
 Files stay in a private, persistent directory on the existing EC2 server, outside the application checkout and web root. Production requires an absolute `CAMPAIGN_UPLOAD_DIR`. The default total upload limit is **512 MiB**, and writes preserve at least **2 GiB** of free disk. `CAMPAIGN_UPLOAD_MAX_BYTES` and `CAMPAIGN_UPLOAD_MIN_FREE_BYTES` control these limits. Storage exhaustion returns an error instead of filling the server disk.
 
-This implementation needs no new S3 bucket or other cloud resource. The directory still needs backup, permissions and deployment configuration; local implementation does not prove those cloud settings are in place. See [deployment preparation](../../infra/README.md). Cleanup removes only expired, unattached generated images; attached images are retained.
+This implementation needs no new S3 bucket or other cloud resource. The deployed release uses the existing server's private persistent directory. Keep its permissions, limits and paired database/file backups in place; backup/restart evidence is a separate check from successful HTTP image delivery. See [deployment preparation](../../infra/README.md) and [release evidence](../evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026). Cleanup removes only expired, unattached generated images; attached images are retained.
 
 ## Database and integration work
 
-The existing nullable `campaigns.image_url VARCHAR(500)` remains a legacy fallback. This branch adds `campaign_images` through `20261013221000-create-campaign-images.js` and its model:
+The existing nullable `campaigns.image_url VARCHAR(500)` remains a legacy fallback. Migration `20261013221000-create-campaign-images.js` and its model add `campaign_images`:
 
 | Column | Required purpose |
 |---|---|
@@ -94,4 +94,4 @@ For removal, detach the current upload if one exists **and** set legacy `campaig
 
 After edit/removal/unpublish/soft-delete, delivery rechecks campaign state and association. Responses use no-store caching. Signed tickets are short-lived and checked against current account/session state; already downloaded bytes cannot be recalled. Keep private URLs out of analytics/logs and use a restrictive referrer policy.
 
-The sample preview demonstrates these interactions in browser storage. Real storage/SQL tests belong to the isolated regression suite; cloud delivery and backup checks must be recorded separately after deployment.
+The sample preview demonstrates these interactions in browser storage. Real storage/SQL regression, production photo delivery, hosted-browser and backup/restart checks are recorded separately in the release evidence. Successful backup integrity and restart persistence do not establish full restoration or offsite recovery.

@@ -2,7 +2,7 @@
 
 The frontend covers public/business campaign posting, photos, owner editing, participation, business enquiries, admin campaign/account management and automatic campaign refresh. This guide maps those screens to backend routes, validation, database changes and integration checks. The labelled sample preview uses browser data; live mode calls the real endpoints and reports errors when they are unavailable.
 
-This reference describes `feature/stage3-additional-apis` on 13 October 2026, based on `main` at `ec11766`. Public/business posting against an existing profile, owner/admin reads and core campaign approval were already implemented. This branch adds AWT-175 images, owner editing/removal, participation, enquiries and admin account/content management. Merge, deployment and cloud verification remain separate from local implementation.
+PR #19 is merged into `main`, and application commit `ffe3df679e5d8d1dc43c8bd1669b96aed757ad86` is live at [CauseConnect on AWS](https://52.62.2.87). The release includes AWT-175 images, owner editing/removal, participation, enquiries and admin account/content management alongside existing posting, reads and approval. The [release evidence](../evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) records release `2026-10-13T12-59-21-475Z-ffe3df679e5d`, passed local checks and eight production acceptance groups.
 
 The tables map each API group to its current code. Linked contracts define the payloads and rules, and `frontend/src/services/` contains the callers. GET/PUT `/api/business/me` is still missing; completing a new business owner's profile and first-post journey remains Kim's work.
 
@@ -15,12 +15,12 @@ The tables map each API group to its current code. Linked contracts define the p
 | User campaign-posting API | Rajita |
 | Business campaign-posting API | Kim |
 | Admin campaign-approval API | Kim and Rajita |
-| Additional APIs in this branch — images, owner management, engagement and admin management (AWT-175) | Unice |
+| Additional APIs — images, owner management, engagement and admin management (AWT-175) | Unice |
 | Remaining business-profile GET/PUT and full new-business journey (AWT-141/AWT-173) | Kim |
 
 Use Jira for current dates and review/assignment status. This code reference does not mark a Jira task done or assume Nithya has reviewed the additional work. Existing posting/approval assignments are unchanged.
 
-The [AWS frontend preview](https://d10e86f5qx46up.cloudfront.net) has separate [dated verification evidence](../evidence/stage-3/frontend-preview/README.md). The earlier sample build uses browser-only data and a **Preview as** selector. Do not use that historical preview as proof that this branch is live: cloud integration needs its own deployed revision, configuration and browser test results. Local changes require a separate deployment.
+The older [AWS frontend preview](https://d10e86f5qx46up.cloudfront.net) has separate [dated verification evidence](../evidence/stage-3/frontend-preview/README.md). It uses browser-only data and a **Preview as** selector. Use the live AWS application above for real integration testing; do not confuse sample interactions with saved API/database results. Later local changes still require their own deployment and verification.
 
 The application uses one dedicated admin account with role `admin`. Its primary navigation includes **Review campaigns**, with **Manage users** under **Account**. Public registration and account screens do not create or promote administrators; the backend enforces admin access independently.
 
@@ -30,24 +30,24 @@ When a session expires, private page state is cleared and the frontend offers si
 
 | Frontend page | API calls | Current backend position |
 |---|---|---|
-| `/campaigns/new` | GET categories, optional POST image, POST campaign | Existing public POST; image upload/attachment added in this branch |
+| `/campaigns/new` | GET categories, optional POST image, POST campaign | Deployed public POST with optional image upload/attachment |
 | `/business/profile` | GET/PUT `/api/business/me` | **Still missing — Kim (AWT-141/AWT-173)**; existing Business table should be reused |
 | `/business/campaigns/new` | GET profile + categories, optional POST image, POST campaign | POST accepts an existing own Business row; new-business browser journey still blocked on profile GET/PUT |
 | `/my-campaigns` | GET `/api/campaigns/mine?page=1&pageSize=10&status=pending` | Implemented owner read; omit status for all statuses |
-| `/my-campaigns/:id/edit` | GET/PATCH/DELETE `/api/campaigns/mine/:id` | Existing detail; edit/resubmit and soft-delete added in this branch |
-| Approved cause detail; `/my-participation` | GET/PUT `/api/campaigns/:id/participation`; GET `/api/participations/mine` | Implemented in this branch; existing own records stay readable/withdrawable after unpublishing or deletion |
-| Approved business detail; `/business/enquiries` | POST `/api/campaigns/:id/enquiries`; GET `/api/business/me/enquiries` | Implemented in this branch using existing Lead fields |
-| `/admin/campaigns` | GET `/api/campaigns/admin` with page/pageSize/status/search | Implemented expanded read; image and deletion handling added in this branch |
-| `/admin/campaigns/:id` | GET admin detail/reviews; PATCH status/publication; DELETE `/api/campaigns/admin/:id` | Existing detail/decision; history, unpublish and soft-delete added in this branch |
-| `/admin/users` | GET `/api/admin/users`; PATCH `/api/admin/users/:id/status` | Implemented in this branch, including session revocation |
+| `/my-campaigns/:id/edit` | GET/PATCH/DELETE `/api/campaigns/mine/:id` | Deployed detail, edit/resubmit and soft-delete |
+| Approved cause detail; `/my-participation` | GET/PUT `/api/campaigns/:id/participation`; GET `/api/participations/mine` | Deployed; existing own records stay readable/withdrawable after unpublishing or deletion |
+| Approved business detail; `/business/enquiries` | POST `/api/campaigns/:id/enquiries`; GET `/api/business/me/enquiries` | Deployed using existing Lead fields; requires an existing business profile |
+| `/admin/campaigns` | GET `/api/campaigns/admin` with page/pageSize/status/search | Deployed expanded read with image and deletion handling |
+| `/admin/campaigns/:id` | GET admin detail/reviews; PATCH status/publication; DELETE `/api/campaigns/admin/:id` | Deployed detail/decision, history, unpublish and soft-delete |
+| `/admin/users` | GET `/api/admin/users`; PATCH `/api/admin/users/:id/status` | Deployed, including session revocation |
 | Home, public detail and My campaigns updates | Repeat their read endpoints while visible/online | No push endpoint required; reads must return current state and respect visibility on every request |
 
 ## What remains
 
 1. **Complete business profile GET/PUT (Kim).** Use the unique `businesses.owner_id` from the authenticated account. A missing profile returns `200 {"business":null}`; PUT returns `200` for both first save and update. Follow the [profile contract](../api/business-profile-contract.md), then test a freshly registered owner through profile setup and [business posting](../api/campaign-posting-future-proposal.md#business-posting). Do not add another profile endpoint or Business table.
-2. **Finish the branch regression and review.** Keep authentication, posting, [reads](../api/campaign-read-contract.md) and [approval](../api/admin-campaign-moderation-contract.md) passing alongside the additional routes. Run isolated MySQL/frontend checks and record actual results, not sample-mode walkthroughs. Account/session checks, conflicting updates, image visibility and retained private history are part of this gate.
-3. **Merge and deploy the reviewed revision separately.** Apply the shared migrations in order, configure the existing server's private image directory and backups, and connect the non-demo frontend. The [image contract](../api/campaign-posting-future-proposal.md#upload-one-campaign-image) covers limits and delivery; [deployment preparation](../../infra/README.md) covers the release settings. No new cloud resource is required for this filesystem implementation.
-4. **Verify on the deployed site.** Record the revision tested. Check real registration/login/logout, owner submission/edit/removal, moderation, images, participation, enquiries and suspension. Exercise the 30-second list/detail/status refresh and expired sessions. The full new-business journey waits for item 1.
+2. **Use the verified release as the testing baseline.** PR #19 is merged and deployed, with eight production acceptance groups passed. The [14 October closeout](../evidence/stage-3/additional-apis/README.md#hosted-browser-and-backuprestart-closeout--14-october-2026) also records hosted photo submission/approval, paired backup integrity and restart persistence. Full restoration and offsite recovery are not claimed. The [image contract](../api/campaign-posting-future-proposal.md#upload-one-campaign-image) and [deployment preparation](../../infra/README.md) remain the configuration references.
+3. **Finish independent testing and submission material.** Use the tested release for cross-role browser checks, including visible/online refresh, expired sessions and mobile behaviour. Record actual results and remaining defects in the team testing document; then finish manuals and the video. The full new-business journey waits for item 1.
+4. **Keep regression checks passing when profiles arrive.** Retest authentication, posting, [reads](../api/campaign-read-contract.md), [approval](../api/admin-campaign-moderation-contract.md), images and ownership against Kim's real implementation. Merge/deploy that change separately, then verify fresh business onboarding on the deployed site.
 
 Reuse the implemented [owner-management](../api/owned-campaign-management-contract.md), [engagement](../api/engagement-contract.md) and [admin-management](../api/admin-management-contract.md) services instead of duplicating their controllers or migrations. Implementation here does not automatically change Jira review or assignment status.
 
@@ -98,7 +98,7 @@ Optional `?` markers in this table explain fields; they are not literal JSON pro
 
 ## Existing database and code map
 
-| Area | Current source | Position in this branch |
+| Area | Current source | Implementation position |
 |---|---|---|
 | Campaign creation | `backend/src/services/campaignSubmission.js`; `controllers/campaigns.js`; `router/campaignRoutes.js` | Public/business posting with optional image reference; transaction for attachment |
 | Campaign reads | `services/campaignQueries.js`; `utils/campaignSerializer.js`; `services/campaignServices.js` | Shared serialization, owner scope, latest review, total, visibility-safe image URL |
@@ -200,7 +200,7 @@ npm run build
 npm run dev
 ```
 
-The development frontend proxies `/api` to `http://127.0.0.1:3000`. Restart it after changing environment settings. Connecting the hosted frontend requires a separate non-demo build and deployment with the agreed HTTPS API origin and CORS configuration.
+The development frontend proxies `/api` to `http://127.0.0.1:3000`. Restart it after changing environment settings. The recorded AWS release uses a non-demo build and same-origin HTTPS `/api`; later configuration changes need a rebuild/deployment and their own routing checks.
 
 In each API PR/handoff, include the endpoints implemented, exact migration filenames and order, environment **variable names only**, tests run and their results, and any known limit. Provide one saved request/response example with tokens/private contact data removed. Say which real browser journey passed and which still needs integration; do not call a sample-mode walkthrough a database test.
 
@@ -208,7 +208,7 @@ In each API PR/handoff, include the endpoints implemented, exact migration filen
 
 | Symptom | Check first |
 |---|---|
-| New page reports unavailable / `404` | Is this branch deployed with migrations applied? Check the exact route and router order. GET/PUT `/api/business/me` is still missing and must not be reported as working. |
+| New page reports unavailable / `404` | Check the deployed revision, applied migrations, exact route and router order. GET/PUT `/api/business/me` is still missing and must not be reported as working. |
 | Login appears successful but a protected call fails | Use the actual login token; confirm the matching active session and current database role/status. Sample-role tokens are intentionally invalid in the real backend. |
 | Admin detail says its version cannot be read | Add `updatedAt` to the admin detail serializer, preserve milliseconds in MySQL/model, and return canonical UTC text. Do not substitute the current time in the response. |
 | Save succeeds in the server log but the UI refuses confirmation | Match the exact HTTP status, envelope, numeric IDs and returned status/version. In particular, DELETE is empty `204`; create is `201`; review/unpublish must return an advanced version. Check saved data before retrying. |

@@ -1,6 +1,6 @@
 # Business profile API
 
-**Status, 13 October 2026:** Frontend implemented; GET/PUT `/api/business/me` is still missing and remains Kim's AWT-141/AWT-173 work. It is not part of the AWT-175 implementation in this branch. Registration creates a `users` row with role `business_owner`, but does not create a `businesses` row. Existing-profile posting works; the full new-business registration → profile → posting journey is not yet complete.
+**Status, 14 October 2026:** Frontend implemented; GET/PUT `/api/business/me` is still missing and returns `404` on the deployed PR #19 release. It remains Kim's AWT-141/AWT-173 work, outside the AWT-175 implementation. Registration creates a `users` row with role `business_owner`, but does not create a `businesses` row. Existing-profile posting works; the full new-business registration → profile → posting journey is not yet complete. See the [release evidence](../evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026).
 
 `/business/profile` uses the two endpoints below. Both require an active session, an active current user and role `business_owner`. Resolve the user from the authenticated session. A client-supplied user/business/owner ID is not accepted.
 

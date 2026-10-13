@@ -1,6 +1,6 @@
 # Current authentication API
 
-**Reference, 13 October 2026:** The checked-out authentication service/controllers in `feature/stage3-additional-apis`. Examples describe implemented responses, not a claim of deployment or exhaustive security verification.
+**Reference, 14 October 2026:** Authentication service/controllers in the merged and deployed PR #19 release. Examples describe implemented responses; the [release evidence](../evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) records bounded verification, not an exhaustive security audit.
 
 ## Register
 
@@ -65,6 +65,6 @@ Controller errors include `401 INVALID_CREDENTIALS`, `403 ACCOUNT_SUSPENDED` and
 
 Success is `204` with no response body. The matching active session becomes expired and receives a logout timestamp. Subsequent protected requests with that session are rejected.
 
-The legacy logout middleware checks JWT validity and an active session. Its errors differ from controller errors: missing/inactive sessions return `401` with an `error` string; token verification failure returns `403` with an `error` string. New campaign/management/engagement routes use the current-account guard and [shared conventions](shared-conventions.md); API parser and unknown-route errors are normalised in this branch.
+The legacy logout middleware checks JWT validity and an active session. Its errors differ from controller errors: missing/inactive sessions return `401` with an `error` string; token verification failure returns `403` with an `error` string. New campaign/management/engagement routes use the current-account guard and [shared conventions](shared-conventions.md); API parser and unknown-route errors are normalised.
 
 The frontend should check the HTTP result before presenting logout as confirmed. Local token removal alone does not prove the server session was invalidated.

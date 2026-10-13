@@ -1,6 +1,6 @@
 # Campaign submission API
 
-Category lookup and campaign submission are implemented for signed-in `public` users (cause campaigns) and `business_owner` users (business campaigns). This branch adds optional uploaded-image attachment; merge and cloud verification are still separate.
+Category lookup and campaign submission are implemented for signed-in `public` users (cause campaigns) and `business_owner` users (business campaigns). Optional uploaded-image attachment is merged through PR #19 and deployed at [CauseConnect on AWS](https://52.62.2.87). See the [release evidence](../evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) for verification scope and remaining gaps.
 
 **Business owners:** the server links the campaign to the owner's own `businesses` row, returning `type: "business"` and that `businessId`. An owner without a business profile receives `409 BUSINESS_PROFILE_REQUIRED` and no row is created. The client still cannot send `businessId`, `createdBy`, `type` or `status`. Admins cannot use this route (`403`). Optional `imageId` must belong to the authenticated user, be unexpired and not already attached.
 

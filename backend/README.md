@@ -1,6 +1,6 @@
 # CauseConnect backend
 
-Node.js, Express, Sequelize and MySQL. Existing APIs cover authentication, categories, public/business campaign submission, owner/admin reads and campaign approval. The AWT-175 branch adds photos, owner edits/removal, participation, business enquiries and admin account/content management. These additions still need merge, deployment and cloud verification.
+Node.js, Express, Sequelize and MySQL. APIs cover authentication, categories, public/business campaign submission, owner/admin reads and campaign approval, plus AWT-175 photos, owner edits/removal, participation, business enquiries and admin account/content management. PR #19 is merged, and application commit `ffe3df679e5d8d1dc43c8bd1669b96aed757ad86` is deployed at [CauseConnect on AWS](https://52.62.2.87). See the [release evidence](../docs/evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) for exact verification scope.
 
 GET/PUT `/api/business/me` is still missing and remains Kim's AWT-141/AWT-173 work. Posting against an existing Business row works; a newly registered owner cannot yet complete the profile and first-post journey through the app.
 
@@ -75,6 +75,8 @@ Unit tests do not need MySQL. The integration suite requires an already-migrated
 
 For the disposable MySQL + real frontend/API run, use `npm run test:real-backend` from `frontend/`; see [isolated testing](../infra/real-backend-testing.md). Record the actual run results. jsdom checks are not deployed-browser acceptance, and fixture-seeded business profiles do not certify the missing profile API.
 
+The PR #19 release passed 76 backend unit tests, 64 HTTP/MySQL checks, 18 actual frontend/API/database checks, 591 frontend tests and 15 acceptance-runner stub checks. Eight production acceptance groups also passed. These layers have different scopes; runner stub tests do not contact AWS, and the production result does not certify the unfinished profile journey.
+
 ## Campaign submission
 
 The [campaign submission contract](../docs/api/campaign-posting-contract.md) lists the endpoints, validation rules and API-to-database field mapping. Public users and business owners (with a business profile) can submit; owners read their own submissions through `GET /api/campaigns/mine`.
@@ -106,4 +108,4 @@ Payloads and exact status codes are in the [API integration guide](../docs/hando
 
 Images use a private persistent directory on the existing server, not a new S3 bucket. Production requires an absolute `CAMPAIGN_UPLOAD_DIR` outside the checkout/web root, with server-only permissions and backup coverage. Defaults are 512 MiB total uploads and a 2 GiB free-disk reserve (`CAMPAIGN_UPLOAD_MAX_BYTES`, `CAMPAIGN_UPLOAD_MIN_FREE_BYTES`). No new cloud resource is required by this implementation.
 
-Accept one JPEG, PNG or WebP up to 5,000,000 bytes and 16 million decoded pixels. Unattached references expire after 24 hours; an account may hold up to 20 active unattached uploads. Private delivery uses five-minute signed tickets and rechecks the current account/session; approved public delivery rechecks campaign visibility. Cleanup targets only expired unattached generated files and metadata. See the [image contract](../docs/api/campaign-posting-future-proposal.md) and [deployment preparation](../infra/README.md) before enabling storage in the cloud.
+Accept one JPEG, PNG or WebP up to 5,000,000 bytes and 16 million decoded pixels. Unattached references expire after 24 hours; an account may hold up to 20 active unattached uploads. Private delivery uses five-minute signed tickets and rechecks the current account/session; approved public delivery rechecks campaign visibility. Cleanup targets only expired unattached generated files and metadata. Cloud storage, paired backup integrity and API-restart photo persistence passed the recorded checks; full restoration and offsite recovery were not tested. See the [image contract](../docs/api/campaign-posting-future-proposal.md), [deployment preparation](../infra/README.md) and [release evidence](../docs/evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026).
