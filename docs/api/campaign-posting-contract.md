@@ -1,14 +1,14 @@
 # Campaign submission API
 
-Category lookup and text-only campaign submission are implemented for signed-in `public` users (cause campaigns) and `business_owner` users (business campaigns).
+Category lookup and campaign submission are implemented for signed-in `public` users (cause campaigns) and `business_owner` users (business campaigns). This branch adds optional uploaded-image attachment; merge and cloud verification are still separate.
 
-**Business owners:** the server links the campaign to the owner's own `businesses` row, returning `type: "business"` and that `businessId`. An owner without a business profile receives `409 BUSINESS_PROFILE_REQUIRED` and no row is created. The client still cannot send `businessId`, `createdBy`, `type` or `status`. Admins cannot use this route (`403`). Image upload (`imageId`) is still not accepted.
+**Business owners:** the server links the campaign to the owner's own `businesses` row, returning `type: "business"` and that `businessId`. An owner without a business profile receives `409 BUSINESS_PROFILE_REQUIRED` and no row is created. The client still cannot send `businessId`, `createdBy`, `type` or `status`. Admins cannot use this route (`403`). Optional `imageId` must belong to the authenticated user, be unexpired and not already attached.
 
 **Owner reads:** `GET /api/campaigns/mine` and `GET /api/campaigns/mine/:id` return only the signed-in creator's campaigns in every status, using the [campaign read contract](campaign-read-contract.md) object including `updatedAt` and the latest `review` feedback.
 
-The frontend uses `/campaigns/new` for the implemented text-only public submission flow. Photo and business posting controls are also present, but their backend extensions still need implementation.
+The frontend uses `/campaigns/new` for public submission and `/business/campaigns/new` for business submission. The latter still needs Kim's GET/PUT `/api/business/me` to complete the profile step for a new owner; supporting an existing Business row is not the whole new-business journey.
 
-The remaining work is defined in the [business posting and image extension](campaign-posting-future-proposal.md), [business profile contract](business-profile-contract.md), [campaign read contract](campaign-read-contract.md) and [admin contract](admin-campaign-moderation-contract.md). The [API integration guide](../handoff/stage3-api-handoff.md) gives the build order.
+Related rules are in the [business posting and image extension](campaign-posting-future-proposal.md), [business profile contract](business-profile-contract.md), [campaign read contract](campaign-read-contract.md) and [admin contract](admin-campaign-moderation-contract.md). The [API integration guide](../handoff/stage3-api-handoff.md) separates implemented work from remaining integration and deployment checks.
 
 ## Category choices
 
@@ -38,7 +38,7 @@ Authorization: Bearer <token returned by login>
 Content-Type: application/json
 ```
 
-The session must be active and match the signed-in account. The account must currently be active with role `public`; an old role/status in a token alone does not grant access. Guests, business owners and admins cannot use this creation route in this implementation.
+The session must be active and match the signed-in account. The account must currently be active with role `public` or `business_owner`; an old role/status in a token alone does not grant access. Guests and admins cannot use this creation route. Business owners must have their own Business row.
 
 Request:
 
@@ -61,10 +61,11 @@ Request:
 | `targetAudience` | Optional string of at most 255 characters after trimming; omitted, `null` or blank becomes `null` |
 | `startDate` | Real date in `YYYY-MM-DD` format, with a year from 1000 through 9999 |
 | `endDate` | Same date rules; on or after `startDate` |
+| `imageId` | Optional non-empty opaque reference from a successful image upload; checked server-side before attachment |
 
-All fields except `targetAudience` are required. Every additional field is rejected, including `imageId`, `imageUrl`, `createdBy`, `businessId`, `type`, `status` and `role`.
+All fields except `targetAudience` and `imageId` are required. Every additional field is rejected, including `imageUrl`, `createdBy`, `businessId`, `type`, `status` and `role`.
 
-The server selects the signed-in creator, sets `businessId` to `null` and stores `status: "pending"`. It does not create an image or a review record.
+The server selects the signed-in creator, sets `businessId` to `null` for a public user or to the business owner's own profile, and stores `status: "pending"`. It does not create a review. When `imageId` is supplied, the existing upload is attached in the campaign transaction; validation/transaction failure does not consume the reference.
 
 `201` response example:
 
@@ -109,7 +110,8 @@ The ID and timestamp are generated when the database saves the row. Use the retu
 | Status | Meaning |
 |---|---|
 | `401` | Missing, invalid or expired token; missing/logged-out/nonmatching session |
-| `403` | Inactive account or current role is not `public` |
+| `403` | Inactive account or current role is neither `public` nor `business_owner` |
+| `409` | Business owner has no profile (`BUSINESS_PROFILE_REQUIRED`) |
 | `413` | JSON body exceeds the request-size limit |
 | `422` | Invalid body/types/dates, unknown category or unsupported fields |
 | `500` | Unexpected failure; response must not expose database details |
@@ -127,10 +129,10 @@ These new-route responses do not imply that every older authentication/read rout
 | `startDate` | `start_date` |
 | `endDate` | `end_date` |
 | Authenticated user's ID | `created_by` |
-| Server sets `null` | `business_id` |
+| Server selects own business for a business owner, otherwise `null` | `business_id` |
 | Server sets `pending` | `status` |
 
-The existing model and migrations already have these columns. This submission slice does not need a new table or migration. Use the repository migrations to prepare a fresh database; do not create the tables by hand.
+The existing model and migrations already have these campaign columns. Image metadata is added by `20261013221000-create-campaign-images.js`; see the [image contract](campaign-posting-future-proposal.md). Use repository migrations to prepare the database, not manual table creation.
 
 ## Visibility after saving
 
@@ -140,7 +142,7 @@ The response confirms a database save, but a pending campaign is not public:
 - `GET /api/campaigns/:id` returns `404` for that pending ID.
 - Existing authenticated admin reads can inspect it.
 
-Do not change its status manually to make the public page look successful. The frontend now links to `/my-campaigns`; its proposed owner-read endpoint still needs implementation. Until then, the confirmed creation response proves the save, while the owner list is not a live backend feature.
+Do not change its status manually to make the public page look successful. The implemented `/my-campaigns` reads show only the current creator's submissions and their review feedback; admin approval is the publication step.
 
 ## Integration checks
 

@@ -15,7 +15,8 @@ function sendServiceError(res, err) {
   if (Number.isInteger(err?.status) && err.status >= 400 && err.status < 500 && err.code) {
     return apiErrorResponse(res, err.status, err.code, err.message, err.fieldErrors ?? null);
   }
-  console.error(err);
+  // SQL/request details can contain tokens, private enquiries or signed URLs.
+  console.error("API request failed", { code: "INTERNAL_SERVER_ERROR" });
   return apiErrorResponse(res, 500, "INTERNAL_SERVER_ERROR", "Something went wrong", null);
 }
 

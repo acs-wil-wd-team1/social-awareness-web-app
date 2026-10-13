@@ -1,8 +1,8 @@
 # Campaign participation and business enquiries
 
-**Status:** The frontend is implemented against this proposed contract. The repository already has `Participation` and `Lead` models and migrations, but does not yet have these API routes. Sample-mode responses are not evidence that the backend is connected.
+**Status, 13 October 2026:** All five routes below are implemented in the AWT-175 branch `feature/stage3-additional-apis`, using the existing Participation and Lead tables. Unit, HTTP/MySQL and real-frontend regression tests are included. Merge, deployment and cloud verification remain separate; sample-mode responses are not backend evidence.
 
-This covers joining or supporting a social-cause campaign and sending a business an expression of interest. It does not add payments, donations, bookings, email delivery or a lead-management workflow. Backend ownership for these additional dependencies still needs coordination; the existing posting/approval assignments do not by themselves assign these endpoints.
+This covers joining or supporting a social-cause campaign and sending a business an expression of interest. It does not add payments, donations, bookings, email delivery or a lead-management workflow. These additional APIs are tracked under AWT-175; they do not replace Kim's remaining business-profile work.
 
 Follow the [shared conventions](shared-conventions.md), [campaign read contract](campaign-read-contract.md) and [business profile contract](business-profile-contract.md). IDs below are positive JSON integers, not numeric strings. Timestamps are ISO 8601 UTC strings.
 
@@ -50,12 +50,12 @@ Register these campaign subroutes explicitly, with literal campaign routes such 
 Implementation rules:
 
 1. The server resolves the active user from the verified session and validates the path ID and body.
-2. It finds and locks the one row for this user and campaign. The existing unique constraint on `(user_id, campaign_id)` is the authority; a different user's row never grants permission.
+2. It locks and rechecks the account, matching active session, campaign, then the one participation row for this user and campaign. The unique `(user_id, campaign_id)` constraint is the authority; a different user's row never grants permission.
 3. For `joined`, the current approved, non-deleted cause is required, including when the user's row already exists. The server creates the row when absent or changes an existing withdrawn row back to joined. Repeating `joined` on a joined row returns that same row only while the campaign remains eligible.
 4. For `withdrawn`, an existing own row is sufficient: the server updates it without requiring public campaign access. Repeating `withdrawn` returns the same row. With no previous participation, an approved cause returns `409 PARTICIPATION_NOT_FOUND`; a private, deleted or missing campaign returns the same `404 CAMPAIGN_NOT_FOUND`. No withdrawal request creates a row or first-join date.
 5. Return the persisted row after the write commits. The response status must match the requested status.
 
-Transactions and the unique constraint handle concurrent first joins without duplicate records. For join/rejoin, the campaign's approved and non-deleted state must still hold when committing; this shares moderation's transaction/locking approach. Withdrawal locks and changes only the authenticated user's existing participation and remains valid during a campaign visibility change. `participatedAt` records the first join and stays unchanged on withdrawal or rejoining. The table has no `updated_at` column.
+Transactions and the unique constraint handle concurrent first joins without duplicate records. For join/rejoin, approval and non-deletion must still hold when committing. Withdrawal uses the same lock order but does not require public campaign visibility; it changes only the authenticated user's existing participation. Private reads also recheck the account/session inside their transaction. `participatedAt` records the first saved join time and stays unchanged on withdrawal or rejoining. The table has no `updated_at` column.
 
 The browser blocks duplicate clicks. If a write times out, returns an unreadable response or fails with a server error, it does not assume success or failure: further changes remain blocked until GET successfully checks the current participation. This reconciliation GET must work for an existing own record even when the campaign has become private. PUT is idempotent; a browser timeout does not prove that the write failed.
 
@@ -169,7 +169,7 @@ POST is not idempotent in this contract. The existing leads table has no request
 
 Find `Business` by `owner_id = currentUser.id`, then filter leads to that business before counting/pagination. If the owner has no business profile, return `409 BUSINESS_PROFILE_REQUIRED`; the page links to `/business/profile`. An existing profile with no enquiries returns an empty successful list.
 
-Sort by `created_at DESC`, then `lead_id DESC`. Include historical enquiries for that business even if a campaign is later rejected. A minimal summary may show its current status; a missing/unavailable summary is `campaign: null`. The frontend never links pending/rejected campaigns to a public detail route.
+Sort by `created_at DESC`, then `lead_id DESC`. Keep historical enquiries for that business after rejection, unpublishing or soft deletion. Only approved, non-deleted campaigns receive a summary; otherwise return `campaign: null`, without a private title. The frontend never links unavailable campaigns to a public detail route.
 
 This inbox is read-only. There is no lead status in the existing schema, and no endpoint here to mark a lead contacted, delete it or assign it to someone. Contact data and message contents must never appear in public campaign responses, another business's inbox or public logs. Do not use browser-supplied query fields to widen owner scope. Use private/no-store caching for authenticated contact-data responses.
 
@@ -195,17 +195,13 @@ Use the shared error envelope. Relevant codes are `401 AUTH_REQUIRED`/`INVALID_T
 | Enquiry contact fields | `Lead.name/email/phone/message` | `leads.name/email/phone/message` |
 | Enquiry `createdAt` | `Lead.createdAt` | `leads.created_at` |
 
-`20260830103040-create-participations.js` already creates the participation table and unique user/campaign index. `20260830103100-create-leads.js` already creates the leads table. Do not create duplicate tables or ask teammates to create them manually. No new columns are required for the contract above. Although the leads table permits a null `message` and `user_id`, these new API writes require a message and an authenticated user. Decide how legacy incomplete rows are handled before exposing them: the frontend validates complete contact records.
+`20260830103040-create-participations.js` already creates the participation table and unique user/campaign index. `20260830103100-create-leads.js` already creates the leads table. No duplicate tables or new engagement columns are required. New enquiry writes require a message and authenticated user. Legacy rows with `message IS NULL` or `user_id IS NULL` are preserved in the database but omitted from inbox results and their `total`, because they cannot satisfy the complete enquiry contract. This is a read filter, not a data deletion or backfill.
 
 The existing association definitions use snake-case foreign-key names while model attributes use camelCase. Verify generated joins use the real mapped columns and do not add unintended attributes. Use explicit response mapping; do not send a complete Sequelize user/business model or session data to the browser.
 
-## Build order and checks
+## Implementation and checks
 
-1. Add protected service/controller/router methods using the existing models and shared error format.
-2. Implement GET/PUT participation and prove one-record concurrency/idempotency before connecting the cause-page controls.
-3. Implement own participation history with counts and visibility-safe campaign summaries.
-4. Implement enquiry creation and the profile-scoped inbox together, so a received message has a private destination.
-5. Run the backend checks below, then test the real browser with sample mode disabled. The sample preview alone is not integration evidence.
+The service is `backend/src/services/engagement.js`, mounted by `router/engagementRoutes.js`. Its unit and database checks are `backend/test/unit/engagement.test.js` and `backend/test/integration/engagement.test.js`. Real frontend/API checks are in `frontend/integration/current-api.real-backend.jsx`. Run the isolated regression, then test the deployed browser with sample mode disabled; neither test layer replaces the other.
 
 Required checks:
 

@@ -5,6 +5,8 @@ const app = express();
 
 const userRoutes = require("./router/authRoutes");
 const campaignRoutes = require("./router/campaignRoutes")
+const models = require("./database/models");
+const { createCampaignImageRouter } = require("./router/campaignImageRoutes");
 
 app.use(
   cors({
@@ -15,7 +17,11 @@ app.use(
 app.use(express.json());
 
 app.use("/api/auth", userRoutes);
+app.use("/api/campaign-images", createCampaignImageRouter(models));
+app.use("/api", require("./router/campaignManagementRoutes"));
+app.use("/api", require("./router/engagementRoutes"));
 app.use("/api/campaigns", campaignRoutes)
+app.use("/api", (req, res) => res.status(404).json({ status: 404, code: "NOT_FOUND", message: "API route not found", fieldErrors: null }));
 
 app.use((err, req, res, next) => {
   if (/^\/api\/auth(\/|$)/i.test(req.path)) {
@@ -34,7 +40,7 @@ app.use((err, req, res, next) => {
     });
   }
   // JSON body errors on campaign writes (create and admin review) use the API error envelope.
-  if (["POST", "PATCH"].includes(req.method) && /^\/api\/campaigns(\/|$)/i.test(req.path)) {
+  if (/^\/api(\/|$)/i.test(req.path)) {
     const invalidBody = [400, 415, 422].includes(err.status);
     const status = err.status === 413 ? 413 : invalidBody ? 422 : 500;
     return res.status(status).json({

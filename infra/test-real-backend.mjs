@@ -6,6 +6,8 @@ import { randomBytes } from 'node:crypto'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { createInterface } from 'node:readline'
 import path from 'node:path'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 const backend = path.join(root, 'backend')
@@ -23,6 +25,7 @@ let cleaning
 let dockerEndpoint
 let vite
 let input
+let uploads
 const browserMode = process.argv.length === 3 && process.argv[2] === '--browser'
 
 function command(program, args, { cwd = root, env = process.env, capture = false } = {}) {
@@ -78,6 +81,10 @@ async function cleanup() {
       await attempt('Express server', () => new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve())))
     }
     if (db) await attempt('Sequelize connection', () => db.sequelize.close())
+    if (uploads) await attempt('disposable uploaded photos', async () => {
+      if (path.dirname(uploads) !== tmpdir() || !path.basename(uploads).startsWith(`cc-test-uploads-${tag}-`)) throw new Error('Upload cleanup ownership check failed.')
+      await rm(uploads, { recursive: true, force: true })
+    })
     if (containerId) {
       await attempt('disposable database container', async () => {
         if (!/^[a-f0-9]{64}$/.test(containerId)) throw new Error('Invalid container ID; refusing removal. Check this run’s printed name and ownership label manually.')
@@ -114,6 +121,7 @@ async function browserFixture(env) {
     accounts.push({ id: user.userId, email: user.email, role: user.role })
   }
   const category = await db.Category.create({ categoryName: `Browser Education ${tag}` })
+  await db.Business.create({ ownerId: accounts.find(account => account.role === 'business_owner').id, businessName: `Disposable browser business ${tag}` })
   const campaigns = []
   for (const status of ['approved', 'pending']) {
     const campaign = await db.Campaign.create({ title: `Browser ${status} ${tag}`, description: `Disposable ${status} campaign for browser regression.`, categoryId: category.categoryId, createdBy: accounts[0].id, status })
@@ -145,7 +153,7 @@ async function browserFixture(env) {
   if (!address || typeof address === 'string' || address.address !== '127.0.0.1') throw new Error('Browser fixture did not bind to loopback.')
   console.log('Browser fixture ready. These accounts exist only in this disposable database:')
   console.log(JSON.stringify({ frontendUrl: `http://127.0.0.1:${address.port}`, run: tag, password: fixturePassword, accounts, category: { id: category.categoryId, name: category.categoryName }, campaigns }, null, 2))
-  console.log('Actual frontend and Express/MySQL are running. Missing Stage 3 APIs are still missing; this is not sample mode.')
+  console.log('Actual frontend and Express/MySQL are running. The business fixture is database-seeded; Kim’s profile API is not replaced by this check. This is not sample mode.')
   console.log('Enter inspect for a safe database readback, or press Ctrl+C to stop and remove this run’s fixture.')
   input = createInterface({ input: process.stdin, output: process.stdout, terminal: Boolean(process.stdin.isTTY) })
   input.on('SIGINT', () => stop('SIGINT'))
@@ -198,12 +206,14 @@ try {
   const binding = await docker(['port', containerId, '3306/tcp'], { capture: true })
   const port = /^127\.0\.0\.1:(\d+)$/.exec(binding)?.[1]
   if (!port) throw new Error('Refusing a database port that is not bound only to 127.0.0.1.')
+  uploads = await mkdtemp(path.join(tmpdir(), `cc-test-uploads-${tag}-`))
   const env = {
     ...process.env, NODE_ENV: 'test', RUN_DB_INTEGRATION: '1', RUN_REAL_BACKEND_TESTS: '1',
     CAUSECONNECT_TEST_RUN: tag, DB_HOST: '127.0.0.1', DB_PORT: port,
     DB_USER: 'cc_test', DB_PASSWORD: password, DB_NAME: `cc_frontend_${tag}_unused`,
     DB_NAME_TEST: database, JWT_SECRET: randomBytes(48).toString('hex'),
     VITE_DEMO_MODE: 'false',
+    CAMPAIGN_UPLOAD_DIR: uploads,
   }
   const mysql = backendRequire('mysql2/promise')
   let ready = false
@@ -220,8 +230,8 @@ try {
   console.log('Applying repository migrations to the empty test database.')
   await command(process.execPath, [backendRequire.resolve('sequelize-cli/lib/sequelize'), 'db:migrate'], { cwd: backend, env })
   if (!browserMode) {
-    await command(process.execPath, ['--test', 'test/unit/*.test.js'], { cwd: backend, env })
-    await command(process.execPath, ['--test', 'test/integration/*.test.js'], { cwd: backend, env })
+    await command(process.execPath, ['--test', '--test-reporter=spec', 'test/unit/*.test.js'], { cwd: backend, env })
+    await command(process.execPath, ['--test', '--test-reporter=spec', 'test/integration/*.test.js'], { cwd: backend, env })
   }
   Object.assign(process.env, env)
   db = backendRequire('./src/database/models')
@@ -232,7 +242,7 @@ try {
   env.VITE_API_BASE_URL = `http://127.0.0.1:${server.address().port}/api`
   console.log('Testing actual frontend components and services against Express and MySQL (jsdom, native HTTP fetch; no API mocks).')
   await command(process.execPath, [path.join(frontend, 'node_modules/vitest/vitest.mjs'), 'run', '--config', 'vitest.real-backend.config.js'], { cwd: frontend, env })
-  console.log('Real-backend regression passed. Missing Stage 3 endpoints are not implemented or certified by this check.')
+  console.log('Real-backend regression passed against the migrated disposable database. Kim’s business-profile APIs still require their own integration checks.')
 } catch (error) {
   console.error(error.message.replaceAll(password, '[redacted]'))
   process.exitCode = 1

@@ -2,9 +2,9 @@
 
 The frontend covers public/business campaign posting, photos, owner editing, participation, business enquiries, admin campaign/account management and automatic campaign refresh. This guide maps those screens to backend routes, validation, database changes and integration checks. The labelled sample preview uses browser data; live mode calls the real endpoints and reports errors when they are unavailable.
 
-The reviewed `main` baseline on 4 October is `cc05f56`, including PR #12's authentication, category lookup and text-only public submission, and PR #13's frontend refinements. The additional endpoints below remain backend work. Extensions must preserve the existing authentication and submission flows.
+This reference describes `feature/stage3-additional-apis` on 13 October 2026, based on `main` at `ec11766`. Public/business posting against an existing profile, owner/admin reads and core campaign approval were already implemented. This branch adds AWT-175 images, owner editing/removal, participation, enquiries and admin account/content management. Merge, deployment and cloud verification remain separate from local implementation.
 
-The tables provide a starting point for each API group. Linked contracts define the payloads and rules, and `frontend/src/services/` contains the corresponding callers. Integration proceeds one complete journey at a time.
+The tables map each API group to its current code. Linked contracts define the payloads and rules, and `frontend/src/services/` contains the callers. GET/PUT `/api/business/me` is still missing; completing a new business owner's profile and first-post journey remains Kim's work.
 
 ## Agreed responsibilities
 
@@ -15,10 +15,12 @@ The tables provide a starting point for each API group. Linked contracts define 
 | User campaign-posting API | Rajita |
 | Business campaign-posting API | Kim |
 | Admin campaign-approval API | Kim and Rajita |
+| Additional APIs in this branch — images, owner management, engagement and admin management (AWT-175) | Unice |
+| Remaining business-profile GET/PUT and full new-business journey (AWT-141/AWT-173) | Kim |
 
-**Current Jira due date: 17 October 2026** for AWT-136, AWT-138, AWT-140 and AWT-142, checked on 4 October. The meeting originally recorded 20 October; Jira currently sets the earlier date. Supporting APIs—images, profiles, owner management, participation, enquiries and admin account management—need coordinated ownership. The table records the agreed assignments; additional endpoint ownership remains to be agreed.
+Use Jira for current dates and review/assignment status. This code reference does not mark a Jira task done or assume Nithya has reviewed the additional work. Existing posting/approval assignments are unchanged.
 
-The [AWS frontend preview](https://d10e86f5qx46up.cloudfront.net) uses sample data. **Preview as** switches between roles. The preview does not call a development API, save real accounts or share sample changes between testers. The remaining backend APIs, database/image storage and final cloud integration still need implementation and testing. Local interface changes require a separate deployment before they appear in the hosted preview. See [verification evidence](../evidence/stage-3/frontend-preview/README.md).
+The [AWS frontend preview](https://d10e86f5qx46up.cloudfront.net) has separate [dated verification evidence](../evidence/stage-3/frontend-preview/README.md). The earlier sample build uses browser-only data and a **Preview as** selector. Do not use that historical preview as proof that this branch is live: cloud integration needs its own deployed revision, configuration and browser test results. Local changes require a separate deployment.
 
 The application uses one dedicated admin account with role `admin`. Its primary navigation includes **Review campaigns**, with **Manage users** under **Account**. Public registration and account screens do not create or promote administrators; the backend enforces admin access independently.
 
@@ -28,32 +30,26 @@ When a session expires, private page state is cleared and the frontend offers si
 
 | Frontend page | API calls | Current backend position |
 |---|---|---|
-| `/campaigns/new` | GET categories, optional POST image, POST campaign | Categories and text-only public POST are merged into `main`; image support pending |
-| `/business/profile` | GET/PUT `/api/business/me` | Routes pending; Business table already exists |
-| `/business/campaigns/new` | GET profile + categories, optional POST image, POST campaign | Profile and business posting extension pending |
-| `/my-campaigns` | GET `/api/campaigns/mine?page=1&pageSize=10&status=pending` | Owner read pending; status parameter omitted for all statuses |
-| `/my-campaigns/:id/edit` | GET/PATCH/DELETE `/api/campaigns/mine/:id` | Owner detail, edit/resubmit and soft-delete pending |
-| Approved cause detail; `/my-participation` | GET/PUT `/api/campaigns/:id/participation`; GET `/api/participations/mine` | Endpoints pending; join/rejoin require approval, while existing own records remain readable and withdrawable after the campaign becomes unavailable |
-| Approved business detail; `/business/enquiries` | POST `/api/campaigns/:id/enquiries`; GET `/api/business/me/enquiries` | Enquiry endpoints pending; existing Lead fields already cover the contract |
-| `/admin/campaigns` | GET `/api/campaigns/admin` with page/pageSize/status/search | Existing read; expand its response fields |
-| `/admin/campaigns/:id` | GET admin detail/reviews; PATCH status/publication; DELETE `/api/campaigns/admin/:id` | Existing detail; decision/history/unpublish/soft-delete endpoints pending |
-| `/admin/users` | GET `/api/admin/users`; PATCH `/api/admin/users/:id/status` | Account list/status changes and session revocation pending |
+| `/campaigns/new` | GET categories, optional POST image, POST campaign | Existing public POST; image upload/attachment added in this branch |
+| `/business/profile` | GET/PUT `/api/business/me` | **Still missing — Kim (AWT-141/AWT-173)**; existing Business table should be reused |
+| `/business/campaigns/new` | GET profile + categories, optional POST image, POST campaign | POST accepts an existing own Business row; new-business browser journey still blocked on profile GET/PUT |
+| `/my-campaigns` | GET `/api/campaigns/mine?page=1&pageSize=10&status=pending` | Implemented owner read; omit status for all statuses |
+| `/my-campaigns/:id/edit` | GET/PATCH/DELETE `/api/campaigns/mine/:id` | Existing detail; edit/resubmit and soft-delete added in this branch |
+| Approved cause detail; `/my-participation` | GET/PUT `/api/campaigns/:id/participation`; GET `/api/participations/mine` | Implemented in this branch; existing own records stay readable/withdrawable after unpublishing or deletion |
+| Approved business detail; `/business/enquiries` | POST `/api/campaigns/:id/enquiries`; GET `/api/business/me/enquiries` | Implemented in this branch using existing Lead fields |
+| `/admin/campaigns` | GET `/api/campaigns/admin` with page/pageSize/status/search | Implemented expanded read; image and deletion handling added in this branch |
+| `/admin/campaigns/:id` | GET admin detail/reviews; PATCH status/publication; DELETE `/api/campaigns/admin/:id` | Existing detail/decision; history, unpublish and soft-delete added in this branch |
+| `/admin/users` | GET `/api/admin/users`; PATCH `/api/admin/users/:id/status` | Implemented in this branch, including session revocation |
 | Home, public detail and My campaigns updates | Repeat their read endpoints while visible/online | No push endpoint required; reads must return current state and respect visibility on every request |
 
-## Build order
+## What remains
 
-1. **Keep existing authentication and public submission passing.** The roles are exactly `public`, `business_owner`, `admin`. Registration's `accountType: "business"` maps to `business_owner`. Protected routes must load the current active user as well as checking JWT/session. Reuse the current submission checks; do not grant permission from a frontend role or stale JWT alone.
-2. **Add business profile GET/PUT.** Query the unique `businesses.owner_id` using the signed-in user. GET missing profile is `200 {"business":null}`. PUT returns `200` for creation and update. Full fields, validation and table mapping: [profile contract](../api/business-profile-contract.md).
-3. **Extend campaign POST for business owners.** Reuse the existing text fields and validation. The server selects creator and linked business; derive type from business association. Missing business profile is `409 BUSINESS_PROFILE_REQUIRED`. Both account types create pending rows. [Posting extension](../api/campaign-posting-future-proposal.md#business-posting).
-4. **Add My campaigns and update read projections.** Scope owner reads by current user, include all three statuses and latest feedback, and add filtered `total`. Return dates, audience, business summary and type from database fields. Use one serializer with public/owner/admin visibility rules. [Read contract](../api/campaign-read-contract.md).
-5. **Add admin decisions.** Admin detail must include canonical ISO-millisecond `updatedAt`. Every decision sends it as `expectedUpdatedAt`; lock and compare it before saving status plus one review. An owner edit after the admin loaded the page must also cause `409`, even if the row is still pending. Return the advanced version with the confirmed status. Rejection needs comments. [Admin contract](../api/admin-campaign-moderation-contract.md).
-6. **Add image storage and attachment.** Add the documented upload metadata migration. Upload one multipart `file` privately, return an opaque reference and expiry, then attach it in the campaign-create transaction. Owner/admin image URLs are signed; public delivery requires approval. [Image contract and migration design](../api/campaign-posting-future-proposal.md#upload-one-campaign-image).
-7. **Add owner editing/resubmission and soft deletion.** Use the authenticated owner and saved `updatedAt` value, not a client creator ID. An edit returns the campaign to pending; preserve previous reviews. Share deletion metadata with admin management rather than adding duplicate columns. [Owner-management contract](../api/owned-campaign-management-contract.md).
-8. **Add participation and business enquiries.** Participation is scoped to the signed-in account. Join/rejoin require an approved cause campaign. An existing own participation record remains readable and withdrawable when its campaign is no longer approved or is soft-deleted; private history returns `campaign:null` for unavailable content. Enquiries target approved business campaigns; only the linked business owner can read the inbox. The existing Participation/Lead tables contain the required fields and participation uniqueness constraint. [Engagement contract](../api/engagement-contract.md).
-9. **Add admin account/content management.** Account suspension must revoke active sessions; no changes to any admin account or account roles. Return approval history and record unpublish/soft-delete events without destroying campaign records. These campaign actions also require `expectedUpdatedAt`, checked inside the transaction; unpublish returns the advanced version. [Admin management contract](../api/admin-management-contract.md).
-10. **Test the complete journey against the real API, then connect cloud settings.** The frontend API base and CORS origin must match the hosted backend/frontend. Test with sample mode disabled. Record the endpoints/migrations and test evidence in the PR so frontend integration can be checked directly. Exercise the 30-second campaign refresh as well as button-triggered reads; public removal and account suspension must take effect on subsequent requests.
+1. **Complete business profile GET/PUT (Kim).** Use the unique `businesses.owner_id` from the authenticated account. A missing profile returns `200 {"business":null}`; PUT returns `200` for both first save and update. Follow the [profile contract](../api/business-profile-contract.md), then test a freshly registered owner through profile setup and [business posting](../api/campaign-posting-future-proposal.md#business-posting). Do not add another profile endpoint or Business table.
+2. **Finish the branch regression and review.** Keep authentication, posting, [reads](../api/campaign-read-contract.md) and [approval](../api/admin-campaign-moderation-contract.md) passing alongside the additional routes. Run isolated MySQL/frontend checks and record actual results, not sample-mode walkthroughs. Account/session checks, conflicting updates, image visibility and retained private history are part of this gate.
+3. **Merge and deploy the reviewed revision separately.** Apply the shared migrations in order, configure the existing server's private image directory and backups, and connect the non-demo frontend. The [image contract](../api/campaign-posting-future-proposal.md#upload-one-campaign-image) covers limits and delivery; [deployment preparation](../../infra/README.md) covers the release settings. No new cloud resource is required for this filesystem implementation.
+4. **Verify on the deployed site.** Record the revision tested. Check real registration/login/logout, owner submission/edit/removal, moderation, images, participation, enquiries and suspension. Exercise the 30-second list/detail/status refresh and expired sessions. The full new-business journey waits for item 1.
 
-Use the agreed responsibilities above and coordinate ownership of each shared endpoint/model change before implementation, so the user, business and admin flows use the same schema and do not introduce duplicate controllers or migrations.
+Reuse the implemented [owner-management](../api/owned-campaign-management-contract.md), [engagement](../api/engagement-contract.md) and [admin-management](../api/admin-management-contract.md) services instead of duplicating their controllers or migrations. Implementation here does not automatically change Jira review or assignment status.
 
 ## Request/response examples to use
 
@@ -72,7 +68,7 @@ The examples use illustrative IDs. Fetch real categories and use IDs returned by
 
 ### Request and success-response quick reference
 
-For all protected calls, send `Authorization: Bearer <login token>`. JSON bodies use `Content-Type: application/json`; image upload uses browser-built multipart. IDs are JSON integers, not numeric strings. Every route must still enforce its role/ownership rules on the server.
+For all protected calls, send `Authorization: Bearer <login token>`. JSON bodies use `Content-Type: application/json`; image upload uses browser-built multipart. IDs are JSON integers, not numeric strings. Every route must enforce its role/ownership rules on the server. **GET/PUT `/api/business/me` below describes the remaining contract, not an implemented endpoint.**
 
 | Request | Body or query | Exact success shape |
 |---|---|---|
@@ -102,33 +98,33 @@ Optional `?` markers in this table explain fields; they are not literal JSON pro
 
 ## Existing database and code map
 
-| Area | Current source | Work needed |
+| Area | Current source | Position in this branch |
 |---|---|---|
-| Campaign text creation | `backend/src/services/campaignSubmission.js`; `controllers/campaigns.js`; `router/campaignRoutes.js` | Preserve validation; allow current business owner + optional image reference; transaction for attachment |
-| Campaign read projection | `backend/src/services/campaignServices.js` | Shared expanded serialization, owner scope, latest review, total, safe image URL |
+| Campaign creation | `backend/src/services/campaignSubmission.js`; `controllers/campaigns.js`; `router/campaignRoutes.js` | Public/business posting with optional image reference; transaction for attachment |
+| Campaign reads | `services/campaignQueries.js`; `utils/campaignSerializer.js`; `services/campaignServices.js` | Shared serialization, owner scope, latest review, total, visibility-safe image URL |
 | Business profile | `database/models/business.js`; migration `20260830103020-create-businesses.js` | Existing unique owner and columns; add service/controller/routes, no duplicate table |
-| Campaign decision | `database/models/campaignReview.js`; migration `20260830103050-create-campaign-reviews.js` | Existing decision columns; implement transaction and conflict handling; model has no automatic timestamps |
-| Campaign images | Existing `campaigns.image_url`, migration `20260912062417-add-image-url-to-campaigns.js` | Add ownership/expiry/storage/attachment metadata migration; private object storage and cleanup |
+| Campaign decision | `services/campaignModeration.js`; `database/models/campaignreview.js` | Transaction and version checks implemented; existing review table has no automatic timestamps |
+| Campaign images | `services/campaignImages.js`; `campaignImageStorage.js`; `database/models/campaignImage.js` | Upload metadata migration, private filesystem storage, controlled delivery and bounded cleanup implemented |
 | Categories | `database/models/category.js` | Existing ID/name mapping; GET returns `{categories:[{id,name}]}` |
-| Owner editing | `database/models/campaign.js` | Owner-only detail/update, optimistic version check, photo replacement/removal and shared soft-deletion metadata |
-| Participation | `database/models/participation.js` | Authenticated account/campaign reads and state changes; enforce one participation record per user/campaign |
-| Business enquiries | `database/models/lead.js` | Use existing contact/message fields; require complete validated API writes and add owner-only inbox |
-| Admin accounts | `database/models/user.js`, `userSession.js` | Safe account projection, suspension/reactivation and all-session revocation |
-| Content management audit | No existing management-audit model | Shared soft-deletion migration and audit-event table; retain review history |
+| Owner editing | `services/ownerCampaignManagement.js` | Owner-only updates, version checks, photo replacement/removal and shared soft deletion implemented |
+| Participation | `services/engagement.js`; `database/models/participation.js` | Authenticated reads/state changes, one record per user/campaign, visibility-safe history implemented |
+| Business enquiries | `services/engagement.js`; `database/models/lead.js` | Validated API writes and owner-only inbox implemented; incomplete legacy rows retained but omitted from results/count |
+| Admin accounts | `services/adminManagement.js`; `database/models/user.js`, `userSession.js` | Safe projection, suspension/reactivation and all-session revocation implemented |
+| Content management audit | `database/models/managementAudit.js`; migration `20261013220000-add-campaign-management.js` | Shared soft-deletion metadata and audit-event table implemented; review history retained |
 
 Paths above are relative to `backend/src/` where abbreviated. Create migrations through the repository's Sequelize workflow. Never ask testers to manually create tables or edit campaign statuses. Keep existing seeded campaign image URLs compatible.
 
 Register literal `/categories`, `/mine`, `/mine/:id` and `/admin` routes, including admin action/history routes, before public `/:id`. Register participation/enquiry subroutes explicitly. Return JSON errors for unknown `/api` paths before any SPA fallback.
 
-### Shared changes to coordinate first
+### Shared implementation to keep
 
-1. **Current-account authentication.** `campaignAuthorAuthentication.js` already verifies token + matching active session + current database account, but currently permits only `public`. Adapt/reuse that pattern for the allowed roles. Older `authentication.js` only finds an active token and older `adminAuthentication.js` checks the JWT role; that pair does not yet enforce the current database account's role/status or the matching session user ID. Upgrade the shared guards for all protected reads/writes before relying on suspension or admin restrictions. Use the [shared conventions](../api/shared-conventions.md), not a copy of sample-mode authentication.
-2. **One serializer and pagination policy.** Public returns approved/non-deleted content, owner returns only their own content, admin returns authorised non-deleted content. Add category/type, business summary, dates, audience, latest private review and safe image URL. Include `updatedAt` on owner/admin detail. Apply filters before count/limit and avoid counting a campaign multiple times when joining review history. Current read services omit these fields and `total`.
-3. **One version migration.** Existing `campaigns.updated_at` is declared as `Sequelize.DATE` without fractional precision. Add a new migration to preserve milliseconds (`DATETIME(3)` / Sequelize `DATE(3)`) and matching model configuration; do not edit an already-applied migration. Every owner/admin content change must monotonically advance that version. Compare the exact loaded value inside the same locked transaction. See [version rules](../api/owned-campaign-management-contract.md#version-checks-and-transactions).
-4. **One soft-delete/audit schema.** Share `deleted_at`, `deleted_by` and `deletion_reason` between owner/admin removal and use one audit table migration. Owner removal does not submit a reason; keep that column nullable. Update all read/action scopes, and retain reviews/participations/enquiries. See [admin database work](../api/admin-management-contract.md#database-work).
-5. **One upload/attachment design.** Share `campaign_images`, storage keys, expiry and ownership checks across public/business create and owner photo replacement. Attach/detach under the campaign transaction, including clearing any legacy image fallback when a photo is removed. Never store signed URLs as permanent campaign fields. See [image storage and replacement](../api/campaign-posting-future-proposal.md#replacing-or-removing-an-existing-photo).
+1. **Current-account checks.** Reuse `currentAccountAuthentication.js` and transactional `lockActor` from `campaignManagementSupport.js`. Lock account, matching active session, campaign, then dependent image/participation rows. Never trust stale role claims or sample tokens. Follow the [shared conventions](../api/shared-conventions.md).
+2. **One serializer and pagination policy.** `campaignQueries.js` applies visibility/ownership before count and limit; `campaignSerializer.js` supplies numeric IDs, type, business, dates, private feedback and exact `updatedAt`. Public responses exclude review data.
+3. **One version migration.** `20261013090000-campaign-updated-at-milliseconds.js` supplies the shared millisecond version. Every owner/admin content change advances it and checks the client's loaded value in the transaction. See [version rules](../api/owned-campaign-management-contract.md#version-checks-and-transactions).
+4. **One soft-delete/audit schema.** `20261013220000-add-campaign-management.js` adds `deleted_at`, `deleted_by`, nullable `deletion_reason` and management audit. Both owner/admin removal retain reviews, participation and enquiries. See [admin database work](../api/admin-management-contract.md#database-work).
+5. **One upload design.** `20261013221000-create-campaign-images.js` adds shared metadata. Files use a private persistent directory on the existing EC2 server: 5 MB JPEG/PNG/WebP, 16 MP decoded limit, 24-hour unattached references, five-minute private tickets, 512 MiB total upload limit and 2 GiB free-disk reserve. No new bucket/resource is needed. See [image storage and replacement](../api/campaign-posting-future-proposal.md#replacing-or-removing-an-existing-photo).
 
-Profiles, categories, participations, leads, users, sessions and review tables already exist. The new schema work is version precision, upload metadata, soft-deletion metadata and management audit—not recreating the database. Keep these shared migrations in one coordinated change sequence so parallel API work can apply them safely.
+Profiles, categories, participations, leads, users, sessions and reviews already exist. Apply the three shared migrations above in filename order; do not recreate the database or duplicate their columns. Legacy Lead rows with a null message or user remain stored but are excluded from inbox results and totals, so incomplete records cannot break the frontend contract.
 
 ## Small fixture set
 
@@ -150,7 +146,7 @@ The repository also includes a [real-backend regression runner](../../infra/real
 npm run test:real-backend
 ```
 
-It creates a separate temporary MySQL container, applies migrations, runs backend tests and checks actual frontend components/services against Express, then removes only its own container. No project database is reused. The current run covers registration, login/logout, categories, public reads and text-only pending submission. It uses jsdom rather than a browser and does not test the unfinished business, image, owner, engagement or moderation APIs. Extend the isolated suite as those endpoints are implemented, then run the real browser journeys below.
+It creates a separate temporary MySQL container, applies migrations, runs backend tests and checks actual frontend components/services against Express, then removes only its own container. No project database is reused. The suite covers authentication, posting/reads/moderation and the additional owner/admin, participation, enquiry and image routes. The frontend integration uses jsdom rather than a full browser. Business fixtures are created directly for these tests: the still-missing profile API is checked as an error, not faked or counted as a completed business journey. Record the current run result, then run the deployed browser journeys below.
 
 ### Backend unit and database tests
 
@@ -161,7 +157,7 @@ npm ci
 npm test
 ```
 
-The current unit suite covers campaign submission validation and the campaign-author guard. Add unit tests for each new service/guard; passing this existing suite alone does not test the new endpoints.
+The unit suite includes authentication, campaign submission/reads/moderation, owner/admin management, engagement and images. Unit success alone does not establish database or deployed-browser correctness.
 
 Before integration tests, configure `DB_HOST` as `localhost`, `127.0.0.1` or `::1`, an existing **separate local** `DB_NAME_TEST` ending in `_test`, the matching local MySQL credentials and `JWT_SECRET`. `DB_NAME_TEST` must differ from `DB_NAME`. Apply migrations to that test database from `backend/`:
 
@@ -186,7 +182,7 @@ Remove-Item Env:RUN_DB_INTEGRATION
 Remove-Item Env:NODE_ENV
 ```
 
-This suite starts its own temporary local HTTP server and creates/removes only its test records. It does not need the normal backend server running, and no demo seeder is required for it. Its current tests cover text-only public submission, not all Stage 3 features. Add the new integration tests under `backend/test/integration/`; retain the isolated-database guard and fixture-scoped cleanup. Do not use shared/cloud data, `sync({force:true})`, database resets or broad truncation to make the tests pass.
+This suite starts temporary local HTTP servers and creates/removes only its own records. It does not need the normal backend server running or a demo seeder. Integration tests under `backend/test/integration/` cover current and additional APIs with guarded, fixture-scoped cleanup. Do not use shared/cloud data, `sync({force:true})`, database resets or broad truncation to make tests pass.
 
 For the real browser check, start the development backend with the usual development database (not the integration-test environment). After checking the configured development target, from `backend/`:
 
@@ -212,7 +208,7 @@ In each API PR/handoff, include the endpoints implemented, exact migration filen
 
 | Symptom | Check first |
 |---|---|
-| New page reports unavailable / `404` | Is the exact proposed route registered? An existing `/api/campaigns` response does not prove `/mine`, images or account-management routes exist. Check router order. |
+| New page reports unavailable / `404` | Is this branch deployed with migrations applied? Check the exact route and router order. GET/PUT `/api/business/me` is still missing and must not be reported as working. |
 | Login appears successful but a protected call fails | Use the actual login token; confirm the matching active session and current database role/status. Sample-role tokens are intentionally invalid in the real backend. |
 | Admin detail says its version cannot be read | Add `updatedAt` to the admin detail serializer, preserve milliseconds in MySQL/model, and return canonical UTC text. Do not substitute the current time in the response. |
 | Save succeeds in the server log but the UI refuses confirmation | Match the exact HTTP status, envelope, numeric IDs and returned status/version. In particular, DELETE is empty `204`; create is `201`; review/unpublish must return an advanced version. Check saved data before retrying. |

@@ -6,11 +6,11 @@ The application will help people discover campaigns supporting social causes and
 
 ## Current stage
 
-**Stage 3 — campaign frontend and API integration work**
+**Stage 3 — frontend, backend integration and cloud deployment**
 
 The Stage 2 prototype provided public campaign browsing, registration and login/logout. Its submission deadline was Sunday 20 September 2026.
 
-This branch adds frontend screens for:
+The frontend covers:
 
 1. Public-user and business campaign posting, business profiles and campaign photos
 2. My campaigns, owner edits/resubmission, photo replacement/removal and soft deletion
@@ -19,7 +19,9 @@ This branch adds frontend screens for:
 5. Admin approval/rejection, review history, content removal and user suspension/reactivation
 6. Automatic updates on the public campaign list/detail and owner submission status
 
-These are frontend implementations, not a claim that all their backend APIs are ready. Category lookup and text-only public submission are implemented in this branch's backend. Other new endpoints, image storage and the final integrated cloud deployment remain pending; the AWS sample frontend is already available. See the [feature coverage](docs/handoff/stage3-feature-coverage.md), [frontend README](frontend/README.md), [API handoff](docs/handoff/stage3-api-handoff.md) and [deployment preparation](infra/README.md).
+As of 13 October, the base `main` already has public/business posting against an existing profile, owner/admin reads and core campaign approval. `feature/stage3-additional-apis` adds real image upload/delivery, owner editing/removal, participation, enquiries and admin account/content management under AWT-175. Its regression tests run against isolated local MySQL; merge, deployment and cloud verification are separate steps.
+
+Kim's GET/PUT `/api/business/me` is still missing (AWT-141/AWT-173). A business owner with an existing profile can post through the API, but a new owner's full registration → profile → posting journey is not yet complete. See the [feature coverage](docs/handoff/stage3-feature-coverage.md), [frontend README](frontend/README.md), current [API handoff](docs/handoff/stage3-api-handoff.md) and [deployment preparation](infra/README.md).
 
 ## Looking ahead to Stage 3
 
@@ -34,7 +36,7 @@ Stage 3 is due **Sunday 25 October 2026, 11:59 pm**. It extends the running Stag
 - Cloud IaaS deployment
 - User, developer and testing documentation
 
-The list above is the overall Stage 3 scope. This branch provides the application frontend and API handoff; real backend integration, cloud testing, manuals and the final recording remain separate deliverables. Jira remains the place for team task allocation. There is no public admin signup, role-promotion screen, payment system or full CRM.
+The list above is the overall Stage 3 scope. Local implementation and regression evidence do not replace cloud/browser testing, manuals or the final recording. Jira remains the place for team task allocation and review status. There is no public admin signup, role-promotion screen, payment system or full CRM.
 
 ## Why this repository was created
 
@@ -113,6 +115,6 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) before making changes.
 
 ## Current status
 
-The Stage 3 frontend and API handoff are prepared in this branch, including the original team logo. The [AWS sample preview](https://d10e86f5qx46up.cloudfront.net) is available for interface review; use **Preview as** to explore the roles. It uses disposable browser data, not the real backend. New backend features, final backend/cloud deployment and real integration testing remain open. Technical notes for the manual/demo owner are in [the frontend handoff](docs/handoff/stage3-frontend-notes.md).
+The additional backend implementation is in this branch, not a declaration that it is merged or deployed. The [AWS preview](https://d10e86f5qx46up.cloudfront.net) has its own deployed revision; the earlier **Preview as** sample build uses browser-only data and is not backend evidence. Verify the deployed revision and run the real browser journeys before reporting cloud completion. Technical notes for the manual/demo owner are in [the frontend handoff](docs/handoff/stage3-frontend-notes.md).
 
 No feature should be described as complete until its implementation and evidence are present.

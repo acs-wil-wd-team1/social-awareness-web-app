@@ -1,7 +1,7 @@
 "use strict";
 
 const allowedFields = new Set([
-  "title", "description", "categoryId", "targetAudience", "startDate", "endDate",
+  "title", "description", "categoryId", "targetAudience", "startDate", "endDate", "imageId",
 ]);
 
 const { serviceError, validationError: buildValidationError } = require("../utils/serviceError");
@@ -60,22 +60,27 @@ function validateCampaignInput(body) {
   if (!errors.startDate && !errors.endDate && values.endDate < values.startDate) {
     errors.endDate = "End date must be on or after the start date";
   }
+  if (Object.hasOwn(body, "imageId")) {
+    if (typeof body.imageId !== "string" || !/^img_[a-f0-9]{48}$/.test(body.imageId)) errors.imageId = "Choose a valid uploaded photo";
+    else values.imageId = body.imageId;
+  }
 
   if (Object.keys(errors).length) throw validationError(errors);
   return values;
 }
 
 // Business owners always post for their own linked business; public users post causes.
-async function resolveBusinessId(Business, currentUser) {
+async function resolveBusinessId(Business, currentUser, transaction) {
   if (currentUser.role !== "business_owner") return null;
-  const business = await Business.findOne({ where: { ownerId: currentUser.id } });
+  const business = await Business.findOne({ where: { ownerId: currentUser.id }, transaction });
   if (!business) {
     throw serviceError(409, "BUSINESS_PROFILE_REQUIRED", "Create your business profile before posting a campaign");
   }
   return business.businessId;
 }
 
-function createCampaignSubmissionService({ Campaign, Category, Business }) {
+function createCampaignSubmissionService(models, { attachImage, buildImageUrl } = {}) {
+  const { Campaign, Category, Business, sequelize } = models;
   return {
     async listCategories() {
       const categories = await Category.findAll({
@@ -85,40 +90,53 @@ function createCampaignSubmissionService({ Campaign, Category, Business }) {
       return { categories: categories.map((category) => ({ id: category.categoryId, name: category.categoryName })) };
     },
 
-    async submit(body, currentUser) {
-      const values = validateCampaignInput(body);
-      const category = await Category.findByPk(values.categoryId);
-      if (!category) throw validationError({ categoryId: "Choose an existing category" });
+    async submit(body, currentUser, token) {
+      const { imageId, ...values } = validateCampaignInput(body);
+      const create = async (transaction) => {
+        if (transaction) {
+          const { lockActor } = require("./campaignManagementSupport");
+          const user = await lockActor(models, currentUser, token, ["public", "business_owner"], transaction);
+          currentUser = { id: user.userId, role: user.role };
+        }
+        const category = await Category.findByPk(values.categoryId, { transaction });
+        if (!category) throw validationError({ categoryId: "Choose an existing category" });
 
-      const businessId = await resolveBusinessId(Business, currentUser);
+        const businessId = await resolveBusinessId(Business, currentUser, transaction);
 
-      const campaign = await Campaign.create({
-        ...values,
-        createdBy: currentUser.id,
-        businessId,
-        status: "pending",
-        imageUrl: null,
-      });
-
-      return {
-        campaign: {
-          id: campaign.campaignId,
-          title: campaign.title,
-          description: campaign.description,
-          categoryId: campaign.categoryId,
-          category: category.categoryName,
-          type: businessId == null ? "cause" : "business",
-          imageUrl: null,
-          targetAudience: campaign.targetAudience,
-          startDate: campaign.startDate,
-          endDate: campaign.endDate,
-          createdBy: campaign.createdBy,
+        const campaign = await Campaign.create({
+          ...values,
+          createdBy: currentUser.id,
           businessId,
           status: "pending",
-          createdAt: campaign.createdAt,
-          updatedAt: campaign.updatedAt,
-        },
+          imageUrl: null,
+        }, { transaction });
+        if (imageId) {
+          if (!attachImage || !transaction) throw serviceError(503, "SERVICE_UNAVAILABLE", "Image storage is unavailable");
+          await attachImage(imageId, campaign.campaignId, currentUser.id, transaction);
+        }
+        if (typeof campaign.reload === "function") await campaign.reload({ transaction });
+
+        return {
+          campaign: {
+            id: campaign.campaignId,
+            title: campaign.title,
+            description: campaign.description,
+            categoryId: campaign.categoryId,
+            category: category.categoryName,
+            type: businessId == null ? "cause" : "business",
+            imageUrl: imageId && buildImageUrl ? await buildImageUrl(campaign.campaignId, { audience: "owner", currentUser, token, transaction }) : null,
+            targetAudience: campaign.targetAudience,
+            startDate: campaign.startDate,
+            endDate: campaign.endDate,
+            createdBy: campaign.createdBy,
+            businessId,
+            status: "pending",
+            createdAt: campaign.createdAt,
+            updatedAt: campaign.updatedAt,
+          },
+        };
       };
+      return sequelize ? sequelize.transaction(create) : create();
     },
   };
 }

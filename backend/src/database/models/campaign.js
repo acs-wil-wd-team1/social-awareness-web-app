@@ -83,6 +83,9 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DATE(3),
         allowNull: false,
       },
+      deletedAt: { type: DataTypes.DATE(3), allowNull: true },
+      deletedBy: { type: DataTypes.INTEGER, allowNull: true },
+      deletionReason: { type: DataTypes.TEXT, allowNull: true },
     },
     {
       sequelize,

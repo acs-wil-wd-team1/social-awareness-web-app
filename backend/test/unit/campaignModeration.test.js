@@ -63,7 +63,7 @@ test("approves a pending campaign once, locks the row and advances the version",
   assert.equal(result.campaign.status, "rejected");
   assert.ok(Date.parse(result.campaign.updatedAt) > Date.parse(version));
   assert.deepEqual(result.review, {
-    id: 4, campaignId: 9, adminId: 1, action: "rejected", comments: "Needs a date", reviewedAt: result.campaign.updatedAt,
+    id: 4, campaignId: 9, adminId: 1, action: "rejected", comments: "Needs a date", reviewedAt: new Date(Math.floor(Date.parse(result.campaign.updatedAt) / 1000) * 1000).toISOString(),
   });
 });
 
@@ -73,6 +73,7 @@ test("returns conflicts without writing a review", async () => {
     [{ campaignId: 9, status: "pending", updatedAt: new Date("2026-10-01T05:00:00.124Z") }, 1, 409, "CAMPAIGN_CHANGED"],
     [{ campaignId: 9, status: "pending", updatedAt: new Date(version) }, 0, 409, "CAMPAIGN_ALREADY_REVIEWED"],
     [null, 1, 404, "CAMPAIGN_NOT_FOUND"],
+    [{ campaignId: 9, status: "pending", updatedAt: new Date(version), deletedAt: new Date(version) }, 1, 404, "CAMPAIGN_NOT_FOUND"],
   ];
   for (const [campaign, updatedRows, status, code] of cases) {
     const models = fakeModels({ campaign, updatedRows });
