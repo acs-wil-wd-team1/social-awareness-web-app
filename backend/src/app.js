@@ -18,6 +18,21 @@ app.use("/api/auth", userRoutes);
 app.use("/api/campaigns", campaignRoutes)
 
 app.use((err, req, res, next) => {
+  if (/^\/api\/auth(\/|$)/i.test(req.path)) {
+    const invalidBody = [400, 415, 422].includes(err.status);
+    const status = err.status === 413 ? 413 : invalidBody ? 422 : 500;
+    if (status === 500) {
+      // Parser errors may contain request snippets. Never log an auth error's
+      // stack, body or SQL parameters, even before its controller is reached.
+      console.error("Authentication request failed", { status, code: "INTERNAL_SERVER_ERROR" });
+    }
+    return res.status(status).json({
+      status,
+      code: status === 413 ? "REQUEST_TOO_LARGE" : invalidBody ? "VALIDATION_FAILED" : "INTERNAL_SERVER_ERROR",
+      message: status === 413 ? "Request body is too large" : invalidBody ? "Account data is invalid" : "Something went wrong",
+      fieldErrors: invalidBody ? { body: "Send a valid JSON object" } : null,
+    });
+  }
   // JSON body errors on campaign writes (create and admin review) use the API error envelope.
   if (["POST", "PATCH"].includes(req.method) && /^\/api\/campaigns(\/|$)/i.test(req.path)) {
     const invalidBody = [400, 415, 422].includes(err.status);

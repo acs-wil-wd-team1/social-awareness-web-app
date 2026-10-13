@@ -1,6 +1,7 @@
 "use strict";
 
 const { apiErrorResponse } = require("../utils/apiErrorResponse");
+const { validateLoginInput } = require("../utils/authValidation");
 
 const {
   registerUser,
@@ -8,37 +9,31 @@ const {
   logoutUser,
 } = require("../services/authServices");
 
+function sendAuthError(res, error, action) {
+  if (Number.isInteger(error?.status) && error.status >= 400 && error.status < 500 && error.code) {
+    return apiErrorResponse(res, error.status, error.code, error.message, error.fieldErrors ?? null);
+  }
+  // Database errors can contain SQL parameters. Never log credentials, tokens
+  // or request bodies, and do not return internal error details to the browser.
+  console.error("Authentication request failed", { action, status: 500, code: "INTERNAL_SERVER_ERROR" });
+  return apiErrorResponse(res, 500, "INTERNAL_SERVER_ERROR", "Something went wrong", null);
+}
+
 // REGISTRATION
 const registration = async (req, res) => {
   try {
-    const { name, email, password, accountType, ...extraFields } = req.body;
-    
-    const result = await registerUser({
-      name,
-      email,
-      password,
-      accountType,
-      extraFields
-    });
+    const result = await registerUser(req.body);
 
     return res.status(201).json(result);
   } catch (err) {
-    console.error(err);
-
-    return apiErrorResponse(
-      res,
-      err.status || 500,
-      err.code || "INTERNAL_SERVER_ERROR",
-      err.message || "Something went wrong",
-      err.fieldErrors ?? null,
-    );
+    return sendAuthError(res, err, "registration");
   }
 };
 
 // LOGIN
 const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password } = validateLoginInput(req.body);
 
     const result = await loginUser(email, password, {
       ipAddress: req.ip,
@@ -47,17 +42,7 @@ const login = async (req, res) => {
 
     return res.status(200).json(result);
   } catch (err) {
-    console.error(err);
-
-    const status = err.status || 500;
-
-    return apiErrorResponse(
-      res,
-      status,
-      err.code || "INTERNAL_SERVER_ERROR",
-      status === 500 ? "Something went wrong" : err.message,
-      err.fieldErrors ?? null,
-    );
+    return sendAuthError(res, err, "login");
   }
 };
 
@@ -70,17 +55,7 @@ const logout = async (req, res) => {
 
     res.status(204).send();
   } catch (err) {
-    console.log(err);
-
-    const status = err.status || 500;
-    
-    return apiErrorResponse(
-      res,
-      status || 500,
-      err.code || "INTERNAL_SERVER_ERROR",
-      status === 500 ? "Something went wrong" : err.message,
-      err.fieldErrors ?? null,
-    );
+    return sendAuthError(res, err, "logout");
   }
 };
 

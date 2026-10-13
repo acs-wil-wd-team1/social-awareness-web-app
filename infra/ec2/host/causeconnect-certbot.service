@@ -1,0 +1,12 @@
+[Unit]
+Description=Renew CauseConnect short-lived IP certificate
+After=network-online.target nginx.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/certbot/bin/certbot renew --quiet --cert-name causeconnect-ip
+TimeoutStartSec=10min
+PrivateTmp=true
+ProtectHome=true
+UMask=0077
