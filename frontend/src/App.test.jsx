@@ -42,16 +42,14 @@ describe('application routing', () => {
 })
 
 describe('site footer', () => {
-  it.each(['/', '/campaigns/42', '/missing'])('keeps public footer links usable from %s', (pathname) => {
+  it.each(['/', '/campaigns/42', '/login', '/admin/campaigns', '/admin/campaigns/42', '/missing'])('shows only the compact copyright footer on %s', (pathname) => {
     render(<App pathname={pathname} />)
-    const footer = within(screen.getByRole('contentinfo'))
-    const links = within(footer.getByRole('navigation', { name: 'Footer navigation' }))
-    expect(footer.getByText('CauseConnect', { exact: true })).toBeTruthy()
-    expect(footer.getByText('Raise awareness. Create change.')).toBeTruthy()
+    const landmark = screen.getByRole('contentinfo')
+    const footer = within(landmark)
+    expect(landmark.textContent).toBe('© 2026 CauseConnect')
     expect(footer.getByText('© 2026 CauseConnect')).toBeTruthy()
-    expect(links.getByRole('link', { name: 'Home', exact: true }).getAttribute('href')).toBe('/')
-    expect(links.getByRole('link', { name: 'Campaigns', exact: true }).getAttribute('href')).toBe('/#campaigns')
-    expect(footer.getAllByRole('link')).toHaveLength(2)
+    expect(footer.queryByRole('navigation')).toBeNull()
+    expect(footer.queryByRole('link')).toBeNull()
     expect(footer.queryByRole('img')).toBeNull()
   })
 })

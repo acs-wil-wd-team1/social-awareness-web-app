@@ -84,14 +84,6 @@ export default function App({ pathname = window.location.pathname }) {
     </main>
     <footer className="site-footer">
       <div className="site-footer__inner">
-        <div className="site-footer__brand">
-          <p className="site-footer__name">CauseConnect</p>
-          <p>Raise awareness. Create change.</p>
-        </div>
-        <nav className="site-footer__links" aria-label="Footer navigation">
-          <a href="/">Home</a>
-          <a href="/#campaigns">Campaigns</a>
-        </nav>
         <p className="site-footer__copyright">© 2026 CauseConnect</p>
       </div>
     </footer>
