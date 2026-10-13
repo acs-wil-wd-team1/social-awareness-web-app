@@ -2,9 +2,12 @@
 
 const { getCampaigns, campaignById  } = require("../services/campaignServices");
 const { apiErrorResponse } = require("../utils/apiErrorResponse");
-const { Campaign, Category } = require("../database/models");
+const { Campaign, Category, Business, CampaignReview } = require("../database/models");
 const { createCampaignSubmissionService } = require("../services/campaignSubmission");
-const submissionService = createCampaignSubmissionService({ Campaign, Category });
+const { createCampaignQueryService } = require("../services/campaignQueries");
+const { sendServiceError } = require("../utils/serviceError");
+const submissionService = createCampaignSubmissionService({ Campaign, Category, Business });
+const queryService = createCampaignQueryService({ Campaign, Category, Business, CampaignReview });
 
 const getCampaignCategories = async (req, res) => {
   try {
@@ -18,10 +21,24 @@ const submitCampaign = async (req, res) => {
   try {
     return res.status(201).json(await submissionService.submit(req.body, req.user));
   } catch (err) {
-    if (err.status === 422 && err.code === "VALIDATION_FAILED") {
-      return apiErrorResponse(res, 422, err.code, err.message, err.fieldErrors);
-    }
-    return apiErrorResponse(res, 500, "INTERNAL_SERVER_ERROR", "Something went wrong", null);
+    return sendServiceError(res, err);
+  }
+};
+
+// Owner view: only campaigns created by the signed-in account, any status.
+const getMyCampaigns = async (req, res) => {
+  try {
+    return res.status(200).json(await queryService.list(req.query, { createdBy: req.user.id }));
+  } catch (err) {
+    return sendServiceError(res, err);
+  }
+};
+
+const getMyCampaignById = async (req, res) => {
+  try {
+    return res.status(200).json(await queryService.findById(req.params.id, { createdBy: req.user.id }));
+  } catch (err) {
+    return sendServiceError(res, err);
   }
 };
 
@@ -127,6 +144,8 @@ module.exports = {
   submitCampaign,
   getPublicCampaigns,
   getPublicCampaignById,
+  getMyCampaigns,
+  getMyCampaignById,
   getAdminCampaigns,
-  getAdminCampaignById
+  getAdminCampaignById,
 };
