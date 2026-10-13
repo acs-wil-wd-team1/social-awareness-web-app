@@ -19,7 +19,7 @@ The frontend covers:
 5. Admin approval/rejection, review history, content removal and user suspension/reactivation
 6. Automatic updates on the public campaign list/detail and owner submission status
 
-As of 13 October, the base `main` already has public/business posting against an existing profile, owner/admin reads and core campaign approval. `feature/stage3-additional-apis` adds real image upload/delivery, owner editing/removal, participation, enquiries and admin account/content management under AWT-175. Its regression tests run against isolated local MySQL; merge, deployment and cloud verification are separate steps.
+PR #19 is merged into `main`, and the real frontend, API and database are live at [CauseConnect on AWS](https://52.62.2.87). The deployed application commit is `ffe3df679e5d8d1dc43c8bd1669b96aed757ad86`. Alongside the existing posting, reads and approval routes, AWT-175 adds image upload/delivery, owner editing/removal, participation, enquiries and admin account/content management. The [release evidence](docs/evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) records the release identifier, passed local checks and eight production acceptance groups.
 
 Kim's GET/PUT `/api/business/me` is still missing (AWT-141/AWT-173). A business owner with an existing profile can post through the API, but a new owner's full registration → profile → posting journey is not yet complete. See the [feature coverage](docs/handoff/stage3-feature-coverage.md), [frontend README](frontend/README.md), current [API handoff](docs/handoff/stage3-api-handoff.md) and [deployment preparation](infra/README.md).
 
@@ -115,6 +115,6 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) before making changes.
 
 ## Current status
 
-The additional backend implementation is in this branch, not a declaration that it is merged or deployed. The [AWS preview](https://d10e86f5qx46up.cloudfront.net) has its own deployed revision; the earlier **Preview as** sample build uses browser-only data and is not backend evidence. Verify the deployed revision and run the real browser journeys before reporting cloud completion. Technical notes for the manual/demo owner are in [the frontend handoff](docs/handoff/stage3-frontend-notes.md).
+The [live AWS application](https://52.62.2.87) uses real accounts, API calls and persistent data. The older [AWS preview](https://d10e86f5qx46up.cloudfront.net) is a separate **Preview as** sample build using browser-only data; it is not the live application or backend evidence. Hosted photo submission/approval, backup integrity and restart persistence passed in the [14 October closeout](docs/evidence/stage-3/additional-apis/README.md#hosted-browser-and-backuprestart-closeout--14-october-2026). Kim's profile routes still return `404`, so fresh business onboarding remains blocked. Independent tester acceptance, manuals and recording remain separate deliverables. Technical notes for the manual/demo owner are in [the frontend handoff](docs/handoff/stage3-frontend-notes.md).
 
 No feature should be described as complete until its implementation and evidence are present.

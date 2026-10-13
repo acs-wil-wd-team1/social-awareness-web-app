@@ -2,7 +2,7 @@
 
 React frontend for CauseConnect. It includes campaign browsing and posting, business profiles, owner edits, participation, business enquiries, admin campaign/account management and registration/login/logout.
 
-The layout follows the CauseConnect storyboard and web design standards. The frontend calls the [API contracts](../docs/api/api-contract.md). On 13 October, `feature/stage3-additional-apis` adds the real image, owner-management, participation, enquiry and admin-management APIs to the existing posting/reads/approval baseline. These are locally verified, not yet a claim that this branch is deployed. The [API integration guide](../docs/handoff/stage3-api-handoff.md) and [feature coverage](../docs/handoff/stage3-feature-coverage.md) separate current code from remaining work.
+The layout follows the CauseConnect storyboard and web design standards. The frontend calls the [API contracts](../docs/api/api-contract.md). PR #19 is merged, and the real frontend and additional APIs are live at [CauseConnect on AWS](https://52.62.2.87), application commit `ffe3df679e5d8d1dc43c8bd1669b96aed757ad86`. The [release evidence](../docs/evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026), [API integration guide](../docs/handoff/stage3-api-handoff.md) and [feature coverage](../docs/handoff/stage3-feature-coverage.md) separate verified work from remaining checks.
 
 GET/PUT `/api/business/me` is still missing (Kim's AWT-141/AWT-173). Posting with an existing Business row works, but new-owner registration → profile → first campaign is not complete.
 
@@ -43,7 +43,7 @@ npm run build
 
 For API/database checks, use `npm run test:real-backend`. It runs actual components/services against Express and fresh disposable MySQL, then removes its own container and upload fixtures. It needs a running Docker engine, cached `mysql:8` image and installed backend dependencies. Read the [runner instructions and limits](../infra/real-backend-testing.md) first.
 
-Local verification on 13 October: **591 frontend tests, 64 backend HTTP/MySQL checks and 18 real frontend/API/database checks passed**. The latter uses jsdom, so browser navigation, CORS and cloud routing require separate checks. The missing business-profile API is verified as an error without database changes, not counted as a completed profile journey.
+Local verification for this release: **591 frontend tests, 76 backend unit tests, 64 backend HTTP/MySQL checks, 18 real frontend/API/database checks and 15 acceptance-runner stub checks passed**. The real frontend/API suite uses jsdom, not a full browser. Eight production acceptance groups passed separately; see the [dated result and limits](../docs/evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026). The missing business-profile API is verified as an error without database changes, not counted as a completed profile journey.
 
 ## Routes
 
@@ -94,6 +94,6 @@ Campaign image and type values come from API responses. The live UI does not inf
 
 The original team logo PNG is included at `public/images/brand/causeconnect-logo.png` and used by the shared header.
 
-The [AWS preview](https://d10e86f5qx46up.cloudfront.net) has a separate deployed revision. Its earlier **Preview as** sample build uses disposable browser data; do not assume this branch's API work is live there. Merge/deploy the reviewed revision and verify HTTPS routing, real sessions, campaign/image visibility and cross-role journeys separately. Deployment instructions are in [infra](../infra/README.md). AWS free-tier eligibility or credits do not guarantee zero charges; review the approved resource plan and actual usage.
+Use the [live AWS application](https://52.62.2.87) for real API integration. The older [AWS preview](https://d10e86f5qx46up.cloudfront.net) is a separate **Preview as** sample build using disposable browser data, not the current API deployment. The [release evidence](../docs/evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) records the live revision and passed checks. Deployment instructions are in [infra](../infra/README.md). AWS free-tier eligibility or credits do not guarantee zero charges; review the approved resource plan and actual usage.
 
 Notes for the developers manual and demonstration are in [the frontend handoff](../docs/handoff/stage3-frontend-notes.md).

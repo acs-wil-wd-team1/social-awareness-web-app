@@ -1,6 +1,6 @@
 # Admin campaign moderation API
 
-**Status, 13 October 2026:** Core approval and expanded admin reads were already implemented in `main`. This branch adds review history, soft deletion and private image delivery alongside account/content management. Tests live in `backend/test/integration/campaignModeration.test.js` and `campaignManagement.test.js`; merge, deployment and cloud verification remain separate.
+**Status, 14 October 2026:** Core approval and expanded admin reads, plus PR #19 review history, soft deletion and private image delivery, are merged and deployed at [CauseConnect on AWS](https://52.62.2.87). Tests live in `backend/test/integration/campaignModeration.test.js` and `campaignManagement.test.js`; the [release evidence](../evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) records the tested revision and production acceptance scope.
 
 Every admin route uses the current-account guard: Bearer token, matching active session, and the account's *current* database role/status (suspended or demoted admins get `403`). `campaigns.updated_at` is stored with millisecond precision (migration `20261013090000`) so it round-trips as the `expectedUpdatedAt` version.
 
@@ -71,9 +71,9 @@ Errors use the [shared envelope](shared-conventions.md): `401` for missing/inval
 
 ## Database and dependent reads
 
-The existing `campaigns.status` and `campaign_reviews` fields cover the core decision data. This branch shares version locking, deletion metadata and image metadata with the owner/admin extensions. Apply the listed migrations before integration tests or deployment.
+The existing `campaigns.status` and `campaign_reviews` fields cover the core decision data. Moderation shares version locking, deletion metadata and image metadata with the owner/admin extensions. Apply the listed migrations before integration tests or a new deployment.
 
-The [owner-submissions/read contract](campaign-read-contract.md) defines `GET /api/campaigns/mine` and the latest `review` object. The admin frontend also consumes review history and content-management actions from the [admin-management contract](admin-management-contract.md). Owner editing/resubmission and soft deletion are covered in the [owner-management contract](owned-campaign-management-contract.md). These supporting APIs are implemented separately in this branch; the approval endpoint alone does not provide them.
+The [owner-submissions/read contract](campaign-read-contract.md) defines `GET /api/campaigns/mine` and the latest `review` object. The admin frontend also consumes review history and content-management actions from the [admin-management contract](admin-management-contract.md). Owner editing/resubmission and soft deletion are covered in the [owner-management contract](owned-campaign-management-contract.md). These supporting APIs are separate implemented routes; the approval endpoint alone does not provide them.
 
 Map the result to the existing schema:
 

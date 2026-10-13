@@ -1,6 +1,6 @@
 # Shared API conventions
 
-**Status, 13 October 2026:** Conventions used by the implemented campaign, management, engagement and image routes in this branch. The business-profile contract is still unimplemented; local code is not a cloud-verification claim.
+**Status, 14 October 2026:** Conventions used by the campaign, management, engagement and image routes merged through PR #19 and deployed at [CauseConnect on AWS](https://52.62.2.87). The business-profile contract is still unimplemented. See the [release evidence](../evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) for the exact revision and bounded verification.
 
 Submission rules are in the [campaign contract](campaign-posting-contract.md). The [Stage 3 API integration guide](../handoff/stage3-api-handoff.md) maps implemented routes and remaining work. Oversized JSON uses `413 REQUEST_TOO_LARGE`; image errors are documented separately.
 
@@ -52,7 +52,7 @@ Stage 3 API errors use:
 | `500` | `INTERNAL_SERVER_ERROR` | Unexpected server failure |
 | `503` | `SERVICE_UNAVAILABLE` / `IMAGE_STORAGE_FULL` / `UPLOAD_BUSY` | API/storage dependency temporarily unavailable |
 
-The branch normalises API parser and unknown-route errors to JSON. The legacy logout middleware still has its older error shape; see [current authentication](current-authentication.md). Use status/code where supplied rather than matching error prose.
+API parser and unknown-route errors are normalised to JSON. The legacy logout middleware still has its older error shape; see [current authentication](current-authentication.md). Use status/code where supplied rather than matching error prose.
 
 The frontend also handles network failure or cancellation when no API response exists. It must not treat an unreadable response or failed request as a successful save.
 

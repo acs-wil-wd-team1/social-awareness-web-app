@@ -1,6 +1,6 @@
 # Campaign participation and business enquiries
 
-**Status, 13 October 2026:** All five routes below are implemented in the AWT-175 branch `feature/stage3-additional-apis`, using the existing Participation and Lead tables. Unit, HTTP/MySQL and real-frontend regression tests are included. Merge, deployment and cloud verification remain separate; sample-mode responses are not backend evidence.
+**Status, 14 October 2026:** All five routes below are merged through PR #19 and deployed at [CauseConnect on AWS](https://52.62.2.87), using the existing Participation and Lead tables. Unit, HTTP/MySQL and real-frontend regression tests passed; production acceptance includes participation. Enquiry regression uses isolated Business fixtures, not the unfinished fresh-business onboarding flow. See the [release evidence](../evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) for exact scope; sample-mode responses are not backend evidence.
 
 This covers joining or supporting a social-cause campaign and sending a business an expression of interest. It does not add payments, donations, bookings, email delivery or a lead-management workflow. These additional APIs are tracked under AWT-175; they do not replace Kim's remaining business-profile work.
 

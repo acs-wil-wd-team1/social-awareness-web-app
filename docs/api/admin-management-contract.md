@@ -1,6 +1,6 @@
 # Admin account and campaign management
 
-**Status, 13 October 2026:** These endpoints and migrations are implemented in the AWT-175 branch `feature/stage3-additional-apis`. Regression tests are included; use the current run/PR results for pass evidence. Merge, deployment and cloud verification remain separate. The sample preview is not a live admin system.
+**Status, 14 October 2026:** These AWT-175 endpoints and migrations are merged through PR #19 and deployed at [CauseConnect on AWS](https://52.62.2.87). See the [release evidence](../evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) for the exact revision, local checks and production acceptance scope. The separate sample preview is not a live admin system.
 
 This extends the [campaign approval contract](admin-campaign-moderation-contract.md) with account suspension/reactivation, review history, removal from public view and recoverable campaign deletion. These extra endpoints do not change the dedicated-admin setup: there is no role editor, admin promotion, public admin registration or account-deletion feature.
 
@@ -131,7 +131,7 @@ Normal campaign reads, owner/admin lists, public detail, new joins/rejoins, enqu
 
 ## Database work
 
-User status, sessions and campaign reviews already exist. This branch adds shared deletion metadata and management audit through `20261013220000-add-campaign-management.js`, with matching Campaign and ManagementAudit models. Apply migrations rather than creating tables manually.
+User status, sessions and campaign reviews already exist. Migration `20261013220000-add-campaign-management.js` adds shared deletion metadata and management audit, with matching Campaign and ManagementAudit models. Apply migrations rather than creating tables manually.
 
 | API value | Existing model attribute | Existing SQL column |
 |---|---|---|

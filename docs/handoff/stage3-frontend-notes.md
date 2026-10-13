@@ -1,12 +1,12 @@
 # Stage 3 frontend notes for the manual and demonstration
 
-These notes describe the repository's frontend and the remaining integration steps. They provide source material for the developers manual, user manual and video; final submission documents remain separate deliverables.
+These notes describe the frontend and remaining integration steps after PR #19 merged and deployed at [CauseConnect on AWS](https://52.62.2.87). They provide source material for the developers manual, user manual and video; final submission documents remain separate deliverables. The [release evidence](../evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) identifies the tested commit and verification limits.
 
 ## Agreed delivery split
 
 Unice owns all remaining frontend work and frontend/backend cloud deployment, using her own AWS account, with a target of **20 October 2026**. Rajita owns the user campaign-posting API; Kim owns the business campaign-posting API; Kim and Rajita share the admin campaign-approval API.
 
-Supporting APIs include image handling, profiles, owner editing, participation, enquiries and admin account management. Kim and Rajita will need to coordinate their implementation split. These notes do not separately assign those dependencies or ownership of the finished manuals/video.
+Unice implemented the AWT-175 image, owner-management, participation, enquiry and additional admin APIs. Kim's GET/PUT business-profile work remains open under AWT-141/AWT-173. The [API handoff](stage3-api-handoff.md#agreed-responsibilities) retains the agreed split; these notes do not reassign the finished manuals/video or mark Jira review complete.
 
 ## What changed
 
@@ -33,14 +33,14 @@ The [coverage table](stage3-feature-coverage.md) maps the broader Confluence req
 |---|---|
 | Visitor | Open `/`, browse approved campaigns, open `/campaigns/:id`, register or log in |
 | Public user | Submit/manage an owned campaign; join/withdraw/rejoin an approved cause campaign; send a business enquiry |
-| Business owner | Save a profile, submit/manage business campaigns and read the private enquiry inbox; also participate in cause campaigns |
+| Business owner | Profile setup and first browser submission remain blocked on Kim's GET/PUT API. Existing-profile campaign APIs and private enquiries are implemented; cause participation is available |
 | Administrator | Review campaigns and decision history; remove published content or soft-delete with a reason; suspend/reactivate non-admin accounts |
 
 New or edited submissions show pending review and remain hidden publicly. After approval, the owner can open the public page. After rejection, the owner can read the reason and edit/resubmit. The frontend shows the exact account role's links; admins do not use the ordinary submission forms. Soft deletion removes normal access while retaining records for backend-controlled recovery/audit.
 
 The agreed application setup uses one dedicated admin account. Its `admin` role enables the header's admin panel link. There is no frontend feature for creating administrators or promoting another user. The API still checks the account's current role and session for every protected request.
 
-The account-management page protects the current admin and all other admin accounts. Suspending an ordinary account is intended to revoke every active session; the backend must implement that behaviour. Reactivation allows a fresh login, not reuse of an expired token.
+The account-management page protects the current admin and all other admin accounts. Suspending an ordinary account revokes every active session. Reactivation allows a fresh login, not reuse of an expired token. Scoped suspension/session-rejection/reactivation checks passed in production; use disposable accounts for further testing.
 
 Posting accepts a title (150 characters), description (5,000), a category returned by the API, start/end dates, optional target audience (255) and one optional JPG/PNG/WebP image up to 5 MB. End date cannot be before start date. Business profile fields are business name, optional ABN, website and description. Rejection comments are required and limited to 2,000 characters.
 
@@ -58,7 +58,7 @@ The exact calls, bodies, response shapes and database mappings are in the [API i
 
 `VITE_DEMO_MODE=false` is the default and calls the real backend. `VITE_API_BASE_URL=/api` uses the same website origin/local proxy. A separate hosted API needs its full HTTPS prefix, including `/api`, plus matching backend CORS. These values are public build configuration; passwords and cloud/signing credentials must never be included. A changed value needs a new build.
 
-The backend already supports authentication and public/admin campaign reads; this branch also implements category lookup and text-only public submission. The other new contracts remain API work: profiles/business posting, images, owner management, participation, enquiries and admin actions/history/accounts. A preview success must not be recorded as proof that those server features are complete.
+The real backend supports authentication, categories, public/owner/admin reads, public and existing-profile business posting, images, owner management, participation, enquiries and admin actions/history/accounts. These routes are merged and deployed. GET/PUT `/api/business/me` still returns `404`, so fresh-business onboarding remains unfinished. Local fixture-backed enquiry tests and sample-preview success must not be recorded as a completed new-business journey.
 
 Automatic updates use the existing read endpoints every 30 seconds while visible/online, plus focus/reconnection and manual refresh. This is polling, not WebSockets. Admin/history/engagement lists refresh through explicit buttons or following actions; do not describe every screen as continuously live.
 
@@ -67,7 +67,7 @@ Automatic updates use the existing read endpoints every 30 seconds while visible
 1. Identify whether the recording uses sample mode or the tested live release. For final integration evidence, use the real release and agreed test accounts.
 2. Show the visitor homepage and one approved campaign.
 3. Log in as a public user, submit a campaign and show its pending status in My campaigns. Demonstrate a field validation error before the successful request.
-4. Show a business owner's profile and a business campaign submission.
+4. Once Kim's profile API is implemented, deployed and tested, show a freshly registered business owner saving a profile and submitting a campaign. Until then, identify this step as blocked; do not substitute sample mode or a seeded profile as evidence that onboarding works.
 5. Log in as admin, inspect a pending submission and approve it. Return to the public page to show that it is now visible.
 6. Reject a second submission with a reason, then show that reason from its owner's account while the campaign remains absent publicly.
 7. Edit and resubmit a rejected campaign; explain that edited approved content also needs another approval.
@@ -98,6 +98,6 @@ Use separate test accounts and harmless sample content. Record real upload, appr
 
 The supplied original logo PNG is included at `frontend/public/images/brand/causeconnect-logo.png` and used by the header. This replaces the pending Confluence attachment download; the team logo was referenced in design document section 9.3.
 
-The [AWS sample frontend](https://d10e86f5qx46up.cloudfront.net) was deployed on 1 October using Unice's account, private S3 storage and the CloudFront Free plan. All 15 routes and all 15 deployed files passed hosting checks; the original logo and sample photos load. Use **Preview as** to switch roles. Sample changes stay in that browser tab and can be reset; no real accounts or backend submissions are saved.
+The [AWS sample frontend](https://d10e86f5qx46up.cloudfront.net) was deployed on 1 October using Unice's account, private S3 storage and the CloudFront Free plan. All 15 routes and all 15 deployed files passed hosting checks; the original logo and sample photos load. This historical preview uses **Preview as** to switch roles. Sample changes stay in that browser tab and can be reset; no real accounts or backend submissions are saved.
 
-This is not the final cloud IaaS/backend deployment. Final evidence needs the real backend, database, private image storage and end-to-end integration checks. Free-tier eligibility or credits are not a zero-cost guarantee. See [deployment instructions](../../infra/README.md) for packaging, API routing, checks and rollback, and [verification evidence](../evidence/stage-3/frontend-preview/README.md) for the exact checked release.
+The real IaaS application is now live at [CauseConnect on AWS](https://52.62.2.87), deployed application commit `ffe3df679e5d8d1dc43c8bd1669b96aed757ad86`, release `2026-10-13T12-59-21-475Z-ffe3df679e5d`. Eight production acceptance groups passed, followed by the hosted photo/approval browser journey, paired backup integrity and restart persistence. Full restoration and offsite recovery are not claimed. Free-tier eligibility or credits are not a zero-cost guarantee. See [deployment instructions](../../infra/README.md), [current release evidence](../evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) and the historical [preview evidence](../evidence/stage-3/frontend-preview/README.md).

@@ -1,6 +1,6 @@
 # Owner campaign editing and removal
 
-This contract supports `/my-campaigns/:id/edit`. Owner detail reads were already in `main`; edit/resubmit and soft-delete are implemented in the AWT-175 branch `feature/stage3-additional-apis`. Backend and real-frontend regression tests cover these routes locally. Their presence in this branch does not mean they have been merged, deployed or cloud-verified.
+This contract supports `/my-campaigns/:id/edit`. Owner reads, edit/resubmit and soft-delete are merged through PR #19 and deployed at [CauseConnect on AWS](https://52.62.2.87). Local regression and scoped production edit/conflict/deletion checks passed. The [release evidence](../evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) records the exact revision and limits.
 
 Both public users and small-business owners can manage their own campaigns. Admin review stays on the separate [admin endpoints](admin-campaign-moderation-contract.md). See the [campaign read contract](campaign-read-contract.md) for the owner list and the [photo extension](campaign-posting-future-proposal.md) for upload references.
 
@@ -128,4 +128,4 @@ The frontend also blocks further edits/removal when a mutation returns an unexpe
 - Validation failures do not mutate data. Return the exact success status and body only after commit.
 - Test browser recovery after a lost response: no duplicate save/delete is sent until the author reloads.
 
-These are backend acceptance checks, not a statement that they have passed against a deployed API.
+This checklist defines the acceptance scope; use the dated release evidence for what was actually run locally and in production. Do not infer that every checklist case was repeated on the deployed API.
