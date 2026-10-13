@@ -26,7 +26,7 @@ run('node', ['infra/package-frontend.mjs', '--mode', 'live'], { stdio: 'inherit'
 const files = git('ls-files', '-z', '--', 'backend', 'infra/ec2/host').split('\0').filter(Boolean)
 for (const file of files) {
   if (file.split('/').some(part => part === '.DS_Store' || part === '__MACOSX' || part.startsWith('._'))) throw new Error(`Metadata file refused: ${file}`)
-  const allowed = /^(backend\/(package(-lock)?\.json|server\.js|\.sequelizerc|src\/)|infra\/ec2\/host\/)/.test(file)
+  const allowed = /^(backend\/(package(-lock)?\.json|server\.js|\.sequelizerc|scripts\/prune-campaign-images\.js$|src\/)|infra\/ec2\/host\/)/.test(file)
   if (!allowed) continue
   if (/(^|\/)(\.env($|\.)|node_modules\/)|\.(pem|key|p12|pfx)$/.test(file)) throw new Error(`Private file refused: ${file}`)
   const target = join(source, file)

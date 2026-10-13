@@ -60,6 +60,17 @@ class ReleaseIntegrityTests(unittest.TestCase):
         self.assertEqual(VERIFY.verify_directory(self.source, 'test-release'), self.manifest)
         self.assertEqual(VERIFY.verify_archive(self.make_archive(), 'test-release'), self.manifest)
 
+    def test_hash_manifest_covers_packaged_image_cleanup_script(self):
+        scripts = self.source / 'backend/scripts'
+        scripts.mkdir()
+        cleanup = scripts / 'prune-campaign-images.js'
+        cleanup.write_bytes(b'// bounded cleanup fixture\n')
+        self.manifest['files']['backend/scripts/prune-campaign-images.js'] = hashlib.sha256(cleanup.read_bytes()).hexdigest()
+        self.save_manifest()
+        self.assertEqual(VERIFY.verify_archive(self.make_archive()), self.manifest)
+        cleanup.write_bytes(b'// changed script\n')
+        self.assert_both_refuse()
+
     def test_appledouble_injected_only_into_archive_is_refused(self):
         VERIFY.verify_directory(self.source)
         archive = self.make_archive([self.extra_file('./backend/._app.js')])

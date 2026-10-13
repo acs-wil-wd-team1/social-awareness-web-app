@@ -2,8 +2,9 @@
 
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
+const { randomBytes } = require("node:crypto");
 
-const { User, UserSession } = require("../database/models");
+const { sequelize, User, UserSession } = require("../database/models");
 const { validateRegistrationInput, validateLoginInput } = require("../utils/authValidation");
 
 const accountTypeToRole = {
@@ -81,43 +82,49 @@ const loginUser = async (email, password, requestMeta = {}) => {
     throw invalidCredentialsError();
   }
 
-  if (user.status === "suspended") {
-    const error = new Error("Account is suspended");
+  return sequelize.transaction(async (transaction) => {
+    // Match management's account-before-session lock order. Login cannot create
+    // a fresh active session after a concurrent suspension has revoked sessions.
+    const currentUser = await User.findByPk(user.userId, { transaction, lock: transaction.LOCK.UPDATE });
+    if (!currentUser) throw invalidCredentialsError();
+    if (currentUser.status !== "active") {
+      const error = new Error("Account is suspended");
 
-    error.status = 403;
-    error.code = "ACCOUNT_SUSPENDED";
-    error.fieldErrors = null;
+      error.status = 403;
+      error.code = "ACCOUNT_SUSPENDED";
+      error.fieldErrors = null;
 
-    throw error;
-  }
+      throw error;
+    }
 
-  const token = jwt.sign(
-    {
-      id: user.userId,
-      role: user.role,
-      status: user.status,
-    },
-    process.env.JWT_SECRET,
-    { expiresIn: "1d" },
-  );
+    const token = jwt.sign(
+      {
+        id: currentUser.userId,
+        role: currentUser.role,
+        status: currentUser.status,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d", jwtid: randomBytes(16).toString("base64url") },
+    );
 
-  await UserSession.create({
-    userId: user.userId,
-    token,
-    ipAddress: requestMeta.ipAddress,
-    userAgent: requestMeta.userAgent?.trim() || "Unknown",
-    status: "active",
+    await UserSession.create({
+      userId: currentUser.userId,
+      token,
+      ipAddress: requestMeta.ipAddress,
+      userAgent: requestMeta.userAgent?.trim().slice(0, 255) || "Unknown",
+      status: "active",
+    }, { transaction });
+
+    return {
+      user: {
+        id: currentUser.userId,
+        name: currentUser.fullName,
+        email: currentUser.email,
+        role: currentUser.role,
+      },
+      token,
+    };
   });
-
-  return {
-    user: {
-      id: user.userId,
-      name: user.fullName,
-      email: user.email,
-      role: user.role,
-    },
-    token,
-  };
 };
 
 const logoutUser = async (authHeader) => {

@@ -1,0 +1,11 @@
+[Unit]
+Description=CauseConnect expired unattached image cleanup
+After=mysql.service
+Requires=mysql.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/causeconnect-host/prune-images.sh
+UMask=0077
+Nice=10
+TimeoutStartSec=150

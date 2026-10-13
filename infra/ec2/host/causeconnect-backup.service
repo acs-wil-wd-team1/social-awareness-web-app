@@ -1,5 +1,5 @@
 [Unit]
-Description=CauseConnect private database backup
+Description=CauseConnect private database and upload backup
 After=mysql.service
 Requires=mysql.service
 

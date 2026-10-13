@@ -40,13 +40,15 @@ function parseListQuery(query = {}) {
 
   const search = pick("search");
   if (search === null) errors.search = "search must be a single value";
+  else if (search !== undefined && typeof search !== "string") errors.search = "search must be text";
+  else if (typeof search === "string" && search.trim().length > 150) errors.search = "Use 150 characters or fewer";
   else if (typeof search === "string" && search.trim()) filters.search = search.trim();
 
   if (Object.keys(errors).length) throw validationError(errors, "Query parameters are invalid");
   return filters;
 }
 
-function createCampaignQueryService({ Campaign, Category, Business, CampaignReview }) {
+function createCampaignQueryService({ Campaign, Category, Business, CampaignReview }, { buildImageUrl } = {}) {
   const include = [
     { model: Category, as: "category", attributes: ["categoryName"] },
     { model: Business, as: "business", attributes: ["businessId", "businessName", "website"] },
@@ -66,11 +68,12 @@ function createCampaignQueryService({ Campaign, Category, Business, CampaignRevi
   }
 
   return {
-    async list(query, { createdBy } = {}) {
+    async list(query, { createdBy, audience = "admin", currentUser, token } = {}) {
       const { page, pageSize, status, category, search } = parseListQuery(query);
-      const where = {};
+      const where = { deletedAt: null };
       if (createdBy !== undefined) where.createdBy = createdBy;
-      if (status) where.status = status;
+      if (audience === "public") where.status = "approved";
+      else if (status) where.status = status;
       if (category) where.categoryId = category;
       if (search) where.title = { [Op.like]: `%${search.replace(/[\\%_]/g, "\\$&")}%` };
 
@@ -82,25 +85,32 @@ function createCampaignQueryService({ Campaign, Category, Business, CampaignRevi
         offset: (page - 1) * pageSize,
         distinct: true,
       });
-      const reviews = await latestReviews(rows.map((row) => row.campaignId));
+      const reviews = audience === "public" ? new Map() : await latestReviews(rows.map((row) => row.campaignId));
 
       return {
-        campaigns: rows.map((row) => serializeCampaign(row, { review: reviews.get(row.campaignId) })),
+        campaigns: await Promise.all(rows.map(async (row) => serializeCampaign(row, {
+          review: reviews.get(row.campaignId), publicView: audience === "public",
+          imageUrl: buildImageUrl ? await buildImageUrl(row.campaignId, { audience, currentUser, token }) ?? row.imageUrl ?? null : row.imageUrl ?? null,
+        }))),
         page,
         pageSize,
         total: count,
       };
     },
 
-    async findById(id, { createdBy } = {}) {
-      const where = { campaignId: parseCampaignId(id) };
+    async findById(id, { createdBy, audience = "admin", currentUser, token } = {}) {
+      const where = { campaignId: parseCampaignId(id), deletedAt: null };
       if (createdBy !== undefined) where.createdBy = createdBy;
+      if (audience === "public") where.status = "approved";
 
       const campaign = await Campaign.findOne({ where, include });
       if (!campaign) throw serviceError(404, "CAMPAIGN_NOT_FOUND", "Campaign not found");
 
-      const reviews = await latestReviews([campaign.campaignId]);
-      return serializeCampaign(campaign, { review: reviews.get(campaign.campaignId) });
+      const reviews = audience === "public" ? new Map() : await latestReviews([campaign.campaignId]);
+      return serializeCampaign(campaign, {
+        review: reviews.get(campaign.campaignId), publicView: audience === "public",
+        imageUrl: buildImageUrl ? await buildImageUrl(campaign.campaignId, { audience, currentUser, token }) ?? campaign.imageUrl ?? null : campaign.imageUrl ?? null,
+      });
     },
   };
 }

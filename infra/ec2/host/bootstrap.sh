@@ -43,7 +43,8 @@ fi
 ln -sfn /etc/nginx/sites-available/causeconnect /etc/nginx/sites-enabled/causeconnect
 if [[ -L /etc/nginx/sites-enabled/default ]]; then unlink /etc/nginx/sites-enabled/default; fi
 install -m 0644 "$host_dir/causeconnect.service" "$host_dir/causeconnect-backup.service" "$host_dir/causeconnect-backup.timer" \
-  "$host_dir/causeconnect-certbot.service" "$host_dir/causeconnect-certbot.timer" /etc/systemd/system/
+  "$host_dir/causeconnect-certbot.service" "$host_dir/causeconnect-certbot.timer" \
+  "$host_dir/causeconnect-image-cleanup.service" "$host_dir/causeconnect-image-cleanup.timer" /etc/systemd/system/
 install -d -m 0755 /etc/systemd/journald.conf.d
 printf '[Journal]\nSystemMaxUse=100M\nRuntimeMaxUse=30M\nMaxRetentionSec=7day\n' > /etc/systemd/journald.conf.d/causeconnect.conf
 systemctl daemon-reload

@@ -15,7 +15,7 @@ function serializeReview(review) {
 }
 
 // Owner/admin campaign object as described in docs/api/campaign-read-contract.md.
-function serializeCampaign(campaign, { review = null } = {}) {
+function serializeCampaign(campaign, { review = null, imageUrl = campaign.imageUrl ?? null, publicView = false } = {}) {
   const business = campaign.business;
   return {
     id: campaign.campaignId,
@@ -24,7 +24,7 @@ function serializeCampaign(campaign, { review = null } = {}) {
     categoryId: campaign.categoryId,
     category: campaign.category?.categoryName ?? null,
     type: campaign.businessId == null ? "cause" : "business",
-    imageUrl: campaign.imageUrl ?? null,
+    imageUrl,
     targetAudience: campaign.targetAudience ?? null,
     startDate: campaign.startDate ?? null,
     endDate: campaign.endDate ?? null,
@@ -36,7 +36,7 @@ function serializeCampaign(campaign, { review = null } = {}) {
     status: campaign.status,
     createdAt: toIso(campaign.createdAt),
     updatedAt: toIso(campaign.updatedAt),
-    review: serializeReview(review),
+    ...(!publicView ? { review: serializeReview(review) } : {}),
   };
 }
 

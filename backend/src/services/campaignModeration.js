@@ -20,7 +20,7 @@ function validateReviewInput(body) {
     throw validationError({ body: "Send a JSON object containing the review decision" }, "Review data is invalid");
   }
 
-  const errors = {};
+  const errors = Object.create(null);
   for (const key of Object.keys(body)) {
     if (!ALLOWED_FIELDS.has(key)) errors[key] = "This field is not accepted";
   }
@@ -52,15 +52,20 @@ function nextVersion(previous) {
   return new Date(Math.max(Date.now(), previous.getTime() + 1));
 }
 
-function createCampaignModerationService({ sequelize, Campaign, CampaignReview }) {
+function createCampaignModerationService(models) {
+  const { sequelize, Campaign, CampaignReview, User } = models;
   return {
-    async review(id, body, admin) {
+    async review(id, body, admin, token) {
       const campaignId = parseCampaignId(id);
       const decision = validateReviewInput(body);
 
       return sequelize.transaction(async (transaction) => {
+        if (User) {
+          const { lockActor } = require("./campaignManagementSupport");
+          await lockActor(models, admin, token, ["admin"], transaction);
+        }
         const campaign = await Campaign.findByPk(campaignId, { transaction, lock: transaction.LOCK.UPDATE });
-        if (!campaign) throw serviceError(404, "CAMPAIGN_NOT_FOUND", "Campaign not found");
+        if (!campaign || campaign.deletedAt) throw serviceError(404, "CAMPAIGN_NOT_FOUND", "Campaign not found");
 
         if (campaign.status !== "pending") {
           throw serviceError(409, "CAMPAIGN_ALREADY_REVIEWED", "This campaign has already been reviewed");
@@ -82,7 +87,9 @@ function createCampaignModerationService({ sequelize, Campaign, CampaignReview }
           adminId: admin.id,
           action: decision.status,
           comments: decision.comments,
-          reviewedAt,
+          // This legacy review column stores whole seconds. The campaign's
+          // concurrency version above retains milliseconds independently.
+          reviewedAt: new Date(Math.floor(reviewedAt.getTime() / 1000) * 1000),
         }, { transaction });
 
         return {

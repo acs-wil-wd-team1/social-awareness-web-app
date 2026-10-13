@@ -1,17 +1,17 @@
 # Campaign reads and owner submissions
 
-**Status:** Public, admin and owner (`/mine`, `/mine/:id`) read routes are implemented. Admin and owner reads return the expanded object below (including `business`, `updatedAt`, latest `review`) and list `total`; private signed image URLs and soft-delete filtering remain proposed. Public reads are unchanged. Existing `campaignServices.js` currently returns only `id`, `title`, `description`, `category`, `imageUrl`, `createdBy`, `status` and `createdAt`.
+**Status, 13 October 2026:** Public, admin and owner (`/mine`, `/mine/:id`) reads are implemented. This branch adds shared public projection, private image delivery and soft-delete filtering to the existing expanded owner/admin reads. `campaignQueries.js` and `campaignSerializer.js` supply the fields below and list `total`. Branch implementation is not a claim of merge or cloud verification.
 
 ## Routes and access
 
 | Request | Status | Access |
 |---|---|---|
-| `GET /api/campaigns` | Existing route; extend response fields | Public, approved only |
-| `GET /api/campaigns/:id` | Existing route; extend response fields | Public, approved only; pending/rejected/missing return `404` |
-| `GET /api/campaigns/admin` | Existing route; extend response fields | Current active admin, all statuses |
-| `GET /api/campaigns/admin/:id` | Existing route; extend response fields | Current active admin, all statuses |
-| `GET /api/campaigns/mine` | New proposed route | Current active `public` or `business_owner`, only rows with `created_by = currentUser.id` |
-| `GET /api/campaigns/mine/:id` | New proposed route | Current active owner only; full editable fields and exact `updatedAt` version |
+| `GET /api/campaigns` | Implemented | Public, approved only |
+| `GET /api/campaigns/:id` | Implemented | Public, approved only; pending/rejected/missing return `404` |
+| `GET /api/campaigns/admin` | Implemented | Current active admin, all statuses |
+| `GET /api/campaigns/admin/:id` | Implemented | Current active admin, all statuses |
+| `GET /api/campaigns/mine` | Implemented | Current active `public` or `business_owner`, only rows with `created_by = currentUser.id` |
+| `GET /api/campaigns/mine/:id` | Implemented | Current active owner only; full editable fields and exact `updatedAt` version |
 
 The owner list expands each item to show submitted details. The edit page additionally needs the owner-detail endpoint specified in the [owner-management contract](owned-campaign-management-contract.md). A business owner's rows are still scoped by `created_by`, not a client business ID. Public queries cannot use `status=pending` to escape the approved filter. All these routes exclude soft-deleted campaigns.
 

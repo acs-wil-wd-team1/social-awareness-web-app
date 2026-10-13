@@ -2,7 +2,9 @@
 
 React frontend for CauseConnect. It includes campaign browsing and posting, business profiles, owner edits, participation, business enquiries, admin campaign/account management and registration/login/logout.
 
-The layout follows the CauseConnect storyboard and web design standards. The Stage 3 frontend calls the [API contracts](../docs/api/api-contract.md). The reviewed `main` baseline on 4 October is `cc05f56`, including authentication, categories, text-only public submission and the frontend/API contracts; the remaining endpoint extensions still need backend work. The [API integration guide](../docs/handoff/stage3-api-handoff.md) lists the connections and [feature coverage](../docs/handoff/stage3-feature-coverage.md) records remaining integration work.
+The layout follows the CauseConnect storyboard and web design standards. The frontend calls the [API contracts](../docs/api/api-contract.md). On 13 October, `feature/stage3-additional-apis` adds the real image, owner-management, participation, enquiry and admin-management APIs to the existing posting/reads/approval baseline. These are locally verified, not yet a claim that this branch is deployed. The [API integration guide](../docs/handoff/stage3-api-handoff.md) and [feature coverage](../docs/handoff/stage3-feature-coverage.md) separate current code from remaining work.
+
+GET/PUT `/api/business/me` is still missing (Kim's AWT-141/AWT-173). Posting with an existing Business row works, but new-owner registration → profile → first campaign is not complete.
 
 ## Run locally
 
@@ -30,7 +32,7 @@ VITE_API_BASE_URL=/api
 
 Restart the development server after changing these values. They are compiled into the production bundle, so changing a deployed server's environment alone does not change an existing build: rebuild and deploy it. These variables are public browser configuration. Never put AWS credentials, database passwords or JWT signing secrets in them.
 
-Sample mode is useful for reviewing the interface; real permissions, uploads, sessions and database writes still need API integration tests. Use `VITE_DEMO_MODE=false` for those tests.
+Sample mode is useful for reviewing the interface; it is not evidence of real permissions, uploads, sessions or database writes. Use `VITE_DEMO_MODE=false` for integration tests.
 
 ## Verify
 
@@ -39,7 +41,9 @@ npm test
 npm run build
 ```
 
-For the existing API/database flows, use `npm run test:real-backend`. It runs the actual frontend components/services against Express and a fresh disposable MySQL container, then removes its test container. It requires a running Docker engine, a locally cached `mysql:8` image and installed backend dependencies. Read the [runner instructions and limits](../infra/real-backend-testing.md) first. These checks use jsdom, so real-browser navigation, CORS and the missing Stage 3 APIs still need separate testing.
+For API/database checks, use `npm run test:real-backend`. It runs actual components/services against Express and fresh disposable MySQL, then removes its own container and upload fixtures. It needs a running Docker engine, cached `mysql:8` image and installed backend dependencies. Read the [runner instructions and limits](../infra/real-backend-testing.md) first.
+
+Local verification on 13 October: **591 frontend tests, 64 backend HTTP/MySQL checks and 18 real frontend/API/database checks passed**. The latter uses jsdom, so browser navigation, CORS and cloud routing require separate checks. The missing business-profile API is verified as an error without database changes, not counted as a completed profile journey.
 
 ## Routes
 
@@ -51,8 +55,8 @@ For the existing API/database flows, use `npm run test:real-backend`. It runs th
 | `/register` | Registration | Calls `POST /api/auth/register` for a public or business-owner account; preserves `returnTo` in the login links |
 | `/logout` | Logout | Clears the browser session immediately, calls `PUT /api/auth/logout` and offers retry if server revocation is unconfirmed |
 | `/campaigns/new` | Public-user campaign posting | GET categories; optional POST `/api/campaign-images`; POST `/api/campaigns` |
-| `/business/profile` | Business profile | GET/PUT `/api/business/me` |
-| `/business/campaigns/new` | Business campaign posting | GET profile/categories; optional image upload; POST campaign |
+| `/business/profile` | Business profile | GET/PUT `/api/business/me` — backend still missing |
+| `/business/campaigns/new` | Business campaign posting | POST works with an existing profile; browser profile step still needs GET/PUT business API |
 | `/my-campaigns` | Own submissions and review feedback | GET `/api/campaigns/mine`, with pagination and status filter |
 | `/my-campaigns/:id/edit` | Edit/resubmit or soft-delete an owned campaign | GET/PATCH/DELETE `/api/campaigns/mine/:id`; optional image upload |
 | `/my-participation` | Own participation history and withdrawal, including unavailable campaigns | GET `/api/participations/mine`; GET/PUT `/api/campaigns/:id/participation` for existing own records |
@@ -90,6 +94,6 @@ Campaign image and type values come from API responses. The live UI does not inf
 
 The original team logo PNG is included at `public/images/brand/causeconnect-logo.png` and used by the shared header.
 
-The [AWS sample preview](https://d10e86f5qx46up.cloudfront.net) is hosted using private S3 and CloudFront. **Preview as** switches roles; changes are disposable and stay in the browser tab. Local interface refinements require a separate deployment before they appear there. A live integrated release still needs the real backend/database/image storage, API origin, CORS, HTTPS and full browser integration checks. Deployment instructions are in [infra](../infra/README.md). AWS free-tier eligibility or credits do not guarantee zero charges; review the approved resource plan and actual usage.
+The [AWS preview](https://d10e86f5qx46up.cloudfront.net) has a separate deployed revision. Its earlier **Preview as** sample build uses disposable browser data; do not assume this branch's API work is live there. Merge/deploy the reviewed revision and verify HTTPS routing, real sessions, campaign/image visibility and cross-role journeys separately. Deployment instructions are in [infra](../infra/README.md). AWS free-tier eligibility or credits do not guarantee zero charges; review the approved resource plan and actual usage.
 
 Notes for the developers manual and demonstration are in [the frontend handoff](../docs/handoff/stage3-frontend-notes.md).

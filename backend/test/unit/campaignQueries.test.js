@@ -36,7 +36,7 @@ test("owner reads are scoped by creator and include the latest review", async ()
   });
 
   const page = await service.list({ status: "rejected" }, { createdBy: 3 });
-  assert.deepEqual(listQuery.where, { createdBy: 3, status: "rejected" });
+  assert.deepEqual(listQuery.where, { createdBy: 3, status: "rejected", deletedAt: null });
   assert.equal(page.total, 1);
   assert.equal(page.campaigns[0].description, "");
   assert.equal(page.campaigns[0].type, "cause");
@@ -44,6 +44,6 @@ test("owner reads are scoped by creator and include the latest review", async ()
   assert.equal(page.campaigns[0].review.comments, "Newest");
 
   assert.equal((await service.findById("5", { createdBy: 3 })).id, 5);
-  assert.deepEqual(detailWhere, { campaignId: 5, createdBy: 3 });
+  assert.deepEqual(detailWhere, { campaignId: 5, createdBy: 3, deletedAt: null });
   await assert.rejects(service.findById("5", { createdBy: 4 }), (err) => err.status === 404);
 });

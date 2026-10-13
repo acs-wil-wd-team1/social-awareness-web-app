@@ -34,9 +34,10 @@ function isolatedModule(relativePath, substitutes, logs = []) {
   return module.exports;
 }
 
-function services({ existing = null, compare = true, updateRows = 1, databaseError = null } = {}) {
+function services({ existing = null, fresh = existing, compare = true, updateRows = 1, databaseError = null } = {}) {
   const calls = [];
   const User = {
+    findByPk: async (id, options) => { calls.push(["lockedAccount", id, options]); return fresh; },
     findOne: async (options) => {
       calls.push(["findOne", options]);
       if (databaseError) throw databaseError;
@@ -50,7 +51,7 @@ function services({ existing = null, compare = true, updateRows = 1, databaseErr
     update: async (values, options) => { calls.push(["logout", values, options]); return [updateRows]; },
   };
   const service = isolatedModule("../../src/services/authServices.js", {
-    "../database/models": { User, UserSession },
+    "../database/models": { User, UserSession, sequelize: { transaction: async (action) => action({ LOCK: { UPDATE: "UPDATE" } }) } },
     bcrypt: {
       hash: async (password, rounds) => { calls.push(["hash", password, rounds]); return "hashed-not-plaintext"; },
       compare: async (password, hash) => { calls.push(["compare", password, hash]); return compare; },
@@ -201,6 +202,17 @@ test("valid login normalizes lookup, preserves password, and stores the real ses
   assert.deepEqual(plain(calls.find(([name]) => name === "session")[1]), {
     userId: 7, token: "unit-token", ipAddress: "127.0.0.1", userAgent: "Unit browser", status: "active",
   });
+  assert.equal(calls.find(([name]) => name === "lockedAccount")[2].lock, "UPDATE");
+  assert.match(calls.find(([name]) => name === "sign")[3].jwtid, /^[A-Za-z0-9_-]{22}$/);
+});
+
+test("login rechecks the locked current account before creating a session", async () => {
+  const existing = { userId: 7, passwordHash: "hashed", role: "public", status: "active" };
+  for (const fresh of [null, { ...existing, status: "suspended" }]) {
+    const { service, calls } = services({ existing, fresh });
+    await assert.rejects(service.loginUser(valid.email, valid.password), (error) => [401, 403].includes(error.status));
+    assert.equal(calls.some(([name]) => name === "sign" || name === "session"), false);
+  }
 });
 
 test("invalid login cannot query, sign a token, or create a session", async () => {
