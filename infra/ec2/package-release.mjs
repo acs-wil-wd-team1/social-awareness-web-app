@@ -25,6 +25,7 @@ run('node', ['infra/package-frontend.mjs', '--mode', 'live'], { stdio: 'inherit'
 // test credentials or unrelated local material.
 const files = git('ls-files', '-z', '--', 'backend', 'infra/ec2/host').split('\0').filter(Boolean)
 for (const file of files) {
+  if (file.split('/').some(part => part === '.DS_Store' || part === '__MACOSX' || part.startsWith('._'))) throw new Error(`Metadata file refused: ${file}`)
   const allowed = /^(backend\/(package(-lock)?\.json|server\.js|\.sequelizerc|src\/)|infra\/ec2\/host\/)/.test(file)
   if (!allowed) continue
   if (/(^|\/)(\.env($|\.)|node_modules\/)|\.(pem|key|p12|pfx)$/.test(file)) throw new Error(`Private file refused: ${file}`)
@@ -37,6 +38,7 @@ async function checksums(directory) {
   const result = {}
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     const file = join(directory, entry.name)
+    if (entry.name === '.DS_Store' || entry.name === '__MACOSX' || entry.name.startsWith('._')) throw new Error(`Metadata file refused: ${file}`)
     if (entry.isDirectory()) Object.assign(result, await checksums(file))
     else if (entry.isFile()) result[relative(source, file)] = createHash('sha256').update(await readFile(file)).digest('hex')
     else throw new Error(`Unexpected non-file in release: ${file}`)
@@ -47,11 +49,15 @@ const metadata = { application: 'CauseConnect', mode: 'live', commit, releaseId,
 await writeFile(join(source, 'frontend/dist/release.json'), `${JSON.stringify(metadata, null, 2)}\n`)
 const manifest = { ...metadata, files: await checksums(source) }
 await writeFile(join(source, 'release.json'), `${JSON.stringify(manifest, null, 2)}\n`)
+const verifier = join(root, 'infra/ec2/host/verify-release.py')
+run('python3', [verifier, '--directory', source, '--release-id', releaseId])
 if (git('rev-parse', 'HEAD') !== commit || git('status', '--porcelain', '--untracked-files=normal')) {
   throw new Error('Source changed while building. Refusing to label these bytes as the reviewed commit.')
 }
 const archive = join(folder, `${releaseId}.tar.gz`)
-run('tar', ['-czf', archive, '-C', source, '.'])
+// macOS tar otherwise injects unmanifested AppleDouble resource-fork files.
+run('tar', ['-czf', archive, '-C', source, '.'], { env: { ...process.env, COPYFILE_DISABLE: '1' } })
+run('python3', [verifier, '--archive', archive, '--release-id', releaseId])
 const sha256 = createHash('sha256').update(await readFile(archive)).digest('hex')
 await writeFile(join(folder, 'deployment.json'), `${JSON.stringify({ commit, releaseId, archive: basename(archive), sha256, key: `live-releases/${releaseId}.tar.gz` }, null, 2)}\n`)
 for (const file of ['stack.json', 'prepare-change-set.py']) await cp(join(root, 'infra/ec2', file), join(folder, file))
