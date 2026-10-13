@@ -10,6 +10,10 @@ At the rates checked on 13 October 2026, the baseline is US$24.53 per 30 days. I
 
 The instance role permits Systems Manager session/command communication and read-only downloads from the selected bucket's `live-releases/` prefix. It cannot read Parameter Store secrets or write/delete bucket contents. Deployment uses the account owner's authenticated AWS session; no long-lived AWS access key belongs in the app.
 
+The server downloads its release with Ubuntu's `python3-boto3` package and the instance role. It does not depend on an AWS CLI package being available in Ubuntu 24.04. The downloaded archive's SHA256 is checked before extraction or execution.
+
+The packager suppresses macOS resource-fork files and checks the actual archive against `release.json`, not just the source folder. Extra/missing files, changed hashes, links and `.DS_Store`/`._*` metadata are refused. The server repeats archive verification before full extraction and extracted-file verification before database initialization or migrations. Never bypass a failed integrity check with an unverified package.
+
 ## Prepare and launch
 
 1. Run the backend, frontend and disposable-MySQL checks. Commit the reviewed release, then run `node infra/ec2/package-release.mjs`. It refuses dirty source and builds live mode with same-origin `/api`.
@@ -35,5 +39,13 @@ Review hosting around 15 November 2026 after the mentor's assessment. The tag is
 - Text campaign submission, owner isolation, pending campaign privacy, admin approval/rejection, stale-write conflict and approved public visibility.
 - MySQL and API unavailable publicly; IMDSv2 required; no demo accounts/default passwords.
 - Restart persistence, bounded logs/backups and successful certificate renewal/reload.
+
+### Core HTTP acceptance
+
+`node infra/ec2/acceptance-live.mjs https://HOST` shows the plan without sending requests. After approving the exact live origin and temporary QA records, add `--allow-qa-writes --expected-commit FULL_COMMIT_SHA`. Do not run it against the sample CloudFront preview.
+
+The script creates two temporary community accounts and one text-only pending campaign, checks login/errors/ownership/public privacy, then revokes its sessions. It generates passwords in memory and never prints them or tokens. Authentication checks are paced for the server's limits; allow about two minutes. Unconfirmed writes are never retried automatically.
+
+The output contains a QA run identifier and fixture IDs for controlled follow-up. No approval/publication/deletion requests are sent, so records remain for admin readback and later cleanup. With the controlled admin account, check that this exact pending campaign appears in the queue/detail and has the expected owner. **Do not approve the QA campaign.** Admin approval/rejection/concurrency, actual browser journeys, restart persistence, certificate renewal and recovery still require their separate checks.
 
 Sources: [AWS Sydney price list](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/ap-southeast-2/index.csv), [IPv4 pricing](https://aws.amazon.com/vpc/pricing/), [Budgets limits](https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-managing-costs.html), [IP certificates](https://letsencrypt.org/2026/03/11/shorter-certs-certbot).

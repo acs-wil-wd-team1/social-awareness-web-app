@@ -34,7 +34,7 @@ python3 -m venv /opt/certbot
 host_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 if [[ "$host_dir" != /opt/causeconnect-host ]]; then
   install -m 0755 "$host_dir/"*.sh /opt/causeconnect-host/
-  install -m 0644 "$host_dir/"*.cjs "$host_dir/"*.conf "$host_dir/"*.service "$host_dir/"*.timer "$host_dir/"*.sql /opt/causeconnect-host/
+  install -m 0644 "$host_dir/"*.py "$host_dir/"*.cjs "$host_dir/"*.conf "$host_dir/"*.service "$host_dir/"*.timer "$host_dir/"*.sql /opt/causeconnect-host/
 fi
 install -m 0644 "$host_dir/mysql.conf" /etc/mysql/mysql.conf.d/zz-causeconnect.cnf
 if [[ ! -f /etc/nginx/sites-available/causeconnect ]]; then

@@ -5,7 +5,7 @@ set -euo pipefail
 package_dir=$(realpath -- "$1")
 release_dir="/srv/causeconnect/releases/$2"
 [[ -f "$package_dir/backend/package-lock.json" && -f "$package_dir/frontend/dist/index.html" && -f "$package_dir/release.json" ]] || { echo 'Incomplete app package.' >&2; exit 1; }
-python3 -m json.tool "$package_dir/release.json" >/dev/null
+python3 /opt/causeconnect-host/verify-release.py --directory "$package_dir" --release-id "$2"
 [[ ! -e "$package_dir/backend/.env" && ! -e "$package_dir/backend/node_modules" ]] || { echo 'Do not package secrets or local node_modules.' >&2; exit 1; }
 [[ -z "$(find "$package_dir/backend" "$package_dir/frontend/dist" -type l -print -quit)" ]] || { echo 'Release package must not contain symlinks.' >&2; exit 1; }
 exec 9>/run/lock/causeconnect-deploy.lock
