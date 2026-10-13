@@ -1,6 +1,6 @@
 # Campaign reads and owner submissions
 
-**Status:** Public and admin read routes exist. The owner route and the expanded fields described here are proposed backend work consumed by the completed frontend. Existing `campaignServices.js` currently returns only `id`, `title`, `description`, `category`, `imageUrl`, `createdBy`, `status` and `createdAt`.
+**Status:** Public, admin and owner (`/mine`, `/mine/:id`) read routes are implemented. Admin and owner reads return the expanded object below (including `business`, `updatedAt`, latest `review`) and list `total`; private signed image URLs and soft-delete filtering remain proposed. Public reads are unchanged. Existing `campaignServices.js` currently returns only `id`, `title`, `description`, `category`, `imageUrl`, `createdBy`, `status` and `createdAt`.
 
 ## Routes and access
 

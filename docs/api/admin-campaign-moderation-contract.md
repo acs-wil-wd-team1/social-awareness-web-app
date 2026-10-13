@@ -1,6 +1,8 @@
 # Admin campaign moderation API proposal
 
-**Status:** The admin frontend is implemented against this contract. The status-write backend is still proposed and has not been verified against a real database. Existing admin reads are identified separately below.
+**Status:** Implemented. `PATCH /api/campaigns/admin/:id/status` and the expanded admin reads (`total`, `updatedAt`, `business`, latest `review`) are implemented in `backend/src/services/campaignModeration.js` and `campaignQueries.js`, and covered by `backend/test/integration/campaignModeration.test.js` against MySQL. Review history (`/admin/:id/reviews`), soft deletion and private image URLs remain proposed.
+
+Every admin route uses the current-account guard: Bearer token, matching active session, and the account's *current* database role/status (suspended or demoted admins get `403`). `campaigns.updated_at` is stored with millisecond precision (migration `20261013090000`) so it round-trips as the `expectedUpdatedAt` version.
 
 **Agreed ownership:** Unice handles the admin frontend; Kim and Rajita share the admin campaign-approval API. Coordinate shared image/read dependencies with the user-posting API (Rajita) and business-posting API (Kim).
 

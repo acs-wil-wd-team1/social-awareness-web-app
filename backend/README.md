@@ -59,4 +59,15 @@ Unit tests do not need MySQL. The integration suite requires an already-migrated
 
 ## Campaign submission
 
-The [campaign submission contract](../docs/api/campaign-posting-contract.md) lists the endpoints, validation rules and API-to-database field mapping. This flow uses the existing tables and needs no new migration. Images, business posting and admin approval writes are separate work.
+The [campaign submission contract](../docs/api/campaign-posting-contract.md) lists the endpoints, validation rules and API-to-database field mapping. Public users and business owners (with a business profile) can submit; owners read their own submissions through `GET /api/campaigns/mine`.
+
+## Admin campaign approval
+
+`PATCH /api/campaigns/admin/:id/status` approves or rejects a pending campaign. See the [moderation contract](../docs/api/admin-campaign-moderation-contract.md). Run `npx sequelize-cli db:migrate` after pulling: migration `20261013090000` gives `campaigns.updated_at` millisecond precision for the review version check.
+
+Code layout:
+
+- `src/middleware/currentAccountAuthentication.js` — shared token + session + current role/status guard
+- `src/services/campaignQueries.js` — owner/admin list and detail reads
+- `src/services/campaignModeration.js` — review validation and the locked, versioned status transaction
+- `src/controllers/adminCampaigns.js` — admin HTTP handlers
