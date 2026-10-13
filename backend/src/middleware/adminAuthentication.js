@@ -1,17 +1,10 @@
-const { apiErrorResponse } = require("../utils/apiErrorResponse");
+"use strict";
 
-const requireAdmin = (req, res, next) => {
-  if (req.user.role !== "admin") {
-    return apiErrorResponse(
-      res,
-      403,
-      "FORBIDDEN",
-      "Admin access required",
-      null
-    );
-  }
+const { createCurrentAccountGuard } = require("./currentAccountAuthentication");
 
-  next();
-};
+// Admin routes re-check the current database role and status on every request.
+function createAdminGuard(models) {
+  return createCurrentAccountGuard(models, { roles: ["admin"], forbiddenMessage: "Admin access required" });
+}
 
-module.exports = requireAdmin;
+module.exports = { createAdminGuard };

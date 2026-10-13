@@ -78,6 +78,11 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: "pending",
       },
+      // Millisecond version used for review/edit conflict checks.
+      updatedAt: {
+        type: DataTypes.DATE(3),
+        allowNull: false,
+      },
     },
     {
       sequelize,

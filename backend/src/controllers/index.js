@@ -1,6 +1,5 @@
-const campaigns = require("./campaigns");
-
 module.exports = {
     authController: require("./auth"),
-    campaignsContoller: require("./campaigns")
+    campaignsContoller: require("./campaigns"),
+    adminCampaignsController: require("./adminCampaigns"),
 }

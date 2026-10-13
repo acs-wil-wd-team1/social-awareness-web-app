@@ -1,6 +1,10 @@
 # Campaign submission API
 
-Category lookup and text-only campaign submission for a signed-in public user are implemented and merged into `main` through PR #12.
+Category lookup and text-only campaign submission are implemented for signed-in `public` users (cause campaigns) and `business_owner` users (business campaigns).
+
+**Business owners:** the server links the campaign to the owner's own `businesses` row, returning `type: "business"` and that `businessId`. An owner without a business profile receives `409 BUSINESS_PROFILE_REQUIRED` and no row is created. The client still cannot send `businessId`, `createdBy`, `type` or `status`. Admins cannot use this route (`403`). Image upload (`imageId`) is still not accepted.
+
+**Owner reads:** `GET /api/campaigns/mine` and `GET /api/campaigns/mine/:id` return only the signed-in creator's campaigns in every status, using the [campaign read contract](campaign-read-contract.md) object including `updatedAt` and the latest `review` feedback.
 
 The frontend uses `/campaigns/new` for the implemented text-only public submission flow. Photo and business posting controls are also present, but their backend extensions still need implementation.
 

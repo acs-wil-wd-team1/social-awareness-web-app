@@ -160,12 +160,14 @@ describe("public campaign submission HTTP and MySQL integration", () => {
   });
 
   it("checks current roles and suspension even when the token says public/active", async () => {
-    for (const user of [adminUser, ownerUser]) {
-      const result = await request("/api/campaigns", { method: "POST", token: await makeToken(user, { role: "public" }), value: body() });
-      assert.equal(result.status, 403);
-      assert.equal(result.body.code, "FORBIDDEN");
-    }
-    await publicUser.update({ role: "business_owner" });
+    const adminResult = await request("/api/campaigns", { method: "POST", token: await makeToken(adminUser, { role: "public" }), value: body() });
+    assert.equal(adminResult.status, 403);
+    assert.equal(adminResult.body.code, "FORBIDDEN");
+    // Business owners are allowed, but only once they have a business profile.
+    const ownerResult = await request("/api/campaigns", { method: "POST", token: await makeToken(ownerUser, { role: "public" }), value: body() });
+    assert.equal(ownerResult.status, 409);
+    assert.equal(ownerResult.body.code, "BUSINESS_PROFILE_REQUIRED");
+    await publicUser.update({ role: "admin" });
     try {
       const result = await request("/api/campaigns", { method: "POST", token: publicToken, value: body() });
       assert.equal(result.status, 403);
