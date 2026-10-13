@@ -87,3 +87,22 @@ test("submission validates category and server-owned campaign fields", async () 
   await assert.rejects(service.submit({ ...valid, categoryId: 99 }, { id: 7 }), (err) => err.status === 422 && Boolean(err.fieldErrors.categoryId));
   assert.equal(saved, null);
 });
+
+test("business owners post for their own linked business and need a profile first", async () => {
+  let saved;
+  const service = createCampaignSubmissionService({
+    Category: { findByPk: async () => ({ categoryName: "Community Support" }) },
+    Business: { findOne: async ({ where }) => (where.ownerId === 2 ? { businessId: 11 } : null) },
+    Campaign: { create: async (row) => { saved = row; return { ...row, campaignId: 26, createdAt: new Date() }; } },
+  });
+  const result = await service.submit(valid, { id: 2, role: "business_owner" });
+  assert.equal(saved.businessId, 11);
+  assert.equal(saved.createdBy, 2);
+  assert.equal(result.campaign.type, "business");
+  assert.equal(result.campaign.businessId, 11);
+
+  saved = null;
+  await assert.rejects(service.submit(valid, { id: 5, role: "business_owner" }),
+    (err) => err.status === 409 && err.code === "BUSINESS_PROFILE_REQUIRED");
+  assert.equal(saved, null);
+});
