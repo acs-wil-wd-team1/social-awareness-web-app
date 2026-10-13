@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily CauseConnect database backup
+
+[Timer]
+OnCalendar=*-*-* 02:00:00 UTC
+RandomizedDelaySec=30m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,99 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "CauseConnect assessment: one Sydney server, private local database and HTTPS. No SSH, RDS, load balancer or NAT gateway.",
+  "Parameters": {
+    "VpcId": {"Type": "AWS::EC2::VPC::Id"},
+    "SubnetId": {"Type": "AWS::EC2::Subnet::Id"},
+    "ImageId": {"Type": "AWS::EC2::Image::Id"},
+    "ReleaseBucket": {"Type": "String", "AllowedPattern": "[a-z0-9][a-z0-9.-]+"},
+    "ReleaseKey": {"Type": "String", "AllowedPattern": "live-releases/[a-zA-Z0-9._-]+\\.tar\\.gz"},
+    "ReleaseSha256": {"Type": "String", "AllowedPattern": "[a-f0-9]{64}"},
+    "ReleaseId": {"Type": "String", "AllowedPattern": "[a-zA-Z0-9._-]+"},
+    "BudgetEmail": {"Type": "String", "AllowedPattern": "[^ @]+@[^ @]+\\.[^ @]+"}
+  },
+  "Resources": {
+    "WebSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "GroupDescription": "CauseConnect HTTP ACME/redirect and HTTPS only; no public SSH, Node or MySQL",
+        "VpcId": {"Ref": "VpcId"},
+        "SecurityGroupIngress": [
+          {"IpProtocol": "tcp", "FromPort": 80, "ToPort": 80, "CidrIp": "0.0.0.0/0", "Description": "Certificate validation and HTTPS redirect only"},
+          {"IpProtocol": "tcp", "FromPort": 443, "ToPort": 443, "CidrIp": "0.0.0.0/0", "Description": "CauseConnect HTTPS website"}
+        ],
+        "SecurityGroupEgress": [
+          {"IpProtocol": "tcp", "FromPort": 80, "ToPort": 80, "CidrIp": "0.0.0.0/0", "Description": "Official OS package updates"},
+          {"IpProtocol": "tcp", "FromPort": 443, "ToPort": 443, "CidrIp": "0.0.0.0/0", "Description": "AWS management, release download, packages and certificate renewal"}
+        ],
+        "Tags": [{"Key": "Project", "Value": "CauseConnect"}]
+      }
+    },
+    "ServerRole": {
+      "Type": "AWS::IAM::Role",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "AssumeRolePolicyDocument": {"Version": "2012-10-17", "Statement": [{"Effect": "Allow", "Principal": {"Service": "ec2.amazonaws.com"}, "Action": "sts:AssumeRole"}]},
+        "Policies": [{"PolicyName": "CauseConnectSessionAndRelease", "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {"Effect": "Allow", "Action": ["ssm:UpdateInstanceInformation", "ssm:GetDocument", "ssm:DescribeDocument"], "Resource": "*"},
+            {"Effect": "Allow", "Action": ["ssmmessages:CreateControlChannel", "ssmmessages:CreateDataChannel", "ssmmessages:OpenControlChannel", "ssmmessages:OpenDataChannel"], "Resource": "*"},
+            {"Effect": "Allow", "Action": "s3:GetObject", "Resource": {"Fn::Sub": "arn:${AWS::Partition}:s3:::${ReleaseBucket}/live-releases/*"}}
+          ]
+        }}],
+        "Tags": [{"Key": "Project", "Value": "CauseConnect"}]
+      }
+    },
+    "ServerProfile": {"Type": "AWS::IAM::InstanceProfile", "DeletionPolicy": "Retain", "UpdateReplacePolicy": "Retain", "Properties": {"Roles": [{"Ref": "ServerRole"}]}},
+    "Server": {
+      "Type": "AWS::EC2::Instance",
+      "DependsOn": ["UsageBudget", "CashBudget"],
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "ImageId": {"Ref": "ImageId"},
+        "InstanceType": "t3.small",
+        "Tenancy": "default",
+        "CreditSpecification": {"CPUCredits": "standard"},
+        "IamInstanceProfile": {"Ref": "ServerProfile"},
+        "MetadataOptions": {"HttpEndpoint": "enabled", "HttpTokens": "required", "HttpPutResponseHopLimit": 1, "InstanceMetadataTags": "disabled"},
+        "Monitoring": false,
+        "DisableApiTermination": true,
+        "NetworkInterfaces": [{"DeviceIndex": "0", "AssociatePublicIpAddress": false, "SubnetId": {"Ref": "SubnetId"}, "GroupSet": [{"Ref": "WebSecurityGroup"}]}],
+        "BlockDeviceMappings": [{"DeviceName": "/dev/sda1", "Ebs": {"VolumeSize": 20, "VolumeType": "gp3", "Iops": 3000, "Encrypted": true, "DeleteOnTermination": false}}],
+        "Tags": [{"Key": "Name", "Value": "causeconnect-assessment"}, {"Key": "Project", "Value": "CauseConnect"}, {"Key": "ReviewAfter", "Value": "2026-11-15"}],
+        "UserData": {"Fn::Base64": {"Fn::Sub": "#!/bin/bash\nset -euo pipefail\nexport DEBIAN_FRONTEND=noninteractive\n# EIP association follows instance creation; retry apt until outbound networking is ready.\nfor attempt in $(seq 1 30); do apt-get update && break; sleep 10; done\napt-get install -y awscli ca-certificates\ninstall -d -m 700 /opt/causeconnect/bootstrap/release\naws s3 cp 's3://${ReleaseBucket}/${ReleaseKey}' /opt/causeconnect/bootstrap/app.tar.gz --region '${AWS::Region}' --only-show-errors\nprintf '%s  %s\\n' '${ReleaseSha256}' /opt/causeconnect/bootstrap/app.tar.gz | sha256sum --check --status\ntar -xzf /opt/causeconnect/bootstrap/app.tar.gz -C /opt/causeconnect/bootstrap/release\nbash /opt/causeconnect/bootstrap/release/infra/ec2/host/bootstrap.sh\nbash /opt/causeconnect/bootstrap/release/infra/ec2/host/deploy.sh /opt/causeconnect/bootstrap/release '${ReleaseId}'\n"}}
+      }
+    },
+    "PublicIp": {"Type": "AWS::EC2::EIP", "DependsOn": ["UsageBudget", "CashBudget"], "DeletionPolicy": "Retain", "UpdateReplacePolicy": "Retain", "Properties": {"Domain": "vpc", "Tags": [{"Key": "Project", "Value": "CauseConnect"}]}},
+    "PublicIpAssociation": {"Type": "AWS::EC2::EIPAssociation", "DeletionPolicy": "Retain", "UpdateReplacePolicy": "Retain", "Properties": {"AllocationId": {"Fn::GetAtt": ["PublicIp", "AllocationId"]}, "InstanceId": {"Ref": "Server"}}},
+    "UsageBudget": {
+      "Type": "AWS::Budgets::Budget",
+      "Properties": {
+        "Budget": {"BudgetName": "CauseConnect-account-gross-usage", "BudgetType": "COST", "TimeUnit": "MONTHLY", "BudgetLimit": {"Amount": 30, "Unit": "USD"}, "CostTypes": {"IncludeCredit": false, "IncludeRefund": false, "IncludeTax": true}},
+        "NotificationsWithSubscribers": [
+          {"Notification": {"NotificationType": "ACTUAL", "ComparisonOperator": "GREATER_THAN", "ThresholdType": "PERCENTAGE", "Threshold": 50}, "Subscribers": [{"SubscriptionType": "EMAIL", "Address": {"Ref": "BudgetEmail"}}]},
+          {"Notification": {"NotificationType": "ACTUAL", "ComparisonOperator": "GREATER_THAN", "ThresholdType": "PERCENTAGE", "Threshold": 80}, "Subscribers": [{"SubscriptionType": "EMAIL", "Address": {"Ref": "BudgetEmail"}}]},
+          {"Notification": {"NotificationType": "ACTUAL", "ComparisonOperator": "GREATER_THAN", "ThresholdType": "PERCENTAGE", "Threshold": 100}, "Subscribers": [{"SubscriptionType": "EMAIL", "Address": {"Ref": "BudgetEmail"}}]}
+        ]
+      }
+    },
+    "CashBudget": {
+      "Type": "AWS::Budgets::Budget",
+      "Properties": {
+        "Budget": {"BudgetName": "CauseConnect-account-net-charge", "BudgetType": "COST", "TimeUnit": "MONTHLY", "BudgetLimit": {"Amount": 0.01, "Unit": "USD"}, "CostTypes": {"IncludeCredit": true, "IncludeRefund": true, "IncludeTax": true}},
+        "NotificationsWithSubscribers": [{"Notification": {"NotificationType": "ACTUAL", "ComparisonOperator": "GREATER_THAN", "ThresholdType": "PERCENTAGE", "Threshold": 1}, "Subscribers": [{"SubscriptionType": "EMAIL", "Address": {"Ref": "BudgetEmail"}}]}]
+      }
+    }
+  },
+  "Outputs": {
+    "InstanceId": {"Value": {"Ref": "Server"}},
+    "PublicIpv4": {"Value": {"Ref": "PublicIp"}},
+    "Website": {"Value": {"Fn::Sub": "https://${PublicIp}"}},
+    "SecurityGroupId": {"Value": {"Ref": "WebSecurityGroup"}},
+    "Notice": {"Value": "HTTPS certificate activation and live checks are required before sharing. Budgets alert; they do not cap charges. Deletion retains instance/disk until separately approved cleanup."}
+  }
+}

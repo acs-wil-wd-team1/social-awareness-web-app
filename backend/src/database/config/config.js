@@ -20,5 +20,6 @@ module.exports = {
     production: {
         ...base,
         database: process.env.DB_NAME,
+        logging: false,
     },
 };

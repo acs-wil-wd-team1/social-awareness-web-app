@@ -4,62 +4,19 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 
 const { User, UserSession } = require("../database/models");
+const { validateRegistrationInput, validateLoginInput } = require("../utils/authValidation");
 
 const accountTypeToRole = {
   user: "public",
   business: "business_owner",
 };
 
-const registerUser = async ({
-  name,
-  email,
-  password,
-  accountType,
-  extraFields
-}) => {
-  if (!name || !email || !password || !accountType) {
-    const error = new Error("Registration data is invalid");
-    error.status = 422;
-    error.code = "VALIDATION_FAILED";
-    error.fieldErrors = {
-      ...(!name && { name: "Name is required" }),
-      ...(!email && { email: "Email is required" }),
-      ...(!password && { password: "Password is required" }),
-      ...(!accountType && {
-        accountType: "Account type is required",
-      }),
-    };
-
-    throw error;
-  }
-
-  if (Object.keys(extraFields).length > 0) {
-    const fields = Object.keys(extraFields);
-
-    const error = new Error(
-      `Unsupported registration field${fields.length > 1 ? "s" : ""}: ${fields.join(", ")}`,
-    );
-    error.status = 422;
-    error.code = "VALIDATION_FAILED";
-    error.fieldErrors = null;
-
-    throw error;
-  }
-
-  if (!["user", "business"].includes(accountType)) {
-    const error = new Error("Registration data is invalid");
-    error.status = 422;
-    error.code = "VALIDATION_FAILED";
-    error.fieldErrors = {
-      accountType: "Account type must be user or business",
-    };
-
-    throw error;
-  }
+const registerUser = async (input) => {
+  const { name, email, password, accountType } = validateRegistrationInput(input);
 
   const role = accountTypeToRole[accountType];
 
-  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedEmail = email;
 
   const existing = await User.findOne({
     where: {
@@ -81,7 +38,7 @@ const registerUser = async ({
   const passwordHash = await bcrypt.hash(password, 10);
 
   const newUser = await User.create({
-    fullName: name.trim(),
+    fullName: name,
     email: normalizedEmail,
     passwordHash,
     role,
@@ -98,22 +55,11 @@ const registerUser = async ({
 };
 
 const loginUser = async (email, password, requestMeta = {}) => {
-  if (!email || !password) {
-    const error = new Error("Email and password are required");
-
-    error.status = 422;
-    error.code = "VALIDATION_FAILED";
-    error.fieldErrors = {
-      ...(!email && { email: "Email is required" }),
-      ...(!password && { password: "Password is required" }),
-    };
-
-    throw error;
-  }
+  const credentials = validateLoginInput({ email, password });
 
   const user = await User.scope("withPassword").findOne({
     where: {
-      email: email.trim().toLowerCase(),
+      email: credentials.email,
     },
   });
 
@@ -129,7 +75,7 @@ const loginUser = async (email, password, requestMeta = {}) => {
     throw invalidCredentialsError();
   }
 
-  const isMatch = await bcrypt.compare(password, user.passwordHash);
+  const isMatch = await bcrypt.compare(credentials.password, user.passwordHash);
 
   if (!isMatch) {
     throw invalidCredentialsError();
@@ -175,7 +121,7 @@ const loginUser = async (email, password, requestMeta = {}) => {
 };
 
 const logoutUser = async (authHeader) => {
-  if (!authHeader) {
+  if (typeof authHeader !== "string" || !authHeader) {
     const error = new Error("No token provided");
     error.status = 401;
     error.code = "INVALID_TOKEN";
@@ -184,9 +130,8 @@ const logoutUser = async (authHeader) => {
     throw error;
   }
 
-  const [scheme, token] = authHeader.split(" ");
-
-  if (scheme !== "Bearer" || !token) {
+  const match = /^Bearer ([^\s]+)$/i.exec(authHeader);
+  if (!match) {
     const error = new Error("Invalid authentication token");
     error.status = 401;
     error.code = "INVALID_TOKEN";
@@ -194,6 +139,7 @@ const logoutUser = async (authHeader) => {
 
     throw error;
   }
+  const token = match[1];
 
   const [updatedRows] = await UserSession.update(
     {
