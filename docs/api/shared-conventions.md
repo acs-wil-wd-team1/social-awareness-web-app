@@ -1,6 +1,6 @@
 # Shared API conventions
 
-**Status, 14 October 2026:** Conventions used by the campaign, management, engagement and image routes merged through PR #19 and deployed at [CauseConnect on AWS](https://52.62.2.87). The business-profile contract is still unimplemented. See the [release evidence](../evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) for the exact revision and bounded verification.
+**Status, 14 October 2026:** Conventions used by the campaign, management, engagement and image routes in deployed application commit `e612d1b448a31cd6639f161740c31a9e22f63ed6` at [CauseConnect on AWS](https://52.62.2.87). The business-profile contract is still unimplemented. See the [current release evidence](../evidence/stage-3/review-hardening/README.md) for the exact revision and bounded verification.
 
 Submission rules are in the [campaign contract](campaign-posting-contract.md). The [Stage 3 API integration guide](../handoff/stage3-api-handoff.md) maps implemented routes and remaining work. Oversized JSON uses `413 REQUEST_TOO_LARGE`; image errors are documented separately.
 
@@ -48,18 +48,18 @@ Stage 3 API errors use:
 | `413` | `REQUEST_TOO_LARGE` | JSON body exceeds the configured limit |
 | `415` | `UNSUPPORTED_IMAGE_TYPE` | Uploaded file is not a supported image |
 | `422` | `VALIDATION_FAILED` | Invalid fields, malformed JSON or unusable image reference |
-| `429` | `IMAGE_OWNER_QUOTA_REACHED` | Review-hardening source: retained owner photo count/bytes reached; cleanup must actually remove old files/rows to free space |
+| `429` | `IMAGE_OWNER_QUOTA_REACHED` | Retained owner photo count/bytes reached; cleanup must actually remove old files/rows to free space |
 | `429` | `IMAGE_UPLOAD_LIMIT` | Earlier release's active-unattached cap; retained for older response compatibility |
 | `500` | `INTERNAL_SERVER_ERROR` | Unexpected server failure |
 | `503` | `SERVICE_UNAVAILABLE` / `IMAGE_STORAGE_FULL` / `UPLOAD_BUSY` | API/storage dependency temporarily unavailable |
 
 API parser and unknown-route errors are normalised to JSON. The legacy logout middleware still has its older error shape; see [current authentication](current-authentication.md). Use status/code where supplied rather than matching error prose.
 
-The review-hardening image decoder distinguishes `422 IMAGE_DIMENSIONS_TOO_LARGE`,
+The current image decoder distinguishes `422 IMAGE_DIMENSIONS_TOO_LARGE`,
 `IMAGE_DECODE_FAILED`, `IMAGE_TYPE_MISMATCH` and `ANIMATED_IMAGE_NOT_SUPPORTED` so
-the user can resize or export a still supported photo. These source changes need
-a new deployment; the PR #19 receipt above is historical evidence, not proof they
-are live.
+the user can resize or export a still supported photo. These changes are included
+in the current deployed source. The dated release receipt separately records
+which checks were actually executed; the earlier PR #19 receipt stays historical.
 
 The frontend also handles network failure or cancellation when no API response exists. It must not treat an unreadable response or failed request as a successful save.
 

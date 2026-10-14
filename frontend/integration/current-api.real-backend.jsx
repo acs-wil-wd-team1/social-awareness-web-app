@@ -62,12 +62,26 @@ describe.sequential('frontend → real Express → disposable MySQL', () => {
     const shortEmail = `short-frontend-${tag}@example.test`
     render(<RegistrationPage />)
     registerForm(shortEmail)
-    change('Password', 'TooShort123!')
-    change('Confirm password', 'TooShort123!')
+    change('Password', 'short')
+    change('Confirm password', 'short')
     fireEvent.click(screen.getByRole('button', { name: 'Register' }))
-    expect(await screen.findByText('Use at least 15 characters. A longer passphrase is easier to remember.')).toBeTruthy()
+    expect(await screen.findByText('Use at least 6 characters. A longer passphrase is easier to remember.')).toBeTruthy()
     expect(screen.queryByText(/Registration successful/)).toBeNull()
     expect(await db.User.count({ where: { email: shortEmail } })).toBe(0)
+  })
+
+  it('accepts an exact six-character signup through the page and stores a verified hash', async () => {
+    const minimumEmail = `minimum-frontend-${tag}@example.test`
+    render(<RegistrationPage />)
+    registerForm(minimumEmail)
+    change('Password', 'abc123')
+    change('Confirm password', 'abc123')
+    fireEvent.click(screen.getByRole('button', { name: 'Register' }))
+    expect(await screen.findByRole('status')).toHaveProperty('textContent', expect.stringContaining('Registration successful'))
+    const minimumUser = await db.User.scope('withPassword').findOne({ where: { email: minimumEmail } })
+    expect(minimumUser.role).toBe('public')
+    expect(minimumUser.passwordHash).not.toBe('abc123')
+    expect(await bcrypt.compare('abc123', minimumUser.passwordHash)).toBe(true)
   })
 
   it('registers through the actual page and stores a hashed password with public role', async () => {

@@ -1,6 +1,6 @@
 # CauseConnect backend
 
-Node.js, Express, Sequelize and MySQL. APIs cover authentication, categories, public/business campaign submission, owner/admin reads and campaign approval, plus AWT-175 photos, owner edits/removal, participation, business enquiries and admin account/content management. PR #19 is merged, and application commit `ffe3df679e5d8d1dc43c8bd1669b96aed757ad86` is deployed at [CauseConnect on AWS](https://52.62.2.87). See the [release evidence](../docs/evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) for exact verification scope.
+Node.js, Express, Sequelize and MySQL. APIs cover authentication, categories, public/business campaign submission, owner/admin reads and campaign approval, plus AWT-175 photos, owner edits/removal, participation, business enquiries and admin account/content management. Application commit `e612d1b448a31cd6639f161740c31a9e22f63ed6`, release `2026-10-14T08-35-53-193Z-e612d1b448a3`, is deployed at [CauseConnect on AWS](https://52.62.2.87). See the [current release evidence](../docs/evidence/stage-3/review-hardening/README.md) for exact verification scope.
 
 GET/PUT `/api/business/me` is still missing and remains Kim's AWT-141/AWT-173 work. Direct API posting against an existing linked Business row works. Browser business submission first needs GET `/api/business/me`, so it is blocked for existing as well as new owners; the full hosted business journey has not passed.
 
@@ -81,7 +81,7 @@ Unit tests do not need MySQL. The integration suite requires an already-migrated
 
 For the disposable MySQL + real frontend/API run, use `npm run test:real-backend` from `frontend/`; see [isolated testing](../infra/real-backend-testing.md). Record the actual run results. jsdom checks are not deployed-browser acceptance, and fixture-seeded business profiles do not certify the missing profile API.
 
-The PR #19 release passed 76 backend unit tests, 64 HTTP/MySQL checks, 18 actual frontend/API/database checks, 591 frontend tests and 15 acceptance-runner stub checks. Eight production acceptance groups also passed. These layers have different scopes; runner stub tests do not contact AWS, and the production result does not certify the unfinished profile journey.
+Current local verification passed 89 backend unit tests, 73 HTTP/MySQL checks, 19 actual frontend/API/database checks, 630 frontend tests, 41 host checks and 21 runner/routing/argument-guard checks. Fifteen Postman assertion checks passed offline, not against a live API. Exact release identity and eight fresh hosted API acceptance groups passed separately. These layers have different scopes; stub/offline tests do not contact AWS, and the hosted result does not certify the unfinished profile journey or exhaustive browser coverage. The [PR #19 receipt](../docs/evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) preserves its original counts.
 
 ## Campaign submission
 
@@ -89,11 +89,12 @@ The [campaign submission contract](../docs/api/campaign-posting-contract.md) lis
 
 ## Authentication
 
-The review-hardening source requires new signup passwords to contain at least
-15 Unicode code points and no more than 72 UTF-8 bytes, without trimming. The
+This source update requires new signup passwords to contain at least
+6 Unicode code points and no more than 72 UTF-8 bytes, without trimming. The
 server and registration form share that rule. Existing accounts keep their old
-login passwords; this is not a password reset or hash migration. Deploy and verify
-the new source before claiming this safeguard is active on AWS. See the
+login passwords; this is not a password reset or hash migration. The previous
+`e612d1b` release used 15 characters; the six-character minimum needs the new
+deployment. See the
 [authentication contract](../docs/api/current-authentication.md).
 
 ## Admin campaign approval
@@ -125,13 +126,14 @@ Images use a private persistent directory on the existing server, not a new S3 b
 
 Accept one JPEG, PNG or WebP up to 5,000,000 bytes and 16 million decoded pixels.
 Larger phone photos must be resized; HEIC/HEIF must be exported in a supported
-format. Unattached references expire after 24 hours. The review-hardening source
-adds default **20 retained photos/50 MiB per owner**: every owner image row counts
+format. Unattached references expire after 24 hours. The current release uses
+default **20 retained photos/50 MiB per owner**: every owner image row counts
 until safe cleanup removes its file and metadata, including attached, expired,
 replaced/removed and soft-deleted-campaign images. Expiry/removal does not instantly
 free the quota. Configure `CAMPAIGN_UPLOAD_OWNER_MAX_PHOTOS` (1–100) and
 `CAMPAIGN_UPLOAD_OWNER_MAX_BYTES` (1–268,435,456 bytes); no attached image is purged.
-These new safeguards need a reviewed deployment before they are live.
+These server-only limits are included in the current release; changing or removing
+a campaign photo does not immediately reclaim retained storage.
 
 Private delivery uses five-minute signed tickets and rechecks the current
 account/session; approved public delivery rechecks campaign visibility. Cleanup
@@ -140,7 +142,7 @@ paired backup integrity and API-restart photo persistence passed the recorded
 PR #19 checks; full restoration and offsite recovery were not tested. See the
 [image contract](../docs/api/campaign-posting-future-proposal.md),
 [deployment preparation](../infra/ec2/host/README.md) and
-[release evidence](../docs/evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026).
+[current release evidence](../docs/evidence/stage-3/review-hardening/README.md).
 
 ### Read-only local photo report
 

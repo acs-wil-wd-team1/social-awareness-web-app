@@ -163,21 +163,29 @@ describe("authentication HTTP and MySQL integration", () => {
   });
 
   it("enforces the new-signup character rule but preserves existing short-password account logins", async () => {
-    for (const password of ["a", "x".repeat(14), "🔒".repeat(8), "🔒".repeat(14)]) {
+    for (const password of ["a", "x".repeat(5), "🔒".repeat(5)]) {
       const email = `${fixtureTag}-short-${invalidCase++}@example.test`;
       const result = await request("/api/auth/register", { value: registration({ email, password }) });
       assert.equal(result.status, 422);
-      assert.match(result.body.fieldErrors.password, /15 characters/);
+      assert.match(result.body.fieldErrors.password, /6 characters/);
       assert.equal(await db.User.count({ where: { email } }), 0);
     }
     const email = `${fixtureTag}-legacy@example.test`;
-    const legacy = await db.User.create({ fullName: "Existing legacy account", email, passwordHash: await bcrypt.hash("old-password", 10), role: "public", status: "active" });
-    const result = await login({ email, password: "old-password" });
+    const legacy = await db.User.create({ fullName: "Existing legacy account", email, passwordHash: await bcrypt.hash("old", 10), role: "public", status: "active" });
+    const result = await login({ email, password: "old" });
     assert.equal(result.status, 200);
     assert.equal(result.body.user.id, legacy.userId);
     await request("/api/auth/logout", { method: "PUT", token: result.body.token });
-    const unicode = await request("/api/auth/register", { value: registration({ email: `${fixtureTag}-unicode-valid@example.test`, password: "🔒".repeat(15) }) });
-    assert.equal(unicode.status, 201);
+    for (const [index, password] of ["x".repeat(6), "🔒".repeat(6), "x".repeat(72), "🔒".repeat(18)].entries()) {
+      const email = `${fixtureTag}-password-boundary-${index}@example.test`;
+      const registered = await request("/api/auth/register", { value: registration({ email, password }) });
+      assert.equal(registered.status, 201);
+      const stored = await db.User.scope("withPassword").findByPk(registered.body.user.id);
+      assert.equal(await bcrypt.compare(password, stored.passwordHash), true);
+      const duplicate = await request("/api/auth/register", { value: registration({ email: ` ${email.toUpperCase()} `, password }) });
+      assert.equal(duplicate.status, 409);
+      assert.equal(duplicate.body.code, "EMAIL_EXISTS");
+    }
   });
 
   it("serializes concurrent duplicate registration through the unique email constraint", async () => {

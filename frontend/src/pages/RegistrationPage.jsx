@@ -46,8 +46,8 @@ export default function RegistrationPage() {
       return 'Please enter a valid email address.'
     }
 
-    if (name === 'password' && Array.from(value).length < 15) {
-      return 'Use at least 15 characters. A longer passphrase is easier to remember.'
+    if (name === 'password' && Array.from(value).length < 6) {
+      return 'Use at least 6 characters. A longer passphrase is easier to remember.'
     }
 
     if (name === 'password' && new TextEncoder().encode(value).length > 72) {
@@ -195,7 +195,7 @@ export default function RegistrationPage() {
               aria-invalid={Boolean(errors.password)}
               aria-describedby={`register-password-help${errors.password ? ' register-password-error' : ''}`}
             />
-            <p id="register-password-help" className="auth-form__help">Use at least 15 characters, up to 72 UTF-8 bytes. Try a memorable passphrase. Emoji and some characters use more than one byte.</p>
+            <p id="register-password-help" className="auth-form__help">Use at least 6 characters, up to 72 UTF-8 bytes. Longer passwords are safer. Emoji and some characters use more than one byte.</p>
             {errors.password ? <p id="register-password-error" className="auth-field__error">{errors.password}</p> : null}
           </div>
 

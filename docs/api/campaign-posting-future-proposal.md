@@ -1,6 +1,6 @@
 # Campaign posting and image extension
 
-**Status, 14 October 2026:** AWT-175 image upload, attachment/replacement/removal and controlled delivery are merged through PR #19 and deployed at [CauseConnect on AWS](https://52.62.2.87). The [release evidence](../evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) records the revision and passed photo/privacy, hosted-browser, paired-backup integrity and restart-persistence checks. This filename is retained so existing links keep working. Sample-preview responses remain separate from real API evidence.
+**Status, 14 October 2026:** AWT-175 image upload, attachment/replacement/removal and controlled delivery, including the review fixes, are deployed at [CauseConnect on AWS](https://52.62.2.87), application commit `e612d1b448a31cd6639f161740c31a9e22f63ed6`. The [current release evidence](../evidence/stage-3/review-hardening/README.md) records exact release identity, local checks and fresh hosted API acceptance. Earlier hosted-browser, paired-backup integrity and restart-persistence checks remain in the dated [PR #19 receipt](../evidence/stage-3/additional-apis/README.md). This filename is retained so existing links keep working. Sample-preview responses remain separate from real API evidence.
 
 The [current backend contract](campaign-posting-contract.md) accepts public submissions and business submissions linked to the authenticated owner's existing Business row. The same `POST /api/campaigns` route accepts optional `imageId`. GET/PUT business profile remains missing; browser business submission is blocked for both new and existing owners because its form first requests the profile. Direct existing-profile API posting is not evidence of a completed hosted business journey.
 
@@ -34,7 +34,7 @@ The server sets `createdBy` from the current user, `businessId` from that user's
 
 Send one `file` using `multipart/form-data`; let the browser set the boundary. Limits are non-animated JPEG, PNG or WebP, at most 5 MB (5,000,000 bytes) and 16 million decoded pixels. The server decodes and re-encodes accepted images, strips metadata and rejects invalid or mismatched content. The server accepts at most two uploads in flight at once.
 
-**Review-hardening source change; new deployment still required:** each owner may
+**Current retained-storage limit:** each owner may
 retain at most **20 photos and 50 MiB of encoded photo files** by default. All their
 image rows count until the bounded cleanup actually removes the files and rows:
 attached photos (including soft-deleted campaigns), unattached uploads, and expired
@@ -70,7 +70,7 @@ An `<img>` request cannot include the API's Bearer header. Owner/admin reads sup
 
 Errors include `413 IMAGE_TOO_LARGE`, `415 UNSUPPORTED_IMAGE_TYPE`,
 `422 VALIDATION_FAILED`, `429 IMAGE_UPLOAD_LIMIT` and
-`503 IMAGE_STORAGE_FULL`/`UPLOAD_BUSY`. The review-hardening source also returns
+`503 IMAGE_STORAGE_FULL`/`UPLOAD_BUSY`. The current source also returns
 `429 IMAGE_OWNER_QUOTA_REACHED` for the retained account limit and an explicit
 `422 IMAGE_DIMENSIONS_TOO_LARGE` above 16 million pixels, with resize guidance.
 Unsupported HEIC/HEIF photos must be exported as JPEG/PNG/WebP; reducing file bytes
@@ -82,13 +82,13 @@ establishes which changes are live.
 
 Files stay in a private, persistent directory on the existing EC2 server, outside the application checkout and web root. Production requires an absolute `CAMPAIGN_UPLOAD_DIR`. The default total upload limit is **512 MiB**, and writes preserve at least **2 GiB** of free disk. `CAMPAIGN_UPLOAD_MAX_BYTES` and `CAMPAIGN_UPLOAD_MIN_FREE_BYTES` control these limits. Storage exhaustion returns an error instead of filling the server disk.
 
-For the review-hardening source, `CAMPAIGN_UPLOAD_OWNER_MAX_PHOTOS` accepts 1–100
+`CAMPAIGN_UPLOAD_OWNER_MAX_PHOTOS` accepts 1–100
 (default 20) and `CAMPAIGN_UPLOAD_OWNER_MAX_BYTES` accepts 1–268,435,456 bytes
 (default 52,428,800 = 50 MiB). These are server-only limits; invalid values must be
 rejected rather than silently disabling the safeguard. Raising quotas does not
 increase disk capacity or remove the global cap/free-space reserve.
 
-This implementation needs no new S3 bucket or other cloud resource. The deployed release uses the existing server's private persistent directory. Keep its permissions, limits and paired database/file backups in place; backup/restart evidence is a separate check from successful HTTP image delivery. See [deployment preparation](../../infra/README.md) and [release evidence](../evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026). Cleanup removes only expired, unattached generated images; attached images are retained.
+This implementation needs no new S3 bucket or other cloud resource. The deployed release uses the existing server's private persistent directory. Keep its permissions, limits and paired database/file backups in place; backup/restart evidence is a separate check from successful HTTP image delivery. See [deployment preparation](../../infra/README.md) and [current release evidence](../evidence/stage-3/review-hardening/README.md). Cleanup removes only expired, unattached generated images; attached images are retained.
 
 ## Database and integration work
 
