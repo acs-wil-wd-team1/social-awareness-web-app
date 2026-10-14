@@ -90,12 +90,17 @@ export default function AdminUsersPage({ token, role, currentUserId, userLoader 
       <header className="campaign-management__heading"><p className="campaign-management__eyebrow">Administration</p>
         <h1 id="admin-users-title">Manage accounts</h1><p>Find community members and business owners, and manage their account access.</p>
       </header>
-      <form className="campaign-management__filters" onSubmit={(event) => { event.preventDefault(); setSearch(searchInput.trim()); setPage(1) }}>
+      <form className="campaign-management__filters" onSubmit={(event) => {
+        event.preventDefault()
+        if (saving || selected) return
+        setSearch(searchInput.trim()); setPage(1); setRetry((value) => value + 1)
+      }}>
         <div><label htmlFor="admin-user-search">Search accounts</label><input id="admin-user-search" type="search" placeholder="Search by name or email" maxLength={150} value={searchInput} disabled={saving} onChange={(event) => setSearchInput(event.target.value)} /></div>
         <div><label htmlFor="admin-user-status">Account status</label><select id="admin-user-status" value={status} disabled={saving} onChange={(event) => { setStatus(event.target.value); setPage(1) }}>
           <option value="">All statuses</option><option value="active">Active</option><option value="suspended">Suspended</option>
         </select></div>
-        <button type="submit" disabled={saving}>Search</button>
+        <button type="submit" disabled={saving || Boolean(selected) || state === 'loading'}>Search</button>
+        <button type="button" disabled={saving || Boolean(selected) || state === 'loading'} onClick={() => setRetry((value) => value + 1)}>Refresh accounts</button>
       </form>
       {notice ? <p className="campaign-management__notice" role="status">{notice}</p> : null}
       {saveError ? <p className="campaign-management__error" role="alert">{saveError}</p> : null}

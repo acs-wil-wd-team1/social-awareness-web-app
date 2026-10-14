@@ -54,6 +54,12 @@ afterEach(() => {
 })
 
 describe('engagement on campaign details', () => {
+  it('gives the actual campaign photo a useful accessible label', async () => {
+    const campaignLoader = vi.fn().mockResolvedValue({ campaign: { ...backendCampaigns[0], imageUrl: '/uploaded-photo.jpg' } })
+    render(<CampaignDetailsPage campaignId="3" campaignLoader={campaignLoader} />)
+    expect((await screen.findByRole('img', { name: 'Campaign photo: Community Food Drive' })).getAttribute('src')).toBe('/uploaded-photo.jpg')
+  })
+
   it('recovers a hidden failed image when the refreshed campaign supplies a new URL', async () => {
     const campaignLoader = vi.fn().mockResolvedValueOnce({ campaign: { ...backendCampaigns[0], imageUrl: '/photo-old.jpg' } })
       .mockResolvedValueOnce({ campaign: { ...backendCampaigns[0], imageUrl: '/photo-new.jpg' } })
@@ -235,7 +241,7 @@ describe('CauseConnect campaign details', () => {
     expect(screen.getByText('Local families')).toBeTruthy()
   })
 
-  it.each(['https://greenleaf.example/menu?day=saturday#hours', 'http://greenleaf.example/'])('links to a public business website from the API: %s', async (website) => {
+  it.each(['https://greenleaf.example/menu?day=saturday#hours', 'http://greenleaf.example/', 'https://greenleaf.example/our%20menu', 'https://greenleaf.example/@team?contact=@host'])('links to a public business website from the API: %s', async (website) => {
     fetch.mockResolvedValue(new Response(JSON.stringify({ ...backendCampaigns[0], type: 'business',
       business: { id: 2, businessName: 'Green Leaf Cafe', website },
     }), { status: 200 }))
@@ -248,6 +254,8 @@ describe('CauseConnect campaign details', () => {
     null, '', { url: 'https://greenleaf.example' }, 'javascript:alert(1)', 'data:text/html,hello',
     '//greenleaf.example', 'https://user:password@greenleaf.example', 'https://user@greenleaf.example',
     'https://', 'https://greenleaf.example\\other', 'https://greenleaf.\nexample',
+    'https:greenleaf.example', 'https:///greenleaf.example', 'https://@greenleaf.example',
+    'https://greenleaf.example/our menu', 'https://greenleaf.example/our\u00a0menu',
   ])('omits an invalid business website while retaining the campaign: %j', async (website) => {
     fetch.mockResolvedValue(new Response(JSON.stringify({ ...backendCampaigns[0], type: 'business',
       business: { id: 2, businessName: 'Green Leaf Cafe', website },

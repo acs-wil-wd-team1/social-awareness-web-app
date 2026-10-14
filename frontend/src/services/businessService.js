@@ -20,7 +20,7 @@ export async function loadBusinessProfile({ token, signal } = {}) {
 }
 
 function unavailableProfile() {
-  return new ApiError('Business profile setup is not available yet. You cannot create a new business campaign until this service is connected. Please check back later.', { status: 404, code: 'BUSINESS_PROFILE_UNAVAILABLE' })
+  return new ApiError('Business profile is temporarily unavailable. Please try again later.', { status: 404, code: 'BUSINESS_PROFILE_UNAVAILABLE' })
 }
 
 export async function saveBusinessProfile(values, { token, signal } = {}) {
@@ -40,13 +40,17 @@ export function validateBusinessProfile(values) {
   else if (values.businessName.trim().length > 150) errors.businessName = 'Use 150 characters or fewer.'
   if (values.abn.trim().length > 20) errors.abn = 'Use 20 characters or fewer.'
   if (values.description.trim().length > 2000) errors.description = 'Use 2,000 characters or fewer.'
-  if (values.website.trim()) {
+  const website = values.website.trim()
+  if (website) {
     try {
-      const url = new URL(values.website.trim())
+      const authority = website.slice(website.indexOf('://') + 3).split(/[/?#]/, 1)[0]
+      if (!/^https?:\/\//i.test(website) || !authority || authority.includes('@')
+        || /[\s\\\x00-\x1f\x7f]/.test(website)) throw new Error('Invalid website')
+      const url = new URL(website)
       if (!['https:', 'http:'].includes(url.protocol) || !url.hostname || url.username || url.password) throw new Error('Invalid website')
-      if (values.website.trim().length > 255) errors.website = 'Use 255 characters or fewer.'
+      if (website.length > 255) errors.website = 'Use 255 characters or fewer.'
     } catch {
-      errors.website = 'Enter a full website address starting with https:// or http://.'
+      errors.website = 'Enter a full website address starting with https:// or http://, without spaces, backslashes or login details.'
     }
   }
   return errors

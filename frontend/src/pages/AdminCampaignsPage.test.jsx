@@ -6,6 +6,21 @@ const campaign = { id: 12, title: 'Neighbourhood gardens', description: 'Plant a
 afterEach(cleanup)
 
 describe('admin campaign queue', () => {
+  it('reloads an unchanged search and refreshes without losing its filters', async () => {
+    const loader = vi.fn().mockResolvedValue({ campaigns: [], page: 1, pageSize: 10 })
+    render(<AdminCampaignsPage token="admin" role="admin" campaignLoader={loader} />)
+    await screen.findByText('No campaigns found.')
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+    await waitFor(() => expect(loader).toHaveBeenCalledTimes(2))
+    fireEvent.change(screen.getByLabelText('Search campaigns'), { target: { value: 'Garden' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+    await waitFor(() => expect(loader).toHaveBeenCalledTimes(3))
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh campaigns', exact: true }))
+    await waitFor(() => expect(loader).toHaveBeenCalledTimes(4))
+    expect(loader).toHaveBeenLastCalledWith(expect.objectContaining({ search: 'Garden', status: 'pending', page: 1 }))
+    expect(screen.getByLabelText('Search campaigns').value).toBe('Garden')
+  })
+
   it.each([149, 150])('matches the API search limit and preserves all %s characters of a valid title search', async length => {
     const loader = vi.fn().mockResolvedValue({ campaigns: [], page: 1, pageSize: 10 })
     render(<AdminCampaignsPage token="admin" role="admin" campaignLoader={loader} />)

@@ -9,8 +9,8 @@ vi.mock('./pages/CampaignDetailsPage.jsx', () => ({ default: ({ campaignId }) =>
 
 const tokenFor = role => `header.${btoa(JSON.stringify({ id: 1, role, exp: 9999999999 }))}.signature`
 function loginAs(role) { storeSession(tokenFor(role), { id: 1, name: 'Test user', role }) }
-beforeEach(() => { localStorage.clear(); vi.stubGlobal('fetch', vi.fn()) })
-afterEach(() => { cleanup(); localStorage.clear(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
+beforeEach(() => { localStorage.clear(); document.title = 'CauseConnect'; vi.stubGlobal('fetch', vi.fn()) })
+afterEach(() => { cleanup(); localStorage.clear(); document.title = 'CauseConnect'; vi.unstubAllGlobals(); vi.restoreAllMocks() })
 
 describe('application routing', () => {
   it.each([
@@ -51,6 +51,45 @@ describe('site footer', () => {
     expect(footer.queryByRole('navigation')).toBeNull()
     expect(footer.queryByRole('link')).toBeNull()
     expect(footer.queryByRole('img')).toBeNull()
+  })
+})
+
+describe('document titles', () => {
+  it.each([
+    ['/', 'Home'], ['/login', 'Login'], ['/register/', 'Create your account'], ['/logout', 'Logout'],
+    ['/campaigns/new', 'Create a campaign'], ['/business/campaigns/new', 'Create a business campaign'],
+    ['/business/profile', 'Business profile'], ['/my-campaigns', 'My campaigns'],
+    ['/my-participation', 'My participation'], ['/business/enquiries', 'Business enquiries'],
+    ['/admin/users', 'Manage accounts'], ['/admin/campaigns', 'Review campaigns'],
+    ['/admin/campaigns/42', 'Campaign review'], ['/my-campaigns/42/edit', 'Edit campaign'],
+    ['/campaigns/42', 'Campaign details'], ['/missing', 'Page not found'],
+  ])('identifies the purpose of %s in the browser title', (pathname, purpose) => {
+    render(<App pathname={pathname} />)
+    expect(document.title).toBe(`${purpose} | CauseConnect`)
+  })
+
+  it('updates the title when the selected route changes', () => {
+    const view = render(<App pathname="/" />)
+    expect(document.title).toBe('Home | CauseConnect')
+    view.rerender(<App pathname="/campaigns/42" />)
+    expect(document.title).toBe('Campaign details | CauseConnect')
+    view.rerender(<App pathname="/unknown" />)
+    expect(document.title).toBe('Page not found | CauseConnect')
+  })
+
+  it('keeps the correct title through StrictMode and session remounts', () => {
+    render(<StrictMode><App pathname="/" /></StrictMode>)
+    expect(document.title).toBe('Home | CauseConnect')
+    act(() => loginAs('public'))
+    expect(document.title).toBe('Home | CauseConnect')
+    act(() => clearSession())
+    expect(document.title).toBe('Home | CauseConnect')
+  })
+
+  it('labels the development-only campaign form preview separately', async () => {
+    render(<App pathname="/draft/campaigns/new" />)
+    await screen.findByRole('heading', { name: 'Create a campaign' })
+    expect(document.title).toBe('Campaign form preview | CauseConnect')
   })
 })
 

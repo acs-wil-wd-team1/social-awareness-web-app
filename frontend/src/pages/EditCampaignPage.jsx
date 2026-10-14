@@ -15,6 +15,7 @@ export default function EditCampaignPage({ campaignId, token, role }) {
   const [loading, setLoading] = useState(true), [busy, setBusy] = useState(false)
   const [outcome, setOutcome] = useState(''), [uncertain, setUncertain] = useState(false)
   const [file, setFile] = useState(null), [imageError, setImageError] = useState(''), [removeImage, setRemoveImage] = useState(false)
+  const [currentPhotoFailed, setCurrentPhotoFailed] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false), [deleteName, setDeleteName] = useState('')
   const request = useRef(null), version = useRef(0), inFlight = useRef(false), uploaded = useRef(null), form = useRef(null), result = useRef(null)
   const shouldFocusError = useRef(false)
@@ -23,7 +24,7 @@ export default function EditCampaignPage({ campaignId, token, role }) {
     const current = ++version.current, controller = new AbortController()
     request.current?.abort(); request.current = controller; inFlight.current = false
     setCampaign(null); setLoading(true); setBusy(false); setError(null); setErrors({}); setOutcome(''); setUncertain(false)
-    setFile(null); setRemoveImage(false); setImageError(''); uploaded.current = null; setConfirmDelete(false); setDeleteName('')
+    setFile(null); setRemoveImage(false); setImageError(''); setCurrentPhotoFailed(false); uploaded.current = null; setConfirmDelete(false); setDeleteName('')
     if (token && allowed) Promise.all([
       loadOwnedCampaign(campaignId, { token, signal: controller.signal }),
       loadCampaignCategories({ signal: controller.signal }),
@@ -105,7 +106,11 @@ export default function EditCampaignPage({ campaignId, token, role }) {
             <div className="campaign-form-field"><label htmlFor="edit-audience">Target audience (optional)</label><input id="edit-audience" maxLength="255" {...field('targetAudience')} />{fieldError('targetAudience')}</div>
             <div className="campaign-form-field"><label htmlFor="edit-start">Start date</label><input id="edit-start" type="date" min="1000-01-01" max="9999-12-31" {...field('startDate')} />{fieldError('startDate')}</div>
             <div className="campaign-form-field"><label htmlFor="edit-end">End date</label><input id="edit-end" type="date" min="1000-01-01" max="9999-12-31" {...field('endDate')} />{fieldError('endDate')}</div>
-            {campaign.imageUrl && !file ? <div className="campaign-form-field campaign-form-field--full"><img className="campaign-management__image" src={campaign.imageUrl} alt="Current campaign photo" /><label><input type="checkbox" checked={removeImage} onChange={e => setRemoveImage(e.target.checked)} /> Remove the current photo when saving</label></div> : null}
+            {campaign.imageUrl && !file ? <div className="campaign-form-field campaign-form-field--full">
+              {currentPhotoFailed ? <p role="status">The current photo preview is unavailable. The photo is still attached and will be kept unless you remove or replace it.</p>
+                : <img className="campaign-management__image" src={campaign.imageUrl} alt="Current campaign photo" loading="lazy" onError={() => setCurrentPhotoFailed(true)} />}
+              <label><input type="checkbox" checked={removeImage} onChange={e => setRemoveImage(e.target.checked)} /> Remove the current photo when saving</label>
+            </div> : null}
             <CampaignImageInput file={file} onChange={value => { setFile(value); uploaded.current = null; if (value) setRemoveImage(false) }} error={imageError} onError={setImageError} disabled={busy || blocked || confirmDelete} />
             <button className="campaign-submit-button" disabled={!categories.length} type="submit">{busy ? 'Saving…' : campaign.status === 'rejected' ? 'Resubmit for review' : 'Save and submit for review'}</button>
           </fieldset>

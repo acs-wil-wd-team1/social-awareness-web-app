@@ -12,7 +12,7 @@ export default function LogoutPage() {
   const endServerSession = useCallback(() => {
     if (!token.current) return Promise.resolve('done')
     if (!request.current) {
-      request.current = apiRequest('/api/auth/logout', { method: 'PUT', token: token.current })
+      request.current = apiRequest('/api/auth/logout', { method: 'PUT', token: token.current, expectedStatus: 204 })
         .then(() => {
           token.current = null
           return 'done'

@@ -12,6 +12,22 @@ function setup({ loader = vi.fn().mockResolvedValue(result), sender = vi.fn(), c
 afterEach(cleanup)
 
 describe('administrator account management', () => {
+  it('reloads an unchanged search and offers a fresh filtered account list', async () => {
+    const { loader } = setup()
+    await screen.findByText('Alex')
+    fireEvent.click(screen.getByRole('button', { name: 'Search', exact: true }))
+    await waitFor(() => expect(loader).toHaveBeenCalledTimes(2))
+    await screen.findByText('Alex')
+    fireEvent.change(screen.getByLabelText('Search accounts'), { target: { value: 'Alex' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Search', exact: true }))
+    await waitFor(() => expect(loader).toHaveBeenCalledTimes(3))
+    await screen.findByText('Alex')
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh accounts', exact: true }))
+    await waitFor(() => expect(loader).toHaveBeenCalledTimes(4))
+    expect(loader).toHaveBeenLastCalledWith(expect.objectContaining({ search: 'Alex', page: 1 }))
+    expect(screen.getByLabelText('Search accounts').value).toBe('Alex')
+  })
+
   it('uses singular account copy for one result', async () => {
     setup({ loader: vi.fn().mockResolvedValue({ ...result, users: [member], total: 1 }) })
     expect(await screen.findByText('1 account on page 1')).toBeTruthy()

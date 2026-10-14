@@ -62,6 +62,7 @@ export default function RegistrationPage() {
   }
 
   function handleChange(event) {
+    if (inFlight.current) return
     const { name, value } = event.target
     const nextValues = {
       ...formValues,
@@ -142,7 +143,7 @@ export default function RegistrationPage() {
           <p className="visually-hidden" aria-live="polite" aria-atomic="true">{validationAnnouncement}</p>
           <div className="auth-field">
             <label htmlFor="register-type">Account type</label>
-            <select id="register-type" name="accountType" value={formValues.accountType} onChange={handleChange} aria-invalid={Boolean(errors.accountType)} aria-describedby={errors.accountType ? 'register-type-error' : undefined}>
+            <select id="register-type" name="accountType" value={formValues.accountType} onChange={handleChange} disabled={isSubmitting} aria-invalid={Boolean(errors.accountType)} aria-describedby={errors.accountType ? 'register-type-error' : undefined}>
               <option value="user">Community member</option>
               <option value="business">Small business owner</option>
             </select>
@@ -154,6 +155,7 @@ export default function RegistrationPage() {
               id="register-name"
               name="name"
               type="text"
+              disabled={isSubmitting}
               maxLength={100}
               autoComplete="name"
               value={formValues.name}
@@ -171,6 +173,7 @@ export default function RegistrationPage() {
               id="register-email"
               name="email"
               type="email"
+              disabled={isSubmitting}
               maxLength={150}
               autoComplete="email"
               value={formValues.email}
@@ -188,6 +191,7 @@ export default function RegistrationPage() {
               id="register-password"
               name="password"
               type="password"
+              disabled={isSubmitting}
               autoComplete="new-password"
               value={formValues.password}
               onChange={handleChange}
@@ -205,6 +209,7 @@ export default function RegistrationPage() {
               id="register-confirm-password"
               name="confirmPassword"
               type="password"
+              disabled={isSubmitting}
               autoComplete="new-password"
               value={formValues.confirmPassword}
               onChange={handleChange}

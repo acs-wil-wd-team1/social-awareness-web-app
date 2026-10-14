@@ -114,7 +114,7 @@ export default function BusinessProfilePage({ token = localStorage.getItem('toke
     <section className="campaign-form-page content-width" aria-labelledby="business-profile-title">
       <div className="campaign-form-card">
         <div className="campaign-form-intro"><p className="campaign-form-eyebrow">Small business</p><h1 id="business-profile-title">Business profile</h1>
-          <p>Add the business details that will appear with your campaigns.</p></div>
+          <p>Your business name and website appear with your campaigns. The other details are saved in your business profile.</p></div>
         {!token ? <><p>Log in to manage your business profile.</p><a className="text-link" href={loginPath}>Log in</a></>
           : !allowed ? <><p>A business-owner account is needed to manage a business profile.</p><a className="text-link" href="/">Back to home</a></>
             : state === 'loading' ? <p role="status">Loading your business profile…</p>

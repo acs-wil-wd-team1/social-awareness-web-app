@@ -24,7 +24,7 @@
 .preview-banner select, .preview-banner button, .auth-field select { font: inherit; border: 1px solid #9a8e71; border-radius: 6px; padding: 8px 10px; min-height: 44px; background: white; color: #272727; }
 .auth-field select { width: 100%; border-color: var(--border); }
 button, input, select, textarea, a { -webkit-tap-highlight-color: transparent; }
-:focus-visible { outline: 3px solid #d88700; outline-offset: 3px; }
+:focus-visible { outline: 3px solid var(--brand-primary, #2563eb); outline-offset: 3px; }
 @media (max-width: 840px) {
   .site-header .site-header__inner { justify-content: center; gap: 8px 24px; padding-block: 8px 16px; }
   .site-header .site-navigation { justify-content: center; }

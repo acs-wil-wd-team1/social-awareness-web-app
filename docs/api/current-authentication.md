@@ -77,6 +77,6 @@ Controller errors include `401 INVALID_CREDENTIALS`, `403 ACCOUNT_SUSPENDED` and
 
 Success is `204` with no response body. The matching active session becomes expired and receives a logout timestamp. Subsequent protected requests with that session are rejected.
 
-The legacy logout middleware checks JWT validity and an active session. Its errors differ from controller errors: missing/inactive sessions return `401` with an `error` string; token verification failure returns `403` with an `error` string. New campaign/management/engagement routes use the current-account guard and [shared conventions](shared-conventions.md); API parser and unknown-route errors are normalised.
+Logout verifies the Bearer header, JWT and the matching owner's active session. Missing, malformed, invalid, expired or revoked credentials return `401 INVALID_TOKEN`, retaining the legacy `error` string alongside `status`, `code`, `message` and `fieldErrors`. A session-store failure returns retryable `503 SERVICE_UNAVAILABLE`; configuration/internal failures return `500`, without raw errors or tokens. Other routes' role-based `403` responses are unchanged. Cryptographic expiry proves a token is unusable; a `401` does not itself perform a session-revocation write.
 
-The frontend should check the HTTP result before presenting logout as confirmed. Local token removal alone does not prove the server session was invalidated.
+The frontend requires `204`, or an already unusable session's `401`, before presenting logout as complete. Server/network failures keep the retry token only in the mounted logout page's memory; local storage is cleared immediately. Local token removal alone does not prove revocation, and an older request must not clear a newer account's session.

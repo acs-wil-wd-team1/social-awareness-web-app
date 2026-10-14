@@ -255,7 +255,7 @@ describe('Campaign submission', () => {
   it('explains the missing business profile API without a futile retry or false campaign form', async () => {
     fetch.mockResolvedValueOnce(json({ code: 'API_ROUTE_NOT_FOUND', message: 'API route not found.' }, 404))
     render(<CreateCampaignPage mode="business" role="business_owner" />)
-    expect((await screen.findByRole('alert')).textContent).toContain('Business profile setup is not available yet')
+    expect((await screen.findByRole('alert')).textContent).toContain('Business profile is temporarily unavailable')
     expect(screen.queryByRole('button', { name: 'Retry business profile' })).toBeNull()
     expect(screen.queryByRole('form')).toBeNull()
     expect(screen.queryByText('API route not found.')).toBeNull()

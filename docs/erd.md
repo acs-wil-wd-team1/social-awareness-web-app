@@ -75,8 +75,9 @@ promotion. Suspension expires active sessions; reactivation requires a new login
 | `description` | TEXT | Nullable |
 | `created_at`, `updated_at` | DATETIME | Not null; initial default current timestamp |
 
-A `business_owner` account does not itself create this row. The remaining
-GET/PUT `/api/business/me` workflow must use this existing table.
+A `business_owner` registration does not itself create this row. Implemented
+GET/PUT `/api/business/me` reads and creates/updates the owning account's one row
+in this existing table; no duplicate business table is needed.
 
 ## campaigns
 

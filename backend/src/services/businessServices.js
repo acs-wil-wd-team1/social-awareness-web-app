@@ -33,14 +33,17 @@ function validateBusinessProfileInput(body) {
   const description = optionalText(body, "description", 2000, errors);
   if (website && !errors.website) {
     try {
+      const authority = website.slice(website.indexOf("://") + 3).split(/[/?#]/, 1)[0];
+      if (!/^https?:\/\//i.test(website) || !authority || authority.includes("@")
+        || /[\s\\\u0000-\u001f\u007f]/.test(website)) {
+        throw new Error("Invalid profile website");
+      }
       const url = new URL(website);
-      const authority = website.slice(website.indexOf("://") + 3).split(/[/?#\\]/, 1)[0];
-      if (!/^https?:\/\//i.test(website) || !["http:", "https:"].includes(url.protocol) || !url.hostname
-        || url.username || url.password || authority.includes("@") || /[\u0000-\u001f\u007f]/.test(website)) {
+      if (!["http:", "https:"].includes(url.protocol) || !url.hostname || url.username || url.password) {
         throw new Error("Invalid profile website");
       }
     } catch {
-      errors.website = "Use a full HTTP or HTTPS website address without a username or password";
+      errors.website = "Use a full HTTP or HTTPS website address without spaces, backslashes or login details";
     }
   }
   if (Object.keys(errors).length) throw validationError(errors, "Business profile data is invalid");

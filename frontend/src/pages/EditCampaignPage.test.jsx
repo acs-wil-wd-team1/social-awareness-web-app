@@ -43,6 +43,45 @@ describe('owner campaign editing', () => {
     expect(fetch).toHaveBeenCalledTimes(2)
   })
 
+  it('shows a nonblocking message for a failed current photo and keeps the attachment on save', async () => {
+    render(page()); await ready()
+    fireEvent.change(screen.getByLabelText('Campaign title'), { target: { value: 'My unsaved title' } })
+    fireEvent.error(screen.getByRole('img', { name: 'Current campaign photo' }))
+    expect(screen.queryByRole('img', { name: 'Current campaign photo' })).toBeNull()
+    expect(screen.getByText(/current photo preview is unavailable/).textContent).toContain('still attached')
+    expect(screen.getByLabelText('Campaign title').value).toBe('My unsaved title')
+    expect(screen.getByRole('checkbox', { name: /Remove the current photo/ }).checked).toBe(false)
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(writes()).toHaveLength(0)
+    fireEvent.submit(form())
+    await screen.findByRole('heading', { name: 'Changes submitted for review' })
+    const saved = JSON.parse(writes()[0][1].body)
+    expect(saved.title).toBe('My unsaved title')
+    expect(saved).not.toHaveProperty('removeImage')
+    expect(saved).not.toHaveProperty('imageId')
+    expect(fetch.mock.calls.filter(([url]) => url === '/api/campaign-images')).toHaveLength(0)
+  })
+
+  it('still permits explicit removal of the current photo after its preview fails', async () => {
+    render(page()); await ready()
+    fireEvent.error(screen.getByRole('img', { name: 'Current campaign photo' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /Remove the current photo/ }))
+    fireEvent.submit(form())
+    await screen.findByRole('heading', { name: 'Changes submitted for review' })
+    expect(JSON.parse(writes()[0][1].body)).toMatchObject({ removeImage: true })
+    expect(fetch.mock.calls.filter(([url]) => url === '/api/campaign-images')).toHaveLength(0)
+  })
+
+  it('resets a failed photo preview when the session changes', async () => {
+    const view = render(page()); await ready()
+    fireEvent.error(screen.getByRole('img', { name: 'Current campaign photo' }))
+    handlers.load = () => json({ ...original, imageUrl: '/private-photo?ticket=new-session' })
+    view.rerender(page({ token: 'new-owner-token' }))
+    await ready()
+    expect(screen.queryByText(/current photo preview is unavailable/)).toBeNull()
+    expect(screen.getByRole('img', { name: 'Current campaign photo' }).getAttribute('src')).toBe('/private-photo?ticket=new-session')
+  })
+
   it.each([{ token: null }, { role: 'admin' }, { role: 'unknown' }])('blocks unavailable author access without requests: %j', (props) => {
     render(page(props))
     expect(screen.queryByRole('form')).toBeNull()

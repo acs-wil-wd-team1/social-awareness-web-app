@@ -41,10 +41,10 @@ Otherwise return `200`:
 |---|---|
 | `businessName` | Required string; trim; 1–150 characters |
 | `abn` | Optional string, at most 20 characters; empty/omitted/null becomes SQL `NULL` |
-| `website` | Optional string, at most 255 characters; full HTTP or HTTPS URL, host required, no embedded username/password; empty/omitted/null becomes `NULL` |
+| `website` | Optional string, at most 255 characters; literal `http://` or `https://`, nonempty host/authority, no raw embedded whitespace, backslashes, controls or authority login details. Encode path spaces as `%20`. Empty/omitted/null becomes `NULL` |
 | `description` | Optional string, at most 2,000 characters; empty/omitted/null becomes `NULL` |
 
-The frontend sends all four keys and uses empty strings to clear optional fields. Reject extra keys and non-string types except the documented optional `null`. This stores ABN text; it does not claim external business/ABN verification.
+The frontend sends all four keys and uses empty strings to clear optional fields. Reject extra keys and non-string types except the documented optional `null`. This stores ABN text; it does not claim external business/ABN verification. Public campaign details show the business name and website; ABN and description stay in the owner's profile rather than being newly exposed publicly.
 
 `401`: missing/expired/invalid session. `403`: wrong role or suspended account. `422 VALIDATION_FAILED`: field errors keyed by `businessName`, `abn`, `website` or `description`. Apply the [shared error envelope](shared-conventions.md). Do not expose another owner's profile when an ID is supplied.
 

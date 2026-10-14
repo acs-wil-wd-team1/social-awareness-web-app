@@ -9,11 +9,11 @@ beforeEach(() => vi.stubGlobal('fetch', vi.fn()))
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 describe('Business enquiries inbox', () => {
-  it('explains a missing profile API instead of inviting a futile new-business setup', async () => {
+  it('explains an unavailable profile service without inventing an inbox', async () => {
     fetch.mockResolvedValueOnce(json({ code: 'BUSINESS_PROFILE_REQUIRED', message: 'Create a business profile first.' }, 409))
       .mockResolvedValueOnce(json({ code: 'API_ROUTE_NOT_FOUND', message: 'API route not found.' }, 404))
     render(<BusinessEnquiriesPage token="owner" role="business_owner" />)
-    expect((await screen.findByText(/Enquiries for a new business will be available/)).textContent).toContain('once that service is connected')
+    expect((await screen.findByRole('alert')).textContent).toContain('Business profile is temporarily unavailable. Please try again later.')
     expect(fetch.mock.calls.map(([url]) => url)).toEqual(['/api/business/me/enquiries?page=1&pageSize=10', '/api/business/me'])
     expect(screen.queryByRole('button', { name: 'Refresh enquiries' })).toBeNull()
     expect(screen.queryByRole('link', { name: 'Set up business profile' })).toBeNull()
@@ -30,7 +30,7 @@ describe('Business enquiries inbox', () => {
   it('reports a missing inbox route as unavailable without a retry loop', async () => {
     fetch.mockResolvedValueOnce(json({ code: 'API_ROUTE_NOT_FOUND', message: 'API route not found.' }, 404))
     render(<BusinessEnquiriesPage token="owner" role="business_owner" />)
-    expect((await screen.findByRole('alert')).textContent).toContain('Business enquiries are not available yet')
+    expect((await screen.findByRole('alert')).textContent).toContain('Business enquiries are temporarily unavailable')
     expect(screen.queryByRole('button', { name: 'Refresh enquiries' })).toBeNull()
     expect(fetch).toHaveBeenCalledTimes(1)
   })

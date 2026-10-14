@@ -107,16 +107,31 @@ describe("business profile HTTP, ownership and MySQL transaction integration", (
     }
   });
 
+  it("preserves encoded website paths and non-authority @ through save, read and MySQL storage", async () => {
+    const website = "HTTPS://example.test/our%20services?contact=team@example.test#details";
+    const expected = { ...normalized, website };
+    const id = assertProfile(await request({ method: "PUT", value: { ...body, website: `  ${website}  ` } }), expected);
+    assertProfile(await request(), expected);
+    assert.equal((await db.Business.findByPk(id)).website, website);
+    assert.equal(await db.Business.count({ where: { ownerId: users.owner.userId } }), 1);
+  });
+
   it("uses exact trimmed model bounds and preserves the saved profile on malformed, credential-bearing or forged input", async () => {
     const prefix = "https://example.test/";
     const maximum = { businessName: "n".repeat(150), abn: "a".repeat(20), website: prefix + "p".repeat(255 - prefix.length), description: "d".repeat(2000) };
     assertProfile(await request({ method: "PUT", value: Object.fromEntries(Object.entries(maximum).map(([key, value]) => [key, ` ${value} `])) }), maximum);
     const snapshot = await db.Business.findOne({ where: { ownerId: users.owner.userId }, raw: true });
+    const invalidWebsites = ["example.test", "ftp://example.test", "http:example.test", "https://", "https:///example.test", "https:////example.test",
+      "https://user:private-profile-password@example.test", "https://@example.test", "https://exa\nmple.test",
+      "https://example.test/our services", "https://example.test/?q=local repairs", "https://example.test/#our services",
+      "https://example.test\\path", "https://\\example.test", "https://example.test/a\tb", "https://example.test/a\rb",
+      "https://example.test/a\u0000b", "https://example.test/a\u007fb", "https://example.test/our\u00a0services",
+    ];
     const cases = [undefined, null, [], {}, false, 4,
       { ...body, businessName: " " }, { ...body, businessName: "n".repeat(151) },
       { ...body, abn: "a".repeat(21) }, { ...body, website: prefix + "p".repeat(256 - prefix.length) }, { ...body, description: "d".repeat(2001) },
       ...["businessName", "abn", "website", "description"].flatMap((field) => [false, {}, [], 10].map((value) => ({ ...body, [field]: value }))),
-      ...["example.test", "ftp://example.test", "https://", "https://user:private-profile-password@example.test", "https://@example.test", "https://exa\nmple.test"].map((website) => ({ ...body, website })),
+      ...invalidWebsites.map((website) => ({ ...body, website })),
       ...["id", "businessId", "ownerId", "userId", "role", "status"].map((field) => ({ ...body, [field]: users.other.userId })),
       JSON.parse('{"businessName":"Repairs","__proto__":{"polluted":true}}'),
     ];
@@ -125,6 +140,10 @@ describe("business profile HTTP, ownership and MySQL transaction integration", (
       assert.equal(result.status, 422, JSON.stringify(value));
       assert.equal(result.body.code, "VALIDATION_FAILED");
       assert.ok(result.body.fieldErrors);
+      if (invalidWebsites.includes(value?.website)) {
+        assert.equal(typeof result.body.fieldErrors.website, "string");
+        assert.deepEqual(await db.Business.findOne({ where: { ownerId: users.owner.userId }, raw: true }), snapshot);
+      }
       assert.ok(!JSON.stringify(result.body).includes("private-profile-password"));
       assert.equal(result.body.stack, undefined);
     }

@@ -1,9 +1,10 @@
 
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { StrictMode } from 'react'
 import App from '../App.jsx'
 import LoginPage from './LoginPage.jsx'
-import { getSession } from '../services/authSession.js'
+import { getSession, storeSession } from '../services/authSession.js'
 
 const token = `header.${btoa(JSON.stringify({ id: 7, role: 'business_owner', exp: 9999999999 }))}.signature`
 const validBody = { token, user: { id: 7, name: 'Sam', role: 'business_owner' } }
@@ -92,6 +93,115 @@ describe('CauseConnect login page', () => {
     await act(async () => resolve(response(401, { message: 'Email or password is incorrect.' })))
     expect(screen.getByRole('alert').textContent).toBe('Email or password is incorrect.')
     expect(screen.getByRole('button', { name: 'Login' }).disabled).toBe(false)
+  })
+
+  it('makes only one login request while a submission is pending', async () => {
+    let resolve
+    fetch.mockReturnValueOnce(new Promise(done => { resolve = done }))
+    const { container } = render(<LoginPage />)
+    fillLogin()
+    fireEvent.submit(container.querySelector('form'))
+    fireEvent.submit(container.querySelector('form'))
+    expect(fetch).toHaveBeenCalledTimes(1)
+    await act(async () => resolve(response(401, { message: 'Email or password is incorrect.' })))
+    expect(screen.getByRole('button', { name: 'Login' }).disabled).toBe(false)
+  })
+
+  it('does not store or redirect a delayed successful login after unmount', async () => {
+    let resolve
+    fetch.mockReturnValueOnce(new Promise(done => { resolve = done }))
+    const view = render(<LoginPage />)
+    fillLogin()
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }))
+    const signal = fetch.mock.calls[0][1].signal
+    view.unmount()
+    expect(signal.aborted).toBe(true)
+    const newerToken = `header.${btoa(JSON.stringify({ id: 9, role: 'public', exp: 9999999999 }))}.signature`
+    storeSession(newerToken, { id: 9, name: 'Newer account', role: 'public' })
+    // Even a transport that resolves after cancellation must not commit this login.
+    await act(async () => resolve(response(200, validBody)))
+    expect(getSession().token).toBe(newerToken)
+    expect(getSession().user.id).toBe(9)
+    expect(window.location.hash).toBe('#before-login')
+  })
+
+  it('keeps a newer session when storage changes without unmounting the login form', async () => {
+    let resolve
+    fetch.mockReturnValueOnce(new Promise(done => { resolve = done }))
+    render(<LoginPage />)
+    fillLogin()
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }))
+    const newerToken = `header.${btoa(JSON.stringify({ id: 9, role: 'public', exp: 9999999999 }))}.signature`
+    storeSession(newerToken, { id: 9, name: 'Newer account', role: 'public' })
+    await act(async () => resolve(response(200, validBody)))
+    expect(getSession().token).toBe(newerToken)
+    expect(getSession().user.id).toBe(9)
+    expect(window.location.hash).toBe('#before-login')
+    expect(screen.getByRole('button', { name: 'Login' }).disabled).toBe(false)
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('cancels the old App login when another tab changes the account', async () => {
+    let resolve
+    fetch.mockReturnValueOnce(new Promise(done => { resolve = done }))
+    render(<App pathname="/login" />)
+    fillLogin()
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }))
+    const signal = fetch.mock.calls[0][1].signal
+    const newerToken = `header.${btoa(JSON.stringify({ id: 9, role: 'public', exp: 9999999999 }))}.signature`
+    await act(async () => {
+      localStorage.setItem('token', newerToken)
+      localStorage.setItem('causeconnect.user', JSON.stringify({ id: 9, name: 'Newer account', role: 'public' }))
+      window.dispatchEvent(new StorageEvent('storage', { key: 'token', newValue: newerToken }))
+    })
+    expect(signal.aborted).toBe(true)
+    await act(async () => resolve(response(200, validBody)))
+    expect(getSession().token).toBe(newerToken)
+    expect(getSession().user.id).toBe(9)
+    expect(window.location.hash).toBe('#before-login')
+  })
+
+  it('still stores and redirects a normal App login through the session remount', async () => {
+    fetch.mockResolvedValueOnce(response(200, validBody))
+    render(<App pathname="/login" />)
+    fillLogin()
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Login' })))
+    expect(getSession()).toEqual({ token, user: validBody.user })
+    expect(window.location.hash).toBe('')
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('allows an intentional login to replace the unchanged starting session', async () => {
+    const startingToken = `header.${btoa(JSON.stringify({ id: 9, role: 'public', exp: 9999999999 }))}.signature`
+    storeSession(startingToken, { id: 9, name: 'Starting account', role: 'public' })
+    fetch.mockResolvedValueOnce(response(200, validBody))
+    render(<App pathname="/login" />)
+    fillLogin()
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Login' })))
+    expect(getSession()).toEqual({ token, user: validBody.user })
+    expect(window.location.hash).toBe('')
+  })
+
+  it('still explains blocked browser storage instead of claiming a successful login', async () => {
+    fetch.mockResolvedValueOnce(response(200, validBody))
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Storage blocked') })
+    render(<LoginPage />)
+    fillLogin()
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Login' })))
+    expect(screen.getByRole('alert').textContent).toContain('Allow site storage and try again')
+    expect(getSession().token).toBeNull()
+    expect(window.location.hash).toBe('#before-login')
+    expect(screen.getByRole('button', { name: 'Login' }).disabled).toBe(false)
+  })
+
+  it('accepts a normal login after StrictMode repeats effect setup', async () => {
+    fetch.mockResolvedValueOnce(response(200, validBody))
+    render(<StrictMode><LoginPage /></StrictMode>)
+    fillLogin()
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Login' })))
+    expect(getSession()).toEqual({ token, user: validBody.user })
+    expect(window.location.hash).toBe('')
+    expect(fetch).toHaveBeenCalledTimes(1)
   })
 
   it.each([

@@ -17,7 +17,8 @@ describe('Business profile', () => {
       fireEvent.change(await screen.findByLabelText('Business name'), { target: { value: values.businessName } })
       fireEvent.submit(screen.getByRole('form'))
     }
-    expect((await screen.findByRole('alert')).textContent).toContain('Business profile setup is not available yet')
+    expect((await screen.findByRole('alert')).textContent).toContain('Business profile is temporarily unavailable. Please try again later.')
+    expect(screen.queryByText(/until this service is connected/)).toBeNull()
     expect(screen.queryByRole('button', { name: /Retry|Save business profile|Reload/ })).toBeNull()
     expect(screen.queryByRole('form')).toBeNull()
     expect(screen.queryByText('API route not found.')).toBeNull()
@@ -111,7 +112,51 @@ describe('Business profile', () => {
   it('validates lengths and website protocol', () => {
     expect(validateBusinessProfile({ ...values, website: 'https://example.com' })).toEqual({})
     expect(validateBusinessProfile({ businessName: 'a'.repeat(151), abn: 'a'.repeat(21), website: 'ftp://example.com', description: 'a'.repeat(2001) })).toEqual({
-      businessName: 'Use 150 characters or fewer.', abn: 'Use 20 characters or fewer.', website: 'Enter a full website address starting with https:// or http://.', description: 'Use 2,000 characters or fewer.',
+      businessName: 'Use 150 characters or fewer.', abn: 'Use 20 characters or fewer.', website: 'Enter a full website address starting with https:// or http://, without spaces, backslashes or login details.', description: 'Use 2,000 characters or fewer.',
     })
+  })
+
+  it.each([
+    'https://example.com/our services', 'https://example.com/?q=local repairs', 'https://example.com/#our services',
+    'http:example.com', 'https:example.com', 'https:///example.com', 'https:////example.com',
+    'https://example.com\\path', 'https://\\example.com', 'https://exa\nmple.com', 'https://example.com/a\tb',
+    'https://example.com/a\rb', 'https://example.com/a\u0000b', 'https://example.com/a\u007fb', 'https://example.com/our\u00a0services',
+    'https://@example.com', 'https://user@example.com', 'https://user:password@example.com',
+  ])('rejects a website that URL parsing would repair or expose credentials: %j', website => {
+    expect(validateBusinessProfile({ ...values, website }).website).toMatch(/Enter a full website address/)
+  })
+
+  it.each([
+    'https://example.com/our services', 'https://example.com\\path', 'http:example.com',
+  ])('focuses the invalid website and sends no profile save: %s', async website => {
+    render(<BusinessProfilePage token="test" />)
+    fireEvent.change(await screen.findByLabelText('Business name'), { target: { value: values.businessName } })
+    fireEvent.change(screen.getByLabelText(/Website/), { target: { value: website } })
+    fireEvent.submit(screen.getByRole('form'))
+    expect(await screen.findByText(/Enter a full website address/)).toBeTruthy()
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText(/Website/)))
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(screen.getByLabelText(/Website/).value).toBe(website)
+    expect(screen.queryByRole('heading', { name: 'Business profile saved' })).toBeNull()
+  })
+
+  it.each([
+    'http://example.com/', 'HTTPS://EXAMPLE.COM/', 'https://example.com/our%20services?q=local%20repairs#details',
+    'https://example.com/path@public?contact=team@example.com', 'https://example.com/caf%C3%A9',
+  ])('accepts a complete website and preserves encoded paths: %s', website => {
+    expect(validateBusinessProfile({ ...values, website: `  ${website}  ` })).toEqual({})
+  })
+
+  it('saves a valid encoded website without decoding or changing its path', async () => {
+    const website = 'https://example.com/our%20services?contact=team@example.com#details'
+    fetch.mockResolvedValueOnce(json({ business: { id: 3, ...values, website } }))
+    render(<BusinessProfilePage token="test" />)
+    fireEvent.change(await screen.findByLabelText('Business name'), { target: { value: values.businessName } })
+    fireEvent.change(screen.getByLabelText(/Website/), { target: { value: `  ${website}  ` } })
+    fireEvent.submit(screen.getByRole('form'))
+    await screen.findByRole('heading', { name: 'Business profile saved' })
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(JSON.parse(fetch.mock.calls[1][1].body).website).toBe(website)
+    expect(screen.getByLabelText(/Website/).value).toBe(website)
   })
 })

@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import HomePage from './pages/HomePage.jsx'
 import CampaignDetailsPage from './pages/CampaignDetailsPage.jsx'
 import RegistrationPage from './pages/RegistrationPage.jsx'
@@ -20,6 +20,16 @@ import './styles/stage3-shell.css'
 const DemoBanner = import.meta.env.VITE_DEMO_MODE === 'true' ? lazy(() => import('./demo/DemoBanner.jsx')) : null
 const hasTeamLogo = Object.keys(import.meta.glob('/public/images/brand/causeconnect-logo.png', { eager: true, query: '?url', import: 'default' })).length > 0
 const CreateCampaignDraft = import.meta.env.DEV ? lazy(() => import('./pages/CreateCampaignDraftPage.jsx')) : null
+const routeTitles = {
+  home: 'Home', login: 'Login', register: 'Create your account', logout: 'Logout',
+  'create-campaign': 'Create a campaign', 'business-campaign': 'Create a business campaign',
+  'business-profile': 'Business profile', 'my-campaigns': 'My campaigns',
+  'my-participation': 'My participation', 'business-enquiries': 'Business enquiries',
+  'admin-users': 'Manage accounts', 'admin-campaigns': 'Review campaigns',
+  'admin-review': 'Campaign review', 'edit-campaign': 'Edit campaign',
+  'campaign-details': 'Campaign details', 'campaign-draft': 'Campaign form preview',
+  'not-found': 'Page not found',
+}
 
 export function getRoute(pathname) {
   const path = pathname.length > 1 ? pathname.replace(/\/$/, '') : pathname
@@ -40,6 +50,9 @@ export function getRoute(pathname) {
 
 export default function App({ pathname = window.location.pathname }) {
   const route = getRoute(pathname)
+  useEffect(() => {
+    document.title = `${routeTitles[route.name] || 'Page not found'} | CauseConnect`
+  }, [route.name])
   const { token, user, sessionExpired } = useSession()
   const role = user?.role
   const sessionProps = { token, role }

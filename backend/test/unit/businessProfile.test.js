@@ -50,11 +50,21 @@ test("business profile rejects forged ownership, privilege and prototype fields"
   assert.equal({}.polluted, undefined);
 });
 
-test("business website requires a full HTTP(S) URL with a host and no credential or control text", () => {
-  for (const website of ["https://example.test", "http://example.test/path?q=1#here", "HTTPS://EXAMPLE.TEST/", "https://example.test/path@public"]) {
+test("business website accepts explicit HTTP(S), encoded paths and non-authority @ without changing the saved address", () => {
+  for (const website of ["https://example.test", "http://example.test/path?q=1#here", "HTTPS://EXAMPLE.TEST/", "https://example.test/path@public?contact=team@example.test", "https://example.test/our%20services?q=local%20repairs#details", "https://example.test/caf%C3%A9"]) {
     assert.equal(validateBusinessProfileInput({ ...valid, website }).website, website);
+    assert.equal(validateBusinessProfileInput({ ...valid, website: `  ${website}  ` }).website, website);
   }
-  for (const website of ["example.test", "/relative", "https:example.test", "https://", "ftp://example.test", "javascript:alert(1)", "https://user:private-password@example.test", "https://user@example.test", "https://@example.test", "https://exa\nmple.test"]) {
+});
+
+test("business website rejects URL-parser repairs, raw whitespace, backslashes, controls and credential text", () => {
+  for (const website of [
+    "example.test", "/relative", "http:example.test", "https:example.test", "https://", "https:///example.test", "https:////example.test",
+    "ftp://example.test", "javascript:alert(1)", "https://user:private-password@example.test", "https://user@example.test", "https://@example.test",
+    "https://example.test/our services", "https://example.test/?q=local repairs", "https://example.test/#our services",
+    "https://example.test\\path", "https://\\example.test", "https://exa\nmple.test", "https://example.test/a\tb",
+    "https://example.test/a\rb", "https://example.test/a\u0000b", "https://example.test/a\u007fb", "https://example.test/our\u00a0services",
+  ]) {
     assert.throws(() => validateBusinessProfileInput({ ...valid, website }), (error) => {
       assert.ok(failure("website")(error));
       assert.ok(!JSON.stringify(error.fieldErrors).includes("private-password"));
@@ -156,7 +166,9 @@ test("profile methods reject expired sessions, suspended users and stale role cl
 
 test("invalid profile writes perform no transaction and database failures propagate for safe masking", async () => {
   const f = fixture();
-  for (const body of [null, { ...valid, businessName: " " }, { ...valid, ownerId: 9 }]) await assert.rejects(f.service.save(body, actor, token), (error) => error.status === 422);
+  for (const body of [null, { ...valid, businessName: " " }, { ...valid, ownerId: 9 },
+    ...["https://example.test/our services", "https://example.test\\path", "http:example.test"].map((website) => ({ ...valid, website })),
+  ]) await assert.rejects(f.service.save(body, actor, token), (error) => error.status === 422);
   assert.deepEqual(f.calls, []);
   const error = new Error("private database details");
   const creating = fixture({ createError: error });

@@ -3,16 +3,34 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import MyCampaignsPage from './MyCampaignsPage.jsx'
 
 const pending = { id: 12, title: 'Neighbourhood gardens', description: 'Plant a shared garden.', category: 'Environment', status: 'pending' }
+function toggleDetails(details, open = true) { details.open = open; fireEvent(details, new Event('toggle')) }
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks() })
 
 describe('owner campaign status', () => {
+  it('does not mount private photos in closed details or replace a working ticket on each refresh', async () => {
+    const loader = vi.fn().mockResolvedValueOnce({ campaigns: [{ ...pending, imageUrl: '/private-photo?signature=old' }], page: 1, pageSize: 10 })
+      .mockResolvedValue({ campaigns: [{ ...pending, imageUrl: '/private-photo?signature=new' }], page: 1, pageSize: 10 })
+    render(<MyCampaignsPage token="owner" role="public" campaignLoader={loader} />)
+    const summary = await screen.findByText(/View submitted details/)
+    expect(screen.queryByAltText('Your submitted campaign image')).toBeNull()
+    const details = summary.closest('details')
+    toggleDetails(details)
+    const photo = await screen.findByAltText('Your submitted campaign image')
+    expect(photo.getAttribute('loading')).toBe('lazy')
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Refresh status' })))
+    expect(screen.getByAltText('Your submitted campaign image')).toBe(photo)
+    expect(photo.getAttribute('src')).toBe('/private-photo?signature=old')
+    toggleDetails(details, false)
+    expect(screen.queryByAltText('Your submitted campaign image')).toBeNull()
+  })
+
   it('shows a refreshed signed image after the previous URL failed without closing details', async () => {
     const loader = vi.fn().mockResolvedValueOnce({ campaigns: [{ ...pending, imageUrl: '/private-photo?signature=old' }], page: 1, pageSize: 10 })
       .mockResolvedValueOnce({ campaigns: [{ ...pending, imageUrl: '/private-photo?signature=new' }], page: 1, pageSize: 10 })
     render(<MyCampaignsPage token="owner" role="public" campaignLoader={loader} />)
+    const details = (await screen.findByText(/View submitted details/)).closest('details')
+    toggleDetails(details)
     const oldImage = await screen.findByAltText('Your submitted campaign image')
-    const details = oldImage.closest('details')
-    details.open = true
     fireEvent.error(oldImage)
     expect(oldImage.hidden).toBe(true)
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Refresh status' })))
@@ -20,6 +38,57 @@ describe('owner campaign status', () => {
     expect(refreshedImage.getAttribute('src')).toBe('/private-photo?signature=new')
     expect(refreshedImage.hidden).toBe(false)
     expect(details.open).toBe(true)
+  })
+
+  it('uses the latest ticket after an open photo fails, without another campaign request', async () => {
+    const loader = vi.fn().mockResolvedValueOnce({ campaigns: [{ ...pending, imageUrl: '/private-photo?signature=old' }], page: 1, pageSize: 10 })
+      .mockResolvedValueOnce({ campaigns: [{ ...pending, imageUrl: '/private-photo?signature=new' }], page: 1, pageSize: 10 })
+    render(<MyCampaignsPage token="owner" role="public" campaignLoader={loader} />)
+    const details = (await screen.findByText(/View submitted details/)).closest('details')
+    toggleDetails(details)
+    const oldPhoto = await screen.findByAltText('Your submitted campaign image')
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Refresh status' })))
+    expect(oldPhoto.getAttribute('src')).toBe('/private-photo?signature=old')
+    fireEvent.error(oldPhoto)
+    const refreshed = screen.getByAltText('Your submitted campaign image')
+    expect(refreshed).not.toBe(oldPhoto)
+    expect(refreshed.getAttribute('src')).toBe('/private-photo?signature=new')
+    expect(refreshed.hidden).toBe(false)
+    expect(details.open).toBe(true)
+    expect(loader).toHaveBeenCalledTimes(2)
+  })
+
+  it('replaces a changed photo on the same campaign while preserving open details', async () => {
+    const loader = vi.fn().mockResolvedValueOnce({ campaigns: [{ ...pending, imageUrl: '/api/campaign-images/old/content?ticket=one' }], page: 1, pageSize: 10 })
+      .mockResolvedValueOnce({ campaigns: [{ ...pending, imageUrl: '/api/campaign-images/replacement/content?ticket=two' }], page: 1, pageSize: 10 })
+    render(<MyCampaignsPage token="owner" role="public" campaignLoader={loader} />)
+    const details = (await screen.findByText(/View submitted details/)).closest('details')
+    toggleDetails(details)
+    const oldPhoto = await screen.findByAltText('Your submitted campaign image')
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Refresh status' })))
+    const replacement = screen.getByAltText('Your submitted campaign image')
+    expect(replacement).not.toBe(oldPhoto)
+    expect(replacement.getAttribute('src')).toBe('/api/campaign-images/replacement/content?ticket=two')
+    expect(details.open).toBe(true)
+  })
+
+  it('clears private photo state when the session changes, even for the same campaign ID', async () => {
+    let finishNewSession
+    const loader = vi.fn().mockResolvedValueOnce({ campaigns: [{ ...pending, imageUrl: '/private-photo?signature=old-owner' }], page: 1, pageSize: 10 })
+      .mockImplementationOnce(() => new Promise(resolve => { finishNewSession = resolve }))
+    const view = render(<MyCampaignsPage token="owner" role="public" campaignLoader={loader} />)
+    const details = (await screen.findByText(/View submitted details/)).closest('details')
+    toggleDetails(details)
+    await screen.findByAltText('Your submitted campaign image')
+    view.rerender(<MyCampaignsPage token="new-owner" role="public" campaignLoader={loader} />)
+    expect(screen.queryByAltText('Your submitted campaign image')).toBeNull()
+    expect(screen.queryByText(pending.title)).toBeNull()
+    await act(async () => finishNewSession({ campaigns: [{ ...pending, imageUrl: '/private-photo?signature=new-owner' }], page: 1, pageSize: 10 }))
+    const newDetails = screen.getByText(/View submitted details/).closest('details')
+    expect(newDetails.open).toBe(false)
+    expect(screen.queryByAltText('Your submitted campaign image')).toBeNull()
+    toggleDetails(newDetails)
+    expect(screen.getByAltText('Your submitted campaign image').getAttribute('src')).toBe('/private-photo?signature=new-owner')
   })
 
   it('asks guests to sign in without requesting owner data', () => {
@@ -71,15 +140,18 @@ describe('owner campaign status', () => {
   it('refreshes status automatically while preserving open submitted details', async () => {
     vi.useFakeTimers()
     vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
-    const loader = vi.fn().mockResolvedValueOnce({ campaigns: [pending], page: 1, pageSize: 10 })
-      .mockResolvedValueOnce({ campaigns: [{ ...pending, status: 'approved' }], page: 1, pageSize: 10 })
+    const loader = vi.fn().mockResolvedValueOnce({ campaigns: [{ ...pending, imageUrl: '/private-photo?signature=old' }], page: 1, pageSize: 10 })
+      .mockResolvedValueOnce({ campaigns: [{ ...pending, status: 'approved', imageUrl: '/private-photo?signature=new' }], page: 1, pageSize: 10 })
     render(<MyCampaignsPage token="owner" role="public" campaignLoader={loader} />)
     await act(async () => {})
     const details = screen.getByText(/View submitted details/).closest('details')
-    details.open = true
+    toggleDetails(details)
+    const photo = screen.getByAltText('Your submitted campaign image')
     await act(async () => vi.advanceTimersByTimeAsync(30000))
     expect(screen.getByText('Your campaign is approved and visible publicly.')).toBeTruthy()
     expect(details.open).toBe(true)
+    expect(screen.getByAltText('Your submitted campaign image')).toBe(photo)
+    expect(photo.getAttribute('src')).toBe('/private-photo?signature=old')
     expect(screen.getByRole('link', { name: /Manage campaign/ }).getAttribute('href')).toBe('/my-campaigns/12/edit')
   })
 

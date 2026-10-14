@@ -57,6 +57,7 @@ export default function AdminCampaignsPage({ token, role, campaignLoader = loadA
         event.preventDefault()
         setPage(1)
         setSearch(searchInput.trim())
+        setRetry((value) => value + 1)
       }}>
         <div>
           <label htmlFor="admin-campaign-search">Search campaigns</label>
@@ -73,7 +74,8 @@ export default function AdminCampaignsPage({ token, role, campaignLoader = loadA
             {CAMPAIGN_STATUSES.map((value) => <option key={value} value={value}>{value[0].toUpperCase() + value.slice(1)}</option>)}
           </select>
         </div>
-        <button type="submit">Search</button>
+        <button type="submit" disabled={requestState === 'loading'}>Search</button>
+        <button type="button" disabled={requestState === 'loading'} onClick={() => setRetry((value) => value + 1)}>Refresh campaigns</button>
       </form>
 
       {requestState === 'loading' ? <p role="status">Loading campaigns…</p> : null}

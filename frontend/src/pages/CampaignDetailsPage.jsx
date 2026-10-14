@@ -18,6 +18,7 @@ function hideBrokenImage(event) {
   else {
     event.currentTarget.dataset.fallback = 'true'
     event.currentTarget.src = '/campaign-placeholder.svg'
+    event.currentTarget.alt = ''
   }
 }
 
@@ -30,7 +31,8 @@ function formatCampaignType(type) {
 function businessWebsite(value) {
   if (typeof value !== 'string') return null
   const address = value.trim()
-  if (!/^https?:\/\//i.test(address) || /[\\\x00-\x20\x7f]/.test(address)) return null
+  const authority = address.match(/^https?:\/\/([^/?#]*)/i)?.[1]
+  if (!authority || authority.includes('@') || /[\s\\\x00-\x1f\x7f]/.test(address)) return null
   try {
     const url = new URL(address)
     return ['http:', 'https:'].includes(url.protocol) && url.hostname && !url.username && !url.password ? url.href : null
@@ -106,7 +108,7 @@ export default function CampaignDetailsPage({
           <img
             key={`${campaign.id}:${campaign.imageUrl || ''}`}
             src={campaign.imageUrl || '/campaign-placeholder.svg'}
-            alt=""
+            alt={campaign.imageUrl ? `Campaign photo: ${campaign.title}` : ''}
             decoding="async"
             onError={hideBrokenImage}
           />

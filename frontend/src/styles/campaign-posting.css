@@ -1,4 +1,6 @@
-.campaign-photo-preview { display: flex; align-items: center; gap: 1rem; padding: 1rem; border: 1px solid var(--color-border, #d5dce4); border-radius: 12px; }
+.campaign-form-card, .campaign-form-field, .campaign-form-success, .campaign-posting-context, .campaign-profile-state { min-width: 0; }
+.campaign-form-success, .campaign-posting-context, .campaign-profile-state { overflow-wrap: anywhere; }
+.campaign-photo-preview { display: flex; min-width: 0; align-items: center; gap: 1rem; padding: 1rem; border: 1px solid var(--color-border, #d5dce4); border-radius: 12px; }
 .campaign-photo-preview img { width: 140px; height: 100px; object-fit: cover; border-radius: 8px; }
 .campaign-photo-preview p { margin: 0 0 .5rem; overflow-wrap: anywhere; }
 .campaign-photo-preview > div { min-width: 0; }

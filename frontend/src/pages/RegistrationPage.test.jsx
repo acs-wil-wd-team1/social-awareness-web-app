@@ -137,6 +137,43 @@ describe('CauseConnect registration page', () => {
     expect(screen.getByRole('status').textContent).toContain('Registration successful')
   })
 
+  it('locks every registration control so a pending account cannot change identity', async () => {
+    let resolve
+    fetch.mockReturnValueOnce(new Promise(done => { resolve = done }))
+    render(<RegistrationPage />)
+    fillRegistration()
+    fireEvent.click(screen.getByRole('button', { name: 'Register' }))
+    for (const label of ['Account type', 'Name', 'Email', 'Password', 'Confirm password']) {
+      expect(screen.getByLabelText(label).disabled).toBe(true)
+    }
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'different@example.test' } })
+    fireEvent.change(screen.getByLabelText('Account type'), { target: { value: 'business' } })
+    await act(async () => resolve(response(201, { user: publicUser })))
+    expect(screen.getByLabelText('Email').value).toBe('alex@example.test')
+    expect(screen.getByLabelText('Account type').value).toBe('user')
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({ email: 'alex@example.test', accountType: 'user' })
+    expect(screen.getByRole('status').textContent).toContain('Registration successful')
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('unlocks the same entered registration details after a server rejection', async () => {
+    let resolve
+    fetch.mockReturnValueOnce(new Promise(done => { resolve = done }))
+    render(<RegistrationPage />)
+    fillRegistration()
+    fireEvent.click(screen.getByRole('button', { name: 'Register' }))
+    await act(async () => resolve(response(409, { code: 'EMAIL_EXISTS', message: 'This email is already registered.', fieldErrors: { email: 'Use another email.' } })))
+    for (const label of ['Account type', 'Name', 'Email', 'Password', 'Confirm password']) {
+      expect(screen.getByLabelText(label).disabled).toBe(false)
+    }
+    expect(screen.getByLabelText('Email').value).toBe('alex@example.test')
+    expect(screen.getByLabelText('Password').value).toBe('FrontendTestPass123!')
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'different@example.test' } })
+    expect(screen.getByLabelText('Email').value).toBe('different@example.test')
+    expect(screen.queryByText(/Registration successful/)).toBeNull()
+    expect(screen.getByRole('button', { name: 'Register' }).disabled).toBe(false)
+  })
+
   it.each([['user', 'business_owner'], ['business', 'public']])('does not confirm a %s registration returned as %s', async (type, role) => {
     vi.mocked(fetch).mockResolvedValue(response(201, { user: { ...publicUser, role } }))
     render(<RegistrationPage />)

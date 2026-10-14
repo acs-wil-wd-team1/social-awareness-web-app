@@ -1,8 +1,8 @@
 # Campaign participation and business enquiries
 
-**Status, 14 October 2026:** All five routes below are merged through PR #19 and deployed at [CauseConnect on AWS](https://52.62.2.87), using the existing Participation and Lead tables. Unit, HTTP/MySQL and real-frontend regression tests passed; production acceptance includes participation. Enquiry regression uses isolated Business fixtures, not the unfinished fresh-business onboarding flow. See the [release evidence](../evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) for exact scope; sample-mode responses are not backend evidence.
+**Status, 14 October 2026:** All five routes below are implemented at [CauseConnect on AWS](https://52.62.2.87), using the existing Participation and Lead tables. PR #22 completed business-profile setup; the [business integration receipt](../evidence/stage-3/business-profile-integration/README.md) records the actual hosted new-business, campaign approval, enquiry and owner-inbox journey. The earlier [PR #19 evidence](../evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) remains historical. Sample-mode responses are not backend evidence; independent tester acceptance remains separate.
 
-This covers joining or supporting a social-cause campaign and sending a business an expression of interest. It does not add payments, donations, bookings, email delivery or a lead-management workflow. These additional APIs are tracked under AWT-175; they do not replace Kim's remaining business-profile work.
+This covers joining or supporting a social-cause campaign and sending a business an expression of interest. It does not add payments, donations, bookings, email delivery or a lead-management workflow. These additional APIs are tracked under AWT-175 and use the implemented business-profile workflow.
 
 Follow the [shared conventions](shared-conventions.md), [campaign read contract](campaign-read-contract.md) and [business profile contract](business-profile-contract.md). IDs below are positive JSON integers, not numeric strings. Timestamps are ISO 8601 UTC strings.
 

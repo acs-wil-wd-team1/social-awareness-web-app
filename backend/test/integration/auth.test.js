@@ -293,6 +293,68 @@ describe("authentication HTTP and MySQL integration", () => {
     assert.equal(await db.UserSession.count({ where: { userId: publicAccount.userId } }), sessionCount);
   });
 
+  it("returns typed 401 for expired/invalid JWTs without disguising real role restrictions", async () => {
+    const claims = { id: publicAccount.userId, role: "public", status: "active" };
+    const expiredToken = jwt.sign(claims, process.env.JWT_SECRET, {
+      expiresIn: -1, jwtid: randomBytes(16).toString("base64url"),
+    });
+    const expiredSession = await db.UserSession.create({
+      userId: publicAccount.userId, token: expiredToken,
+      ipAddress: "127.0.0.1", userAgent: fixtureTag, status: "active",
+    });
+    const activeBefore = await db.UserSession.findOne({ where: { token: loginToken } });
+    assert.equal(activeBefore.status, "active");
+    for (const token of [
+      expiredToken,
+      jwt.sign(claims, "different-integration-fixture-signing-key", { expiresIn: "1h" }),
+      jwt.sign({ ...claims, nbf: Math.floor(Date.now() / 1000) + 3600 }, process.env.JWT_SECRET),
+      "not-a-jwt",
+    ]) {
+      const result = await request("/api/auth/logout", { method: "PUT", token });
+      assert.equal(result.status, 401);
+      assert.equal(result.body.code, "INVALID_TOKEN");
+      assert.equal(result.body.error, "Invalid token");
+      assert.equal(result.body.message, "Your session is invalid or has expired");
+      assert.equal(result.body.fieldErrors, null);
+      assert.equal(result.body.stack, undefined);
+      assert.equal(JSON.stringify(result.body).includes(token), false);
+    }
+    // A JWT already unusable through expiry needs no revocation write. Do not
+    // imply its retained ledger row or an unrelated active session was changed.
+    await expiredSession.reload();
+    assert.equal(expiredSession.status, "active");
+    assert.equal(expiredSession.logoutAt, null);
+    assert.equal((await db.UserSession.findOne({ where: { token: loginToken } })).status, "active");
+    const protectedExpired = await request("/api/campaigns/mine", { method: "GET", token: expiredToken });
+    assert.equal(protectedExpired.status, 401);
+    assert.equal(protectedExpired.body.code, "INVALID_TOKEN");
+    const forbidden = await request("/api/campaigns/admin", { method: "GET", token: loginToken });
+    assert.equal(forbidden.status, 403);
+    assert.equal(forbidden.body.code, "FORBIDDEN");
+  });
+
+  it("rejects missing sessions and mismatched verified ownership without revoking another ledger owner", async () => {
+    const claims = { id: publicAccount.userId, role: "public", status: "active" };
+    const absentToken = jwt.sign(claims, process.env.JWT_SECRET, { expiresIn: "1h", jwtid: randomBytes(16).toString("base64url") });
+    const mismatchedToken = jwt.sign({ ...claims, id: publicAccount.userId + 100000 }, process.env.JWT_SECRET, {
+      expiresIn: "1h", jwtid: randomBytes(16).toString("base64url"),
+    });
+    const mismatchedSession = await db.UserSession.create({
+      userId: publicAccount.userId, token: mismatchedToken,
+      ipAddress: "127.0.0.1", userAgent: fixtureTag, status: "active",
+    });
+    for (const token of [absentToken, mismatchedToken]) {
+      const result = await request("/api/auth/logout", { method: "PUT", token });
+      assert.equal(result.status, 401);
+      assert.equal(result.body.code, "INVALID_TOKEN");
+      assert.equal(result.body.error, "Session expired or logged out");
+      assert.equal(result.body.fieldErrors, null);
+    }
+    await mismatchedSession.reload();
+    assert.equal(mismatchedSession.status, "active");
+    assert.equal(mismatchedSession.logoutAt, null);
+  });
+
   it("logout expires the persisted session, invalidates its token and rejects repeated/malformed logout", async () => {
     assert.equal((await request("/api/campaigns/mine", { method: "GET", token: loginToken })).status, 200);
     const logout = await request("/api/auth/logout", { method: "PUT", token: loginToken });
@@ -305,15 +367,16 @@ describe("authentication HTTP and MySQL integration", () => {
     assert.equal(protectedRoute.body.code, "INVALID_TOKEN");
     const repeated = await request("/api/auth/logout", { method: "PUT", token: loginToken });
     assert.equal(repeated.status, 401);
-    // The existing logout guard has a documented legacy error wrapper. Keep
-    // that separate from the standardized protected-campaign guard response.
+    // Retain the legacy error field alongside the typed response envelope.
     assert.equal(repeated.body.error, "Session expired or logged out");
+    assert.equal(repeated.body.code, "INVALID_TOKEN");
     for (const [headers, expectedStatus] of [
-      [{}, 401], [{ Authorization: "Basic fixture" }, 403], [{ Authorization: "Bearer fixture extra" }, 403],
+      [{}, 401], [{ Authorization: "Basic fixture" }, 401], [{ Authorization: "Bearer fixture extra" }, 401],
     ]) {
       const result = await request("/api/auth/logout", { method: "PUT", headers });
       assert.equal(result.status, expectedStatus);
       assert.equal(typeof result.body.error, "string");
+      assert.equal(result.body.code, "INVALID_TOKEN");
       assert.equal(result.body.stack, undefined);
     }
   });

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import useLiveRefresh from '../hooks/useLiveRefresh.js'
 import {
   CAMPAIGN_STATUSES, campaignListHasNext, formatCampaignDate,
@@ -6,6 +6,38 @@ import {
 } from '../services/campaignManagementService.js'
 import '../styles/campaign-management.css'
 const privateUnavailable = error => [401, 403, 404].includes(error?.status)
+
+function SubmittedPhoto({ imageUrl }) {
+  const [source, setSource] = useState(imageUrl)
+  const [failed, setFailed] = useState(false)
+  useEffect(() => {
+    if (failed && imageUrl !== source) {
+      setSource(imageUrl)
+      setFailed(false)
+    }
+  }, [failed, imageUrl, source])
+  function failedPreview() {
+    if (imageUrl !== source) {
+      setSource(imageUrl)
+      setFailed(false)
+    } else setFailed(true)
+  }
+  return <>
+    <img key={source} className="campaign-management__image" src={source} alt="Your submitted campaign image" loading="lazy" hidden={failed} onError={failedPreview} />
+    {failed ? <p>Photo preview unavailable. Refresh status to try again.</p> : null}
+  </>
+}
+
+function SubmittedDetails({ campaign, children }) {
+  const [open, setOpen] = useState(false)
+  // Signing tickets change during polling; the photo identity stays in its path.
+  const photoKey = campaign.imageUrl?.split(/[?#]/, 1)[0]
+  return <details onToggle={event => setOpen(event.currentTarget.open)}>
+    <summary>View submitted details<span className="visually-hidden"> for {campaign.title}</span></summary>
+    {open && campaign.imageUrl ? <SubmittedPhoto key={photoKey} imageUrl={campaign.imageUrl} /> : null}
+    {children}
+  </details>
+}
 
 export default function MyCampaignsPage({ token, role, campaignLoader = loadMyCampaigns }) {
   const [status, setStatus] = useState('')
@@ -81,9 +113,7 @@ export default function MyCampaignsPage({ token, role, campaignLoader = loadMyCa
                       <p>{campaign.review?.comments || 'No review feedback was provided.'}</p>
                     </div>
                   ) : campaign.review?.comments ? <p><strong>Review note:</strong> {campaign.review.comments}</p> : null}
-                  <details>
-                    <summary>View submitted details<span className="visually-hidden"> for {campaign.title}</span></summary>
-                    {campaign.imageUrl ? <img key={campaign.imageUrl} className="campaign-management__image" src={campaign.imageUrl} alt="Your submitted campaign image" onError={(event) => { event.currentTarget.hidden = true }} /> : null}
+                  <SubmittedDetails campaign={campaign}>
                     <p className="campaign-management__description">{campaign.description}</p>
                     <dl className="campaign-management__facts">
                       <div><dt>Campaign reference</dt><dd>#{campaign.id}</dd></div>
@@ -93,7 +123,7 @@ export default function MyCampaignsPage({ token, role, campaignLoader = loadMyCa
                       {campaign.targetAudience ? <div><dt>Target audience</dt><dd>{campaign.targetAudience}</dd></div> : null}
                       {campaign.review?.reviewedAt ? <div><dt>Reviewed</dt><dd>{formatCampaignDate(campaign.review.reviewedAt)}</dd></div> : null}
                     </dl>
-                  </details>
+                  </SubmittedDetails>
                   <p><a className="text-link" href={`/my-campaigns/${campaign.id}/edit`}>{campaign.status === 'rejected' ? 'Edit and resubmit' : 'Manage campaign'}<span className="visually-hidden">: {campaign.title}</span></a></p>
                   {campaign.status === 'approved' ? <a className="text-link" href={`/campaigns/${campaign.id}`}>View public campaign<span className="visually-hidden">: {campaign.title}</span></a> : null}
                 </li>

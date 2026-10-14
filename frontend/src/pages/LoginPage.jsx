@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { apiRequest } from '../services/apiClient.js'
-import { authPagePath, safeReturnPath, storeSession } from '../services/authSession.js'
+import { authPagePath, getSession, safeReturnPath, storeSession } from '../services/authSession.js'
 
 const initialValues = {
   email: '',
@@ -16,6 +16,20 @@ export default function LoginPage() {
   const [validationAnnouncement, setValidationAnnouncement] = useState('')
   const form = useRef(null)
   const focusError = useRef(false)
+  const mounted = useRef(false)
+  const inFlight = useRef(false)
+  const requestVersion = useRef(0)
+  const request = useRef(null)
+
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      requestVersion.current += 1
+      request.current?.abort()
+      inFlight.current = false
+    }
+  }, [])
 
   useEffect(() => {
     if (focusError.current && !isSubmitting) {
@@ -61,6 +75,7 @@ export default function LoginPage() {
 
   async function handleSubmit(event) {
     event.preventDefault()
+    if (inFlight.current || !mounted.current) return
 
     const nextErrors = {
       email: validateField('email', formValues.email),
@@ -77,32 +92,48 @@ export default function LoginPage() {
       return
     }
 
+    inFlight.current = true
     setIsSubmitting(true)
+    const version = ++requestVersion.current
+    const previousToken = getSession().token
+    const controller = new AbortController()
+    request.current = controller
+    const isCurrent = () => mounted.current && version === requestVersion.current
+      && !controller.signal.aborted && getSession().token === previousToken
 
     try {
       const body = await apiRequest('/api/auth/login', {
         method: 'POST',
         expectedStatus: 200,
+        signal: controller.signal,
         body: {
           email: formValues.email.trim(),
           password: formValues.password,
         },
       })
+      if (!isCurrent()) return
 
       if (typeof body?.token !== 'string' || !body.token.trim() || !Number.isSafeInteger(body.user?.id) || body.user.id <= 0 || !['public', 'business_owner', 'admin'].includes(body.user?.role)) {
         setApiError('The server did not return a valid login session. Please try again.')
         return
       }
 
+      // Check before storing: the normal session event can remount this page.
+      // Keep storing and redirecting synchronous once this request is accepted.
       storeSession(body.token, body.user)
       window.location.href = returnTo
     } catch (error) {
+      if (!isCurrent() || error.code === 'ABORTED') return
       const fields = Object.fromEntries(Object.entries(error.fieldErrors || {}).filter(([name]) => Object.hasOwn(initialValues, name)))
       setErrors(current => ({ ...current, ...fields }))
       focusError.current = Object.keys(fields).length > 0
       setApiError(error.message || 'The login service could not be reached.')
     } finally {
-      setIsSubmitting(false)
+      if (mounted.current && version === requestVersion.current) {
+        inFlight.current = false
+        request.current = null
+        setIsSubmitting(false)
+      }
     }
   }
 
