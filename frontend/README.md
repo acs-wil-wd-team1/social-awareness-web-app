@@ -2,9 +2,9 @@
 
 React frontend for CauseConnect. It includes campaign browsing and posting, business profiles, owner edits, participation, business enquiries, admin campaign/account management and registration/login/logout.
 
-The layout follows the CauseConnect storyboard and web design standards. The frontend calls the [API contracts](../docs/api/api-contract.md). The current application is live at [CauseConnect on AWS](https://52.62.2.87), commit `e612d1b448a31cd6639f161740c31a9e22f63ed6`, release `2026-10-14T08-35-53-193Z-e612d1b448a3`. The [current release evidence](../docs/evidence/stage-3/review-hardening/README.md), [API integration guide](../docs/handoff/stage3-api-handoff.md) and [feature coverage](../docs/handoff/stage3-feature-coverage.md) separate verified work from remaining checks.
+The layout follows the CauseConnect storyboard and web design standards. The frontend calls the [API contracts](../docs/api/api-contract.md). The current application is live at [CauseConnect on AWS](https://52.62.2.87), commit `fc9f9594b9f27e70ad5dc0b2d8f1ee1d754e0949`, release `2026-10-14T09-34-26-691Z-fc9f9594b9f2`. The [current release evidence](../docs/evidence/stage-3/signup-minimum-six/README.md), [API integration guide](../docs/handoff/stage3-api-handoff.md) and [feature coverage](../docs/handoff/stage3-feature-coverage.md) separate verified work from remaining checks. The [PR #21 review-fix receipt](../docs/evidence/stage-3/review-hardening/README.md) is historical.
 
-GET/PUT `/api/business/me` is still missing (Kim's AWT-141/AWT-173). Direct API posting works with an existing Business row, but the browser form first loads the profile: browser posting is blocked for both new and existing owners. An existing linked business's implemented inbox works independently. The complete new-owner registration → profile → campaign → enquiry/inbox journey has not passed.
+GET/PUT `/api/business/me` is not merged or deployed and still returns `404` (Kim's AWT-141/AWT-173). [PR #22](https://github.com/acs-wil-wd-team1/social-awareness-web-app/pull/22) provides an implementation but is open with conflicts and awaits resolution/review. Direct API posting works with an existing Business row, but the browser form first loads the profile: browser posting is blocked for both new and existing owners. An existing linked business's implemented inbox works independently. The complete new-owner registration → profile → campaign → enquiry/inbox journey has not passed.
 
 ## Run locally
 
@@ -43,7 +43,7 @@ npm run build
 
 For API/database checks, use `npm run test:real-backend`. It runs actual components/services against Express and fresh disposable MySQL, then removes its own container and upload fixtures. It needs a running Docker engine, cached `mysql:8` image and installed backend dependencies. Read the [runner instructions and limits](../infra/real-backend-testing.md) first.
 
-Local verification for this release: **630 frontend tests, 89 backend unit tests, 73 backend HTTP/MySQL checks, 19 real frontend/API/database checks, 41 host checks and 21 runner/routing/argument-guard checks passed**. Fifteen Postman assertion checks passed offline; they are not live API execution. The real frontend/API suite uses jsdom, not a full browser. Exact release identity and eight fresh hosted API acceptance groups passed separately; see the [dated result and limits](../docs/evidence/stage-3/review-hardening/README.md). The missing business-profile API is verified as an error, not counted as a completed business journey. Independent team/cross-browser testing remains separate.
+Local verification for this release: **631 frontend tests, 89 backend unit tests, 73 backend HTTP/MySQL checks and 20 real frontend/API/database checks passed**. The real frontend/API suite uses jsdom, not a full browser. The prior PR #21 results for the unchanged host/tooling tree remain 41 host checks, 21 runner/routing/argument-guard checks and 15 offline Postman assertion checks; they were not fresh AWS/API execution for PR #23. Exact release identity, eight fresh hosted API groups and hosted five-/six-character signup and login/logout checks passed separately; see the [current result and limits](../docs/evidence/stage-3/signup-minimum-six/README.md). The unmerged profile API is not counted as a completed business journey. Independent team/cross-browser testing remains separate.
 
 ## Routes
 
@@ -55,7 +55,7 @@ Local verification for this release: **630 frontend tests, 89 backend unit tests
 | `/register` | Registration | Calls `POST /api/auth/register` for a public or business-owner account; preserves `returnTo` in the login links |
 | `/logout` | Logout | Clears the browser session immediately, calls `PUT /api/auth/logout` and offers retry if server revocation is unconfirmed |
 | `/campaigns/new` | Public-user campaign posting | GET categories; optional POST `/api/campaign-images`; POST `/api/campaigns` |
-| `/business/profile` | Business profile | GET/PUT `/api/business/me` — backend still missing |
+| `/business/profile` | Business profile | GET/PUT `/api/business/me` — not merged/deployed; PR #22 awaits conflict resolution/review |
 | `/business/campaigns/new` | Business campaign posting | POST works with an existing profile; browser profile step still needs GET/PUT business API |
 | `/my-campaigns` | Own submissions and review feedback | GET `/api/campaigns/mine`, with pagination and status filter |
 | `/my-campaigns/:id/edit` | Edit/resubmit or soft-delete an owned campaign | GET/PATCH/DELETE `/api/campaigns/mine/:id`; optional image upload |
@@ -78,7 +78,7 @@ The homepage, public details and My campaigns refresh from their read endpoints 
 
 The shared session state restores role-aware navigation after refresh and updates on login/logout/session expiry. Roles are `public`, `business_owner` and `admin`. Client checks control the interface; the API must independently enforce current role, active session, ownership and account status.
 
-This source update permits new registrations with at least 6 Unicode characters and at most 72 UTF-8 bytes; the previous `e612d1b` deployment used 15 characters. Longer passwords are safer. Existing accounts still use their original login passwords, with unchanged hashing, sessions and login rate limits. Auth errors are linked to fields and focus the first invalid field. Public/admin search caps input at 150 characters without clipping a valid search. Actual timestamps display in the viewer's time zone, while campaign start/end calendar dates do not shift. A non-JSON rate-limit response gives a wait instruction; structured photo-quota errors retain their specific explanation.
+The current deployed release permits new registrations with at least 6 Unicode characters and at most 72 UTF-8 bytes. The historical PR #21 `e612d1b` release used 15 characters. Longer passwords are safer. Existing accounts still use their original login passwords, with unchanged hashing, sessions and login rate limits. Auth errors are linked to fields and focus the first invalid field. Public/admin search caps input at 150 characters without clipping a valid search. Actual timestamps display in the viewer's time zone, while campaign start/end calendar dates do not shift. A non-JSON rate-limit response gives a wait instruction; structured photo-quota errors retain their specific explanation.
 
 Campaign image and type values come from API responses. The live UI does not infer them from a campaign title. Missing photos use the neutral local placeholder; missing type values are not invented. Sample photographs belong to explicit sample mode. Their provenance is recorded in [the Stage 2 evidence folder](../docs/evidence/stage-2/campaign-image-provenance.md).
 
@@ -96,6 +96,6 @@ Campaign image and type values come from API responses. The live UI does not inf
 
 The original team logo PNG is included at `public/images/brand/causeconnect-logo.png` and used by the shared header.
 
-Use the [live AWS application](https://52.62.2.87) for real API integration. The older [AWS preview](https://d10e86f5qx46up.cloudfront.net) is a separate **Preview as** sample build using disposable browser data, not the current API deployment. The [current release evidence](../docs/evidence/stage-3/review-hardening/README.md) records the live revision and passed checks. Deployment instructions are in [infra](../infra/README.md). AWS free-tier eligibility or credits do not guarantee zero charges; review the approved resource plan and actual usage.
+Use the [live AWS application](https://52.62.2.87) for real API integration. The older [AWS preview](https://d10e86f5qx46up.cloudfront.net) is a separate **Preview as** sample build using disposable browser data, not the current API deployment. The [current release evidence](../docs/evidence/stage-3/signup-minimum-six/README.md) records the live revision and passed checks. Deployment instructions are in [infra](../infra/README.md). AWS free-tier eligibility or credits do not guarantee zero charges; review the approved resource plan and actual usage.
 
 Notes for the developers manual and demonstration are in [the frontend handoff](../docs/handoff/stage3-frontend-notes.md).

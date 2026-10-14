@@ -1,6 +1,6 @@
 # Shared API conventions
 
-**Status, 14 October 2026:** Conventions used by the campaign, management, engagement and image routes in deployed application commit `e612d1b448a31cd6639f161740c31a9e22f63ed6` at [CauseConnect on AWS](https://52.62.2.87). The business-profile contract is still unimplemented. See the [current release evidence](../evidence/stage-3/review-hardening/README.md) for the exact revision and bounded verification.
+**Status, 14 October 2026:** Conventions used by the campaign, management, engagement and image routes in deployed application commit `fc9f9594b9f27e70ad5dc0b2d8f1ee1d754e0949` at [CauseConnect on AWS](https://52.62.2.87). The business-profile implementation is in open, conflicting PR #22, not merged or deployed. See the [current release evidence](../evidence/stage-3/signup-minimum-six/README.md) for the exact revision and bounded verification; the [PR #21 receipt](../evidence/stage-3/review-hardening/README.md) remains historical.
 
 Submission rules are in the [campaign contract](campaign-posting-contract.md). The [Stage 3 API integration guide](../handoff/stage3-api-handoff.md) maps implemented routes and remaining work. Oversized JSON uses `413 REQUEST_TOO_LARGE`; image errors are documented separately.
 
