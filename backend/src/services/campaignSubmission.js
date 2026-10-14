@@ -79,7 +79,7 @@ async function resolveBusinessId(Business, currentUser, transaction) {
   return business.businessId;
 }
 
-function createCampaignSubmissionService(models, { attachImage, buildImageUrl } = {}) {
+function createCampaignSubmissionService(models, { attachImage, buildImageUrl, allowedRoles = ["public", "business_owner"] } = {}) {
   const { Campaign, Category, Business, sequelize } = models;
   return {
     async listCategories() {
@@ -95,7 +95,7 @@ function createCampaignSubmissionService(models, { attachImage, buildImageUrl } 
       const create = async (transaction) => {
         if (transaction) {
           const { lockActor } = require("./campaignManagementSupport");
-          const user = await lockActor(models, currentUser, token, ["public", "business_owner"], transaction);
+          const user = await lockActor(models, currentUser, token, allowedRoles, transaction);
           currentUser = { id: user.userId, role: user.role };
         }
         const category = await Category.findByPk(values.categoryId, { transaction });

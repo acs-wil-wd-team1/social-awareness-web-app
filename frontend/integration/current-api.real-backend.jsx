@@ -1,6 +1,7 @@
 import React from 'react'
 import { createRequire } from 'node:module'
 import { randomBytes } from 'node:crypto'
+import { File as NativeFile } from 'node:buffer'
 import path from 'node:path'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
@@ -9,6 +10,7 @@ import LoginPage from '../src/pages/LoginPage.jsx'
 import LogoutPage from '../src/pages/LogoutPage.jsx'
 import CreateCampaignPage from '../src/pages/CreateCampaignPage.jsx'
 import BusinessProfilePage from '../src/pages/BusinessProfilePage.jsx'
+import AdminCampaignReviewPage from '../src/pages/AdminCampaignReviewPage.jsx'
 import MyParticipationPage from '../src/pages/MyParticipationPage.jsx'
 import BusinessEnquiriesPage from '../src/pages/BusinessEnquiriesPage.jsx'
 import CampaignParticipation from '../src/components/CampaignParticipation.jsx'
@@ -27,6 +29,11 @@ import { loadAdminUsers, changeUserStatus } from '../src/services/adminUserServi
 const require = createRequire(path.resolve(process.cwd(), '../backend/package.json'))
 const db = require('./src/database/models')
 const bcrypt = require('bcrypt')
+const sharp = require('sharp')
+const frontendRequire = createRequire(path.resolve(process.cwd(), 'package.json'))
+const { FormData: NativeFormData } = frontendRequire('undici')
+const originalFormData = globalThis.FormData
+const apiOrigin = new URL(import.meta.env.VITE_API_BASE_URL).origin
 db.sequelize.options.logging = false
 const tag = process.env.CAUSECONNECT_TEST_RUN
 const password = `LocalOnly-${randomBytes(16).toString('hex')}`
@@ -49,13 +56,16 @@ const payload = () => ({ title: `HTTP campaign ${tag}`, description: 'Created th
 
 beforeAll(async () => {
   expect(DEMO_MODE).toBe(false)
+  // Use real multipart serialization with native fetch. jsdom's File/FormData
+  // are DOM objects, not streamable Node fetch bodies; no request is mocked.
+  globalThis.FormData = NativeFormData
   await db.sequelize.authenticate()
   category = await db.Category.create({ categoryName: `Integration ${tag}` })
   admin = await db.User.create({ fullName: 'Test admin', email: `admin-${tag}@example.test`, passwordHash: await bcrypt.hash(password, 10), role: 'admin', status: 'active' })
   approved = await db.Campaign.create({ title: `Approved ${tag}`, description: 'Existing approved record.', categoryId: category.categoryId, createdBy: admin.userId, status: 'approved' })
 })
 afterEach(() => { cleanup(); localStorage.clear() })
-afterAll(async () => { await db.sequelize.close() })
+afterAll(async () => { globalThis.FormData = originalFormData; await db.sequelize.close() })
 
 describe.sequential('frontend → real Express → disposable MySQL', () => {
   it('rejects a short signup password on the page without creating a database row', async () => {
@@ -189,6 +199,10 @@ describe.sequential('additional frontend flows → real API → disposable MySQL
   let participant, ownerA, ownerB, moderator
   let participantToken, ownerAToken, ownerBToken, moderatorToken
   let cause, managed, businessCampaign, businessA
+  let journeyOwner, journeyToken, journeyBusiness, journeyCampaign, journeyImageBytes
+  const journeyEmail = `new-business-${tag}@example.test`
+  const journeyBusinessName = `New business ${tag}`
+  const journeyTitle = `New business campaign ${tag}`
 
   async function login(account) {
     return (await apiRequest('/api/auth/login', { method: 'POST', body: { email: account.email, password }, expectedStatus: 200 })).token
@@ -214,8 +228,8 @@ describe.sequential('additional frontend flows → real API → disposable MySQL
     ownerAToken = await login(ownerA)
     ownerBToken = await login(ownerB)
     moderatorToken = await login(moderator)
-    // Business-profile GET/PUT remains Kim's separate work. Seed isolated
-    // business fixtures directly; do not invent that API to run these tests.
+    // Existing linked-business fixtures exercise historical inbox isolation.
+    // The fresh onboarding journey below creates its profile through the API.
     const businessRowA = await db.Business.create({ ownerId: ownerA.userId, businessName: `Business A ${tag}` })
     businesses.push(businessRowA.businessId)
     businessA = { id: businessRowA.businessId }
@@ -234,28 +248,171 @@ describe.sequential('additional frontend flows → real API → disposable MySQL
       await db.Participation.destroy({ where: { campaignId: campaigns } })
       await db.CampaignReview.destroy({ where: { campaignId: campaigns } })
       await db.ManagementAudit.destroy({ where: { targetType: 'campaign', targetId: campaigns } })
+      await db.CampaignImage.destroy({ where: { campaignId: campaigns } })
       await db.Campaign.destroy({ where: { campaignId: campaigns }, force: true })
     }
     if (businesses.length) await db.Business.destroy({ where: { businessId: businesses } })
     if (users.length) {
+      await db.CampaignImage.destroy({ where: { ownerId: users } })
       await db.ManagementAudit.destroy({ where: { targetType: 'user', targetId: users } })
       await db.UserSession.destroy({ where: { userId: users } })
       await db.User.destroy({ where: { userId: users } })
     }
   })
 
-  it('shows the unavailable business-profile API honestly without changing the fixture', async () => {
-    const before = (await db.Business.findByPk(businessA.id)).get({ plain: true })
-    await expect(loadBusinessProfile({ token: ownerAToken })).rejects.toMatchObject({ status: 404, code: 'BUSINESS_PROFILE_UNAVAILABLE' })
-    render(<BusinessProfilePage token={ownerAToken} role="business_owner" />)
-    expect(await screen.findByRole('alert')).toBeTruthy()
-    expect(screen.getByRole('alert').textContent).toContain('not available yet')
-    expect(screen.queryByRole('button', { name: 'Retry business profile' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Save business profile' })).toBeNull()
-    expect(screen.queryByRole('heading', { name: 'Business profile saved' })).toBeNull()
-    await expect(saveBusinessProfile({ businessName: `Must not save ${tag}`, abn: '', website: '', description: '' }, { token: ownerAToken })).rejects.toMatchObject({ status: 404, code: 'BUSINESS_PROFILE_UNAVAILABLE' })
-    expect((await db.Business.findByPk(businessA.id)).get({ plain: true })).toEqual(before)
-    expect(await db.Business.count({ where: { ownerId: ownerA.userId } })).toBe(1)
+  it('registers and signs in a new business owner through real pages, then loads an empty profile without seeding one', async () => {
+    render(<RegistrationPage />)
+    registerForm(journeyEmail)
+    change('Account type', 'business')
+    fireEvent.click(screen.getByRole('button', { name: 'Register' }))
+    expect(await screen.findByRole('status')).toHaveProperty('textContent', expect.stringContaining('Registration successful'))
+    journeyOwner = await db.User.scope('withPassword').findOne({ where: { email: journeyEmail } })
+    users.push(journeyOwner.userId)
+    expect(journeyOwner.role).toBe('business_owner')
+    expect(await bcrypt.compare(password, journeyOwner.passwordHash)).toBe(true)
+    expect(await db.Business.count({ where: { ownerId: journeyOwner.userId } })).toBe(0)
+    expect(getSession().token).toBeNull()
+
+    cleanup()
+    render(<LoginPage />)
+    change('Email', journeyEmail)
+    change('Password', password)
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }))
+    await waitFor(() => expect(getSession().token).toBeTruthy())
+    journeyToken = getSession().token
+    expect(getSession().user).toMatchObject({ id: journeyOwner.userId, role: 'business_owner' })
+    expect(await loadBusinessProfile({ token: journeyToken })).toBeNull()
+
+    cleanup()
+    render(<BusinessProfilePage token={journeyToken} role="business_owner" />)
+    expect(await screen.findByLabelText('Business name')).toHaveProperty('value', '')
+    expect(screen.getByRole('button', { name: 'Save business profile' })).toBeTruthy()
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(await db.Business.count({ where: { ownerId: journeyOwner.userId } })).toBe(0)
+  })
+
+  it('saves the first business profile through the form, reloads it, and persists cleared optional fields as SQL null', async () => {
+    render(<BusinessProfilePage token={journeyToken} role="business_owner" />)
+    await screen.findByLabelText('Business name')
+    change('Business name', `  ${journeyBusinessName}  `)
+    change(/ABN/, ' local-reference ')
+    change(/Website/, ' https://business.example.test ')
+    change(/About your business/, '  A harmless local integration business.  ')
+    fireEvent.click(screen.getByRole('button', { name: 'Save business profile' }))
+    await screen.findByRole('heading', { name: 'Business profile saved' })
+    journeyBusiness = await db.Business.findOne({ where: { ownerId: journeyOwner.userId } })
+    businesses.push(journeyBusiness.businessId)
+    expect(journeyBusiness).toMatchObject({ businessName: journeyBusinessName, abn: 'local-reference', website: 'https://business.example.test', description: 'A harmless local integration business.' })
+    expect(await db.Business.count({ where: { ownerId: journeyOwner.userId } })).toBe(1)
+    expect((await loadBusinessProfile({ token: ownerAToken })).id).toBe(businessA.id)
+
+    cleanup()
+    render(<BusinessProfilePage token={journeyToken} role="business_owner" />)
+    expect(await screen.findByLabelText('Business name')).toHaveProperty('value', journeyBusinessName)
+    expect(screen.getByLabelText(/Website/).value).toBe('https://business.example.test')
+    for (const field of [/ABN/, /Website/, /About your business/]) change(field, '')
+    fireEvent.click(screen.getByRole('button', { name: 'Save business profile' }))
+    await screen.findByRole('heading', { name: 'Business profile saved' })
+    expect(await loadBusinessProfile({ token: journeyToken })).toEqual({ id: journeyBusiness.businessId, businessName: journeyBusinessName, abn: null, website: null, description: null })
+    expect(await journeyBusiness.reload()).toMatchObject({ abn: null, website: null, description: null })
+    expect(await db.Business.count({ where: { ownerId: journeyOwner.userId } })).toBe(1)
+  })
+
+  it('handles real profile field validation without changing persisted values or another owner', async () => {
+    const invalid = { businessName: 'B'.repeat(151), abn: '', website: '', description: '' }
+    await expect(saveBusinessProfile(invalid, { token: journeyToken })).rejects.toMatchObject({ status: 422, code: 'VALIDATION_FAILED', fieldErrors: { businessName: expect.any(String) } })
+    await expect(apiRequest('/api/business/me', { method: 'PUT', token: journeyToken, body: { businessName: journeyBusinessName, website: 'https://user:secret@example.test' } })).rejects.toMatchObject({ status: 422, code: 'VALIDATION_FAILED', fieldErrors: { website: expect.any(String) } })
+    await expect(loadBusinessProfile({ token: participantToken })).rejects.toMatchObject({ status: 403 })
+    expect((await loadBusinessProfile({ token: journeyToken })).businessName).toBe(journeyBusinessName)
+    expect((await loadBusinessProfile({ token: ownerAToken })).id).toBe(businessA.id)
+
+    render(<BusinessProfilePage token={journeyToken} role="business_owner" />)
+    await screen.findByLabelText('Business name')
+    change(/Website/, 'ftp://example.test')
+    fireEvent.click(screen.getByRole('button', { name: 'Save business profile' }))
+    expect(screen.getByLabelText(/Website/).getAttribute('aria-invalid')).toBe('true')
+    expect(screen.getByLabelText(/Website/).getAttribute('aria-describedby')).toBe('business-website-error')
+    expect(document.activeElement).toBe(screen.getByLabelText(/Website/))
+    expect(await journeyBusiness.reload()).toMatchObject({ businessName: journeyBusinessName, website: null })
+  })
+
+  it('posts a photo-backed business campaign through the actual page and reloads its private persisted photo', async () => {
+    storeSession(journeyToken, { id: journeyOwner.userId, role: 'business_owner', name: 'New integration business' })
+    render(<CreateCampaignPage token={journeyToken} role="business_owner" mode="business" />)
+    await screen.findByRole('option', { name: category.categoryName })
+    await screen.findByText(journeyBusinessName)
+    const value = { ...payload(), title: journeyTitle }
+    change('Campaign title', value.title)
+    change('Description', value.description)
+    change('Category', String(value.categoryId))
+    change('Start date', value.startDate)
+    change('End date', value.endDate)
+    const photo = await sharp({ create: { width: 8, height: 6, channels: 3, background: 'green' } }).jpeg().toBuffer()
+    fireEvent.change(screen.getByLabelText(/Campaign photo/), { target: { files: [new NativeFile([photo], 'business-test.jpg', { type: 'image/jpeg' })] } })
+    fireEvent.click(screen.getByRole('button', { name: 'Submit campaign for review' }))
+    await screen.findByRole('heading', { name: 'Campaign submitted' })
+    journeyCampaign = await db.Campaign.findOne({ where: { title: journeyTitle } })
+    campaigns.push(journeyCampaign.campaignId)
+    expect(journeyCampaign).toMatchObject({ createdBy: journeyOwner.userId, businessId: journeyBusiness.businessId, status: 'pending', imageUrl: null })
+    const image = await db.CampaignImage.findOne({ where: { campaignId: journeyCampaign.campaignId } })
+    expect(image).toMatchObject({ ownerId: journeyOwner.userId, contentType: 'image/jpeg' })
+    const saved = await loadOwnedCampaign(journeyCampaign.campaignId, { token: journeyToken })
+    expect(saved.imageUrl).toBeTruthy()
+    const privatePhoto = await fetch(new URL(saved.imageUrl, apiOrigin))
+    expect(privatePhoto.status).toBe(200)
+    journeyImageBytes = Buffer.from(await privatePhoto.arrayBuffer())
+    expect(await sharp(journeyImageBytes).metadata()).toMatchObject({ format: 'jpeg', width: 8, height: 6 })
+    await expect(getCampaignById(journeyCampaign.campaignId)).rejects.toMatchObject({ code: 'NOT_FOUND' })
+    await expect(loadOwnedCampaign(journeyCampaign.campaignId, { token: ownerBToken })).rejects.toMatchObject({ status: 404 })
+  })
+
+  it('approves the newly posted business campaign through the real admin page and preserves its public photo', async () => {
+    render(<AdminCampaignReviewPage token={moderatorToken} role="admin" campaignId={journeyCampaign.campaignId} />)
+    await screen.findByRole('heading', { name: journeyTitle })
+    fireEvent.click(screen.getByLabelText('Approve campaign'))
+    change('Review comments (optional)', 'New-business integration review.')
+    fireEvent.click(screen.getByRole('button', { name: 'Review decision' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm approval' }))
+    await screen.findByText('Campaign approved. It is now available publicly.')
+    expect(await journeyCampaign.reload()).toHaveProperty('status', 'approved')
+    const publicCampaign = (await getCampaignById(journeyCampaign.campaignId)).campaign
+    expect(publicCampaign).toMatchObject({ type: 'business', business: { id: journeyBusiness.businessId, businessName: journeyBusinessName } })
+    const publicPhoto = await fetch(new URL(publicCampaign.imageUrl, apiOrigin))
+    expect(publicPhoto.status).toBe(200)
+    expect(Buffer.from(await publicPhoto.arrayBuffer())).toEqual(journeyImageBytes)
+    expect((await loadCampaignReviews(journeyCampaign.campaignId, { token: moderatorToken })).reviews).toHaveLength(1)
+  })
+
+  it('sends a real enquiry to the newly onboarded business and reads it only through its owner inbox', async () => {
+    const publicCampaign = (await getCampaignById(journeyCampaign.campaignId)).campaign
+    render(<CampaignEnquiryForm campaign={publicCampaign} token={participantToken} role="public" />)
+    change('Name', '  New-business visitor  ')
+    change('Email', 'NEW-VISITOR@EXAMPLE.TEST')
+    change('Message', `  New business enquiry ${tag}.  `)
+    fireEvent.click(screen.getByRole('button', { name: 'Send enquiry' }))
+    await screen.findByRole('heading', { name: 'Enquiry sent' })
+    const rows = await db.Lead.findAll({ where: { campaignId: journeyCampaign.campaignId } })
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ businessId: journeyBusiness.businessId, userId: participant.userId, name: 'New-business visitor', email: 'new-visitor@example.test', phone: null, message: `New business enquiry ${tag}.` })
+    cleanup()
+    render(<BusinessEnquiriesPage token={journeyToken} role="business_owner" />)
+    await screen.findByText(`New business enquiry ${tag}.`)
+    expect(screen.getByRole('link', { name: 'new-visitor@example.test' })).toBeTruthy()
+    cleanup()
+    render(<BusinessEnquiriesPage token={ownerBToken} role="business_owner" />)
+    await screen.findByText('No enquiries on this page.')
+    expect(screen.queryByText(`New business enquiry ${tag}.`)).toBeNull()
+    expect((await loadBusinessEnquiries({ token: ownerBToken })).total).toBe(0)
+  })
+
+  it('logs out the newly onboarded owner and rejects their profile and inbox token while retaining saved business data', async () => {
+    storeSession(journeyToken, { id: journeyOwner.userId, role: 'business_owner', name: 'New integration business' })
+    render(<LogoutPage />)
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe('You’re logged out.'))
+    expect((await db.UserSession.findOne({ where: { token: journeyToken } })).status).toBe('expired')
+    await expect(loadBusinessProfile({ token: journeyToken })).rejects.toMatchObject({ status: 401 })
+    await expect(loadBusinessEnquiries({ token: journeyToken })).rejects.toMatchObject({ status: 401 })
+    expect(await journeyBusiness.reload()).toHaveProperty('businessName', journeyBusinessName)
   })
 
   it('joins and withdraws through the participation component and reads the saved first-join timestamp', async () => {

@@ -48,7 +48,9 @@ app.use((err, req, res, next) => {
     return res.status(status).json({
       status,
       code: status === 413 ? "REQUEST_TOO_LARGE" : invalidBody ? "VALIDATION_FAILED" : "INTERNAL_SERVER_ERROR",
-      message: status === 413 ? "Request body is too large" : invalidBody ? "Campaign data is invalid" : "Something went wrong",
+      message: status === 413 ? "Request body is too large" : invalidBody
+        ? (/^\/api\/business(\/|$)/i.test(req.path) ? "Business profile data is invalid" : "Campaign data is invalid")
+        : "Something went wrong",
       fieldErrors: invalidBody ? { body: "Send a valid JSON object" } : null,
     });
   }

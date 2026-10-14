@@ -1,10 +1,20 @@
+"use strict";
+
 const express = require("express");
-const router = express.Router();
-const Controllers = require("../controllers");
+const { createCurrentAccountGuard } = require("../middleware/currentAccountAuthentication");
+const { createBusinessProfileService } = require("../services/businessServices");
+const { createBusinessProfileController } = require("../controllers/business");
 
-const protect = require("../middleware/authentication")
+function createBusinessProfileRouter(models, { service = createBusinessProfileService(models) } = {}) {
+  const router = express.Router();
+  const owner = createCurrentAccountGuard(models, {
+    roles: ["business_owner"], forbiddenMessage: "Only active business owners can use a business profile",
+  });
+  const controller = createBusinessProfileController(service);
+  router.get("/me", owner, controller.getMyProfile);
+  router.put("/me", owner, controller.updateProfile);
+  return router;
+}
 
-router.get("/me", protect, Controllers.businessController.getMyProfile)
-router.put("/me", protect, Controllers.businessController.updateProfile)
-
-module.exports = router;
+module.exports = createBusinessProfileRouter(require("../database/models"));
+module.exports.createBusinessProfileRouter = createBusinessProfileRouter;

@@ -1,65 +1,25 @@
 "use strict";
 
-const { Category, Campaign } = require("../database/models");
-const {
-  isBusinessOwner,
-  businessProfile,
-} = require("../services/businessServices");
-const { validateCampaignInput } = require("../services/campaignSubmission");
+const { createCampaignSubmissionService } = require("./campaignSubmission");
+const { serviceError } = require("../utils/serviceError");
 
-const submitBusinessCampaigns = async (body, userId) => {
-  await isBusinessOwner(userId);
-
-  const business = await businessProfile(userId);
-
-  if (!business) {
-    const error = new Error("Business profile not found");
-    error.status = 404;
-    error.code = "BUSINESS_NOT_FOUND";
-    throw error;
-  }
-
-  const values = validateCampaignInput(body);
-
-  const category = await Category.findByPk(values.categoryId);
-
-  if (!category) {
-    const error = new Error("Choose an existing category");
-    error.status = 422;
-    error.code = "VALIDATION_FAILED";
-    error.fieldErrors = {
-      categoryId: "Choose an existing category",
-    };
-    throw error;
-  }
-
-  const campaign = await Campaign.create({
-    ...values,
-    createdBy: userId,
-    businessId: business.businessId,
-    imageUrl: null,
+// The dedicated business route and canonical route share one submission implementation.
+function createBusinessCampaignSubmissionService(models, imageOptions) {
+  const submission = createCampaignSubmissionService(models, {
+    ...imageOptions,
+    allowedRoles: ["business_owner"],
   });
-
   return {
-    campaign: {
-      id: campaign.campaignId,
-      title: campaign.title,
-      description: campaign.description,
-      categoryId: campaign.categoryId,
-      category: category.categoryName,
-      type: "business",
-      imageUrl: campaign.imageUrl,
-      targetAudience: campaign.targetAudience,
-      startDate: campaign.startDate,
-      endDate: campaign.endDate,
-      createdBy: campaign.createdBy,
-      businessId: campaign.businessId,
-      status: campaign.status,
-      createdAt: campaign.createdAt,
+    async submit(body, currentUser, token) {
+      if (currentUser?.role !== "business_owner") {
+        throw serviceError(403, "FORBIDDEN", "Only business owners can post business campaigns");
+      }
+      // The shared transaction rechecks role/status/session and attaches the photo.
+      return submission.submit(body, currentUser, token);
     },
   };
-};
+}
 
 module.exports = {
-  submitBusinessCampaigns,
+  createBusinessCampaignSubmissionService,
 };

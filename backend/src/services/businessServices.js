@@ -1,178 +1,97 @@
 "use strict";
 
-const { Business, User } = require("../database/models");
-const { apiErrorResponse } = require("../utils/apiErrorResponse");
+const { validationError } = require("../utils/serviceError");
+const { validateBody, lockActor } = require("./campaignManagementSupport");
 
-const isBusinessOwner = async (userId) => {
-  const businessOwner = await User.findOne({
-    where: {
-      userId: userId,
-      role: "business_owner",
-    },
-  });
+const PROFILE_FIELDS = ["businessName", "abn", "website", "description"];
+const PROFILE_ATTRIBUTES = ["businessId", ...PROFILE_FIELDS];
 
-  if (!businessOwner) {
-    const error = new Error("Access denied. Business owners only");
-    error.status = 403;
-    error.code = "ACCESS_DENIED";
-    error.field = null;
-
-    throw error;
+function optionalText(body, field, maximum, errors) {
+  const value = body[field];
+  if (value == null) return null;
+  if (typeof value !== "string") {
+    errors[field] = "Use text or leave this field empty";
+    return null;
   }
-  return;
-};
+  const trimmed = value.trim() || null;
+  if (trimmed?.length > maximum) errors[field] = `Use ${maximum} characters or fewer`;
+  return trimmed;
+}
 
-const businessProfile = (userId) => {
-  const business = Business.findOne({
-    where: {
-      ownerId: userId,
-    },
-    attributes: ["businessId", "businessName", "abn", "website", "description"],
-  });
-
-  return business;
-};
-
-const inputValidation = (businessData) => {
-
-  if (
-    businessData === null ||
-    typeof businessData !== "object" ||
-    Array.isArray(businessData)
-  ) {
-    const error = new Error("Request body must be a JSON object");
-
-    error.status = 400;
-    error.code = "VALIDATION_ERROR";
-
-    throw error;
-  }
-  
-  const { businessName, abn, website, description } = businessData;
-
+function validateBusinessProfileInput(body) {
+  validateBody(body, PROFILE_FIELDS);
   const errors = {};
-
-  const allowedFields = ["businessName", "abn", "website", "description"];
-  
-
-  const unexpectedFields = Object.keys(businessData).filter(
-    (field) => !allowedFields.includes(field),
-  );
-
-  if (unexpectedFields.length > 0) {
-    errors.fields = `Unexpected fields: ${unexpectedFields.join(", ")}`;
-  }
-
-  // Business name (required)
-  if (typeof businessName !== "string" || !businessName.trim()) {
+  let businessName;
+  if (typeof body.businessName !== "string" || !body.businessName.trim()) {
     errors.businessName = "Business name is required";
-  } else if (businessName.length > 255) {
-    errors.businessName = "Business name must not exceed 255 characters";
+  } else {
+    businessName = body.businessName.trim();
+    if (businessName.length > 150) errors.businessName = "Use 150 characters or fewer";
   }
-
-  // ABN (optional)
-  if (abn != null && abn !== "") {
-    if (typeof abn !== "string" || !/^\d{11}$/.test(abn)) {
-      errors.abn = "ABN must contain exactly 11 digits";
-    }
-  }
-
-  // Website (optional)
-  if (website != null && website !== "") {
-    if (typeof website !== "string") {
-      errors.website = "Website must be a string";
-    } else if (website.length > 2048) {
-      errors.website = "Website must not exceed 2048 characters";
-    } else {
-      try {
-        const url = new URL(website);
-
-        if (!["http:", "https:"].includes(url.protocol)) {
-          errors.website = "Website must use HTTP or HTTPS";
-        }
-      } catch {
-        errors.website = "Invalid website URL";
+  const abn = optionalText(body, "abn", 20, errors);
+  const website = optionalText(body, "website", 255, errors);
+  const description = optionalText(body, "description", 2000, errors);
+  if (website && !errors.website) {
+    try {
+      const url = new URL(website);
+      const authority = website.slice(website.indexOf("://") + 3).split(/[/?#\\]/, 1)[0];
+      if (!/^https?:\/\//i.test(website) || !["http:", "https:"].includes(url.protocol) || !url.hostname
+        || url.username || url.password || authority.includes("@") || /[\u0000-\u001f\u007f]/.test(website)) {
+        throw new Error("Invalid profile website");
       }
+    } catch {
+      errors.website = "Use a full HTTP or HTTPS website address without a username or password";
     }
   }
+  if (Object.keys(errors).length) throw validationError(errors, "Business profile data is invalid");
+  return { businessName, abn, website, description };
+}
 
-  // Description (optional)
-  if (description != null) {
-    if (typeof description !== "string") {
-      errors.description = "Description must be a string";
-    } else if (description.length > 2000) {
-      errors.description = "Description must not exceed 2000 characters";
-    }
-  }
+function serializeBusinessProfile(row) {
+  if (!row) return { business: null };
+  return { business: {
+    id: row.businessId, businessName: row.businessName,
+    abn: row.abn ?? null, website: row.website ?? null, description: row.description ?? null,
+  } };
+}
 
-  if (Object.keys(errors).length > 0) {
-    const error = new Error("Invalid business profile data");
-    error.status = 400;
-    error.code = "VALIDATION_ERROR";
-    error.fieldErrors = errors;
-
-    throw error;
-  }
-
-  return businessData;
-};
-
-const getBusinessProfile = async (userId) => {
-  const business = await businessProfile(userId);
-
-  if (!business)
-    return {
-      business: null,
-    };
-
+function createBusinessProfileService(models) {
+  const { sequelize, Business } = models;
+  const ownedProfile = (ownerId, transaction) => Business.findOne({
+    where: { ownerId }, attributes: PROFILE_ATTRIBUTES, transaction, logging: false,
+  });
   return {
-    business: {
-      id: business.businessId,
-      businessName: business.businessName,
-      abn: business.abn,
-      website: business.website,
-      description: business.description,
+    async get(actor, token) {
+      return sequelize.transaction(async (transaction) => {
+        const user = await lockActor(models, actor, token, ["business_owner"], transaction);
+        return serializeBusinessProfile(await ownedProfile(user.userId, transaction));
+      });
+    },
+    async save(body, actor, token) {
+      const values = validateBusinessProfileInput(body);
+      return sequelize.transaction(async (transaction) => {
+        // Every save locks the owning account first, then its session. Competing
+        // first saves therefore resolve to the same unique owner row. Avoid a
+        // missing-row gap lock so different owners can save concurrently.
+        const user = await lockActor(models, actor, token, ["business_owner"], transaction);
+        let profile = await ownedProfile(user.userId, transaction);
+        if (profile) await profile.update(values, { transaction, logging: false });
+        else profile = await Business.create({ ...values, ownerId: user.userId }, { transaction, logging: false });
+        // Return this transaction's saved receipt, not a later writer's read.
+        return serializeBusinessProfile(profile);
+      });
     },
   };
-};
+}
 
-const updateBusinessProfile = async (businessData, userId) => {
-
-  inputValidation(businessData);
-
-  const { businessName, abn, website, description } = businessData;
-
-  await Business.update(
-    {
-      businessName,
-      abn,
-      website,
-      description,
-    },
-    {
-      where: { ownerId: userId },
-    },
-  );
-};
-
-const createBusinessProfile = async (businessData, userId) => {
-  const { businessName, abn, website, description } = businessData;
-
-  await inputValidation(businessData);
-
-  await Business.create({
-    ownerId: userId,
-    businessName,
-    abn,
-    website,
-    description,
-  });
-};
+let defaultService;
+function getDefaultService() {
+  if (!defaultService) defaultService = createBusinessProfileService(require("../database/models"));
+  return defaultService;
+}
 
 module.exports = {
-  isBusinessOwner,
-  businessProfile,
-  getBusinessProfile,
-  updateBusinessProfile,
-  createBusinessProfile,
+  createBusinessProfileService, validateBusinessProfileInput, serializeBusinessProfile,
+  getBusinessProfile: (...args) => getDefaultService().get(...args),
+  saveBusinessProfile: (...args) => getDefaultService().save(...args),
 };

@@ -1,24 +1,18 @@
 "use strict";
 
-const {
-  submitBusinessCampaigns,
-} = require("../services/businessCampaignSubmissions");
-const { apiErrorResponse } = require("../utils/apiErrorResponse");
+const models = require("../database/models");
+const { createBusinessCampaignSubmissionService } = require("../services/businessCampaignSubmissions");
+const { attachImage, buildImageUrl } = require("../services/campaignImages");
+const { sendServiceError } = require("../utils/serviceError");
+const service = createBusinessCampaignSubmissionService(models, { attachImage, buildImageUrl });
 
 const createBusinessCampaigns = async (req, res) => {
   try {
-    const result = await submitBusinessCampaigns(req.body, req.user.id);
+    const result = await service.submit(req.body, req.user, req.token);
 
     return res.status(201).json(result);
   } catch (err) {
-    console.error(err);
-    return apiErrorResponse(
-      res,
-      err.status || 500,
-      err.code || "INTERNAL_SERVER_ERROR",
-      err.status ? err.message : "Something went wrong",
-      err.fieldErrors ?? null,
-    );
+    return sendServiceError(res, err);
   }
 };
 
