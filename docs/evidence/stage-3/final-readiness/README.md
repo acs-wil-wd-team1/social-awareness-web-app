@@ -23,6 +23,7 @@ This follow-up to PR #22 fixes edge cases found during fresh source review and i
 | Production build | Passed |
 | Host checks, including opt-in isolated Nginx | 41 passed, no skips |
 | Runner safety and preview routing | 6 passed |
+| Hosted acceptance CLI/stub safety tests | 33 passed; no live requests |
 | Offline Postman validator | 15 passed; no requests sent |
 
 The database runner applied all 12 migrations in separate disposable MySQL containers. No shared database, real environment file or demo seeder was used.
@@ -35,4 +36,4 @@ Claude's review was targeted source/CSS/contract inspection, not executed testin
 
 The existing server's Certbot renewal dry run, deploy hook and Nginx syntax check passed on 14 October. The renewal timer is enabled. The current real certificate expires on 19 October; a dry run does not prove future renewal.
 
-At this commit the repairs are tested but not yet published. Add a separate dated hosted receipt after deployment. Independent team testing, actual Safari/Windows Edge and screen-reader checks, future certificate renewal and full/offsite recovery remain separate. No zero-bug claim.
+This local receipt was recorded before publication. The separate [hosted receipt](hosted-2026-10-14.md) records the subsequent deployment and checks. Independent team testing, actual Safari/Windows Edge and screen-reader checks, future certificate renewal and full/offsite recovery remain separate. No zero-bug claim.
