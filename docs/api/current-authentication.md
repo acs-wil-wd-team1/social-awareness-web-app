@@ -30,15 +30,15 @@ Registration does not return a token or create a business profile. Controller er
 
 The frontend limits the trimmed name to 100 characters and email to 150, matching the existing user columns. It confirms registration only when the returned role matches the submitted account type. These browser checks do not replace server-side validation.
 
-**Current registration rule:** new signups
-require **at least 15 Unicode code points and at most 72 UTF-8 bytes**
+**Registration rule in this source update:** new signups
+require **at least 6 Unicode code points and at most 72 UTF-8 bytes**
 in the password. Spaces and Unicode are allowed; the password is not trimmed.
 Both browser and server enforce the same registration rule. The byte ceiling
 avoids bcrypt silently ignoring a suffix. Existing accounts retain their existing
 login passwords; login does not impose the new-signup minimum or rewrite hashes.
-This length rule follows the single-factor minimum in
-[NIST's password guidance](https://pages.nist.gov/800-63-4/sp800-63b/authenticators/);
-it is not a claim that the application meets every NIST requirement.
+The six-character minimum is the requested assessment setting; longer unique
+passwords are safer. This is not a security-certification claim. The earlier
+`e612d1b` release used 15 characters; the six-character rule needs the new release.
 
 ## Login
 

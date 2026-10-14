@@ -102,12 +102,12 @@ test("registration normalizes name/email but preserves the password exactly", ()
   assert.equal(validateRegistrationInput({ ...valid, accountType: "business" }).accountType, "business");
 });
 
-test("new registrations require 15 Unicode characters while existing short-password logins remain valid", () => {
-  for (const password of ["a", "a".repeat(14), "🔒".repeat(8), "🔒".repeat(14)]) {
+test("new registrations require 6 Unicode characters while existing short-password logins remain valid", () => {
+  for (const password of ["a", "a".repeat(5), "🔒".repeat(5)]) {
     invalid(validateRegistrationInput, { ...valid, password }, "password");
     assert.equal(validateLoginInput({ email: valid.email, password }).password, password);
   }
-  for (const password of ["a".repeat(15), "🔒".repeat(15), "a long pass phrase with spaces"]) {
+  for (const password of ["a".repeat(6), "🔒".repeat(6), " a🔒éz ", "a long pass phrase with spaces"]) {
     assert.equal(validateRegistrationInput({ ...valid, password }).password, password);
   }
 });

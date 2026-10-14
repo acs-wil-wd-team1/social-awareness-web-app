@@ -89,10 +89,12 @@ The [campaign submission contract](../docs/api/campaign-posting-contract.md) lis
 
 ## Authentication
 
-The current release requires new signup passwords to contain at least
-15 Unicode code points and no more than 72 UTF-8 bytes, without trimming. The
+This source update requires new signup passwords to contain at least
+6 Unicode code points and no more than 72 UTF-8 bytes, without trimming. The
 server and registration form share that rule. Existing accounts keep their old
-login passwords; this is not a password reset or hash migration. See the
+login passwords; this is not a password reset or hash migration. The previous
+`e612d1b` release used 15 characters; the six-character minimum needs the new
+deployment. See the
 [authentication contract](../docs/api/current-authentication.md).
 
 ## Admin campaign approval

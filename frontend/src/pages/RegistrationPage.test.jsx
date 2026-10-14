@@ -209,11 +209,11 @@ describe('CauseConnect registration page', () => {
     expect(screen.getByRole('button', { name: 'Register' }).disabled).toBe(false)
   })
 
-  it.each(['short123', '😀'.repeat(14)])('rejects a new password under 15 Unicode characters: %s', password => {
+  it.each(['short', '😀'.repeat(5)])('rejects a new password under 6 Unicode characters: %s', password => {
     render(<RegistrationPage />)
     fillRegistration({ password })
     fireEvent.click(screen.getByRole('button', { name: 'Register' }))
-    expect(screen.getByText(/Use at least 15 characters\. A longer/)).toBeTruthy()
+    expect(screen.getByText(/Use at least 6 characters\. A longer/)).toBeTruthy()
     expect(screen.getByLabelText('Password').getAttribute('aria-describedby')).toBe('register-password-help register-password-error')
     expect(document.activeElement).toBe(screen.getByLabelText('Password'))
     expect(fetch).not.toHaveBeenCalled()
@@ -228,7 +228,7 @@ describe('CauseConnect registration page', () => {
     expect(fetch).not.toHaveBeenCalled()
   })
 
-  it.each(['a'.repeat(15), 'a'.repeat(72), '😀'.repeat(18)])('accepts a policy-compliant new password without requiring arbitrary character types', async password => {
+  it.each(['a'.repeat(6), '😀'.repeat(6), 'a'.repeat(72), '😀'.repeat(18)])('accepts a policy-compliant new password without requiring arbitrary character types', async password => {
     fetch.mockResolvedValue(response(201, { user: publicUser }))
     render(<RegistrationPage />)
     fillRegistration({ password })
