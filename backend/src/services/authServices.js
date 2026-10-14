@@ -2,64 +2,31 @@
 
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
+const { randomBytes } = require("node:crypto");
+const { UniqueConstraintError } = require("sequelize");
 
-const { User, UserSession } = require("../database/models");
+const { sequelize, User, UserSession } = require("../database/models");
+const { validateRegistrationInput, validateLoginInput } = require("../utils/authValidation");
 
 const accountTypeToRole = {
   user: "public",
   business: "business_owner",
 };
 
-const registerUser = async ({
-  name,
-  email,
-  password,
-  accountType,
-  extraFields
-}) => {
-  if (!name || !email || !password || !accountType) {
-    const error = new Error("Registration data is invalid");
-    error.status = 422;
-    error.code = "VALIDATION_FAILED";
-    error.fieldErrors = {
-      ...(!name && { name: "Name is required" }),
-      ...(!email && { email: "Email is required" }),
-      ...(!password && { password: "Password is required" }),
-      ...(!accountType && {
-        accountType: "Account type is required",
-      }),
-    };
+function emailExistsError() {
+  return Object.assign(new Error("Unable to create your account"), {
+    status: 409,
+    code: "EMAIL_EXISTS",
+    fieldErrors: { email: "Email has already been registered. Please use different email." },
+  });
+}
 
-    throw error;
-  }
-
-  if (Object.keys(extraFields).length > 0) {
-    const fields = Object.keys(extraFields);
-
-    const error = new Error(
-      `Unsupported registration field${fields.length > 1 ? "s" : ""}: ${fields.join(", ")}`,
-    );
-    error.status = 422;
-    error.code = "VALIDATION_FAILED";
-    error.fieldErrors = null;
-
-    throw error;
-  }
-
-  if (!["user", "business"].includes(accountType)) {
-    const error = new Error("Registration data is invalid");
-    error.status = 422;
-    error.code = "VALIDATION_FAILED";
-    error.fieldErrors = {
-      accountType: "Account type must be user or business",
-    };
-
-    throw error;
-  }
+const registerUser = async (input) => {
+  const { name, email, password, accountType } = validateRegistrationInput(input);
 
   const role = accountTypeToRole[accountType];
 
-  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedEmail = email;
 
   const existing = await User.findOne({
     where: {
@@ -68,24 +35,28 @@ const registerUser = async ({
   });
 
   if (existing) {
-    const error = new Error("Unable to create your account");
-    error.status = 409;
-    error.code = "EMAIL_EXISTS";
-    error.fieldErrors = {
-      email: "Email has already been registered. Please use different email.",
-    };
-
-    throw error;
+    throw emailExistsError();
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
 
-  const newUser = await User.create({
-    fullName: name.trim(),
-    email: normalizedEmail,
-    passwordHash,
-    role,
-  });
+  let newUser;
+  try {
+    newUser = await User.create({
+      fullName: name,
+      email: normalizedEmail,
+      passwordHash,
+      role,
+    });
+  } catch (error) {
+    // The pre-check cannot serialize concurrent signups. The database's unique
+    // email constraint is authoritative; only map that specific conflict.
+    if (error instanceof UniqueConstraintError && (
+      Object.hasOwn(error.fields || {}, "email")
+      || error.errors?.some((item) => item.path === "email")
+    )) throw emailExistsError();
+    throw error;
+  }
 
   return {
     message: "Registered!",
@@ -98,22 +69,11 @@ const registerUser = async ({
 };
 
 const loginUser = async (email, password, requestMeta = {}) => {
-  if (!email || !password) {
-    const error = new Error("Email and password are required");
-
-    error.status = 422;
-    error.code = "VALIDATION_FAILED";
-    error.fieldErrors = {
-      ...(!email && { email: "Email is required" }),
-      ...(!password && { password: "Password is required" }),
-    };
-
-    throw error;
-  }
+  const credentials = validateLoginInput({ email, password });
 
   const user = await User.scope("withPassword").findOne({
     where: {
-      email: email.trim().toLowerCase(),
+      email: credentials.email,
     },
   });
 
@@ -129,53 +89,59 @@ const loginUser = async (email, password, requestMeta = {}) => {
     throw invalidCredentialsError();
   }
 
-  const isMatch = await bcrypt.compare(password, user.passwordHash);
+  const isMatch = await bcrypt.compare(credentials.password, user.passwordHash);
 
   if (!isMatch) {
     throw invalidCredentialsError();
   }
 
-  if (user.status === "suspended") {
-    const error = new Error("Account is suspended");
+  return sequelize.transaction(async (transaction) => {
+    // Match management's account-before-session lock order. Login cannot create
+    // a fresh active session after a concurrent suspension has revoked sessions.
+    const currentUser = await User.findByPk(user.userId, { transaction, lock: transaction.LOCK.UPDATE });
+    if (!currentUser) throw invalidCredentialsError();
+    if (currentUser.status !== "active") {
+      const error = new Error("Account is suspended");
 
-    error.status = 403;
-    error.code = "ACCOUNT_SUSPENDED";
-    error.fieldErrors = null;
+      error.status = 403;
+      error.code = "ACCOUNT_SUSPENDED";
+      error.fieldErrors = null;
 
-    throw error;
-  }
+      throw error;
+    }
 
-  const token = jwt.sign(
-    {
-      id: user.userId,
-      role: user.role,
-      status: user.status,
-    },
-    process.env.JWT_SECRET,
-    { expiresIn: "1d" },
-  );
+    const token = jwt.sign(
+      {
+        id: currentUser.userId,
+        role: currentUser.role,
+        status: currentUser.status,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d", jwtid: randomBytes(16).toString("base64url") },
+    );
 
-  await UserSession.create({
-    userId: user.userId,
-    token,
-    ipAddress: requestMeta.ipAddress,
-    userAgent: requestMeta.userAgent?.trim() || "Unknown",
-    status: "active",
+    await UserSession.create({
+      userId: currentUser.userId,
+      token,
+      ipAddress: requestMeta.ipAddress,
+      userAgent: requestMeta.userAgent?.trim().slice(0, 255) || "Unknown",
+      status: "active",
+    }, { transaction });
+
+    return {
+      user: {
+        id: currentUser.userId,
+        name: currentUser.fullName,
+        email: currentUser.email,
+        role: currentUser.role,
+      },
+      token,
+    };
   });
-
-  return {
-    user: {
-      id: user.userId,
-      name: user.fullName,
-      email: user.email,
-      role: user.role,
-    },
-    token,
-  };
 };
 
 const logoutUser = async (authHeader) => {
-  if (!authHeader) {
+  if (typeof authHeader !== "string" || !authHeader) {
     const error = new Error("No token provided");
     error.status = 401;
     error.code = "INVALID_TOKEN";
@@ -184,9 +150,8 @@ const logoutUser = async (authHeader) => {
     throw error;
   }
 
-  const [scheme, token] = authHeader.split(" ");
-
-  if (scheme !== "Bearer" || !token) {
+  const match = /^Bearer ([^\s]+)$/i.exec(authHeader);
+  if (!match) {
     const error = new Error("Invalid authentication token");
     error.status = 401;
     error.code = "INVALID_TOKEN";
@@ -194,6 +159,7 @@ const logoutUser = async (authHeader) => {
 
     throw error;
   }
+  const token = match[1];
 
   const [updatedRows] = await UserSession.update(
     {

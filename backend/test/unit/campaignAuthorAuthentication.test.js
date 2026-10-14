@@ -48,11 +48,12 @@ test("requires a valid Bearer token and matching active database session", async
 
 test("uses current database role and status rather than stale JWT claims", async () => {
   const token = sign();
-  for (const role of ["business_owner", "admin"]) {
-    const result = await run({ header: `Bearer ${token}`, user: { userId: 7, role, status: "active" } });
-    assert.equal(result.response.statusCode, 403);
-    assert.equal(result.passed, false);
-  }
+  const admin = await run({ header: `Bearer ${token}`, user: { userId: 7, role: "admin", status: "active" } });
+  assert.equal(admin.response.statusCode, 403);
+  assert.equal(admin.passed, false);
+  const owner = await run({ header: `Bearer ${sign({ role: "public" })}`, user: { userId: 7, role: "business_owner", status: "active" } });
+  assert.equal(owner.passed, true);
+  assert.equal(owner.request.user.role, "business_owner");
   const suspended = await run({ header: `Bearer ${token}`, user: { userId: 7, role: "public", status: "suspended" } });
   assert.equal(suspended.response.body.code, "ACCOUNT_SUSPENDED");
   assert.equal(suspended.response.statusCode, 403);

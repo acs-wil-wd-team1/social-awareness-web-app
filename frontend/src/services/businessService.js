@@ -11,7 +11,16 @@ function readBusiness(body, allowEmpty = false) {
 }
 
 export async function loadBusinessProfile({ token, signal } = {}) {
-  return readBusiness(await apiRequest('/api/business/me', { token, signal, expectedStatus: 200 }), true)
+  try {
+    return readBusiness(await apiRequest('/api/business/me', { token, signal, expectedStatus: 200 }), true)
+  } catch (error) {
+    if (error.status === 404) throw unavailableProfile()
+    throw error
+  }
+}
+
+function unavailableProfile() {
+  return new ApiError('Business profile setup is not available yet. You cannot create a new business campaign until this service is connected. Please check back later.', { status: 404, code: 'BUSINESS_PROFILE_UNAVAILABLE' })
 }
 
 export async function saveBusinessProfile(values, { token, signal } = {}) {
@@ -19,6 +28,7 @@ export async function saveBusinessProfile(values, { token, signal } = {}) {
   try {
     return readBusiness(await apiRequest('/api/business/me', { method: 'PUT', body, token, signal, expectedStatus: 200 }))
   } catch (error) {
+    if (error.status === 404) throw unavailableProfile()
     if (error.code === 'NETWORK_ERROR') throw new ApiError('We could not confirm whether your business profile was saved. Reload the profile to check before saving again.', { code: 'NETWORK_ERROR' })
     throw error
   }

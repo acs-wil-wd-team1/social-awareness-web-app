@@ -62,9 +62,12 @@ export async function apiRequest(path, { method = 'GET', body, token, signal, he
       if (response.status === 401 && token) {
         window.dispatchEvent(new CustomEvent('causeconnect:unauthorized', { detail: { token } }))
       }
-      throw new ApiError((typeof data?.message === 'string' && data.message) || (response.status === 503 ? 'The API is not available yet. Please try again later.' : 'The request could not be completed.'), {
+      const fallbackMessage = response.status === 429
+        ? 'Too many requests. Please wait a minute before trying again.'
+        : response.status === 503 ? 'The API is not available yet. Please try again later.' : 'The request could not be completed.'
+      throw new ApiError((typeof data?.message === 'string' && data.message) || fallbackMessage, {
         status: response.status,
-        code: typeof data?.code === 'string' && data.code.trim() ? data.code : (response.status === 404 ? 'NOT_FOUND' : 'REQUEST_FAILED'),
+        code: typeof data?.code === 'string' && data.code.trim() ? data.code : (response.status === 404 ? 'NOT_FOUND' : response.status === 429 ? 'RATE_LIMITED' : 'REQUEST_FAILED'),
         fieldErrors: data?.fieldErrors && typeof data.fieldErrors === 'object' && !Array.isArray(data.fieldErrors)
           ? Object.fromEntries(Object.entries(data.fieldErrors).filter(([, value]) => typeof value === 'string')) : {},
       })

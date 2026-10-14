@@ -1,0 +1,14 @@
+[Unit]
+Description=CauseConnect private database and upload backup
+After=mysql.service
+Requires=mysql.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/causeconnect-host/backup.sh
+UMask=0077
+Nice=10
+IOSchedulingClass=idle
+NoNewPrivileges=true
+ProtectHome=true
+PrivateTmp=true

@@ -1,15 +1,15 @@
 # Admin account and campaign management
 
-**Status:** The frontend is implemented against this contract. The endpoints and database changes below are proposed backend work, not completed or database-tested features. The sample preview is not a live admin system.
+**Status, 14 October 2026:** These AWT-175 endpoints and migrations are merged through PR #19 and deployed at [CauseConnect on AWS](https://52.62.2.87). See the [release evidence](../evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) for the exact revision, local checks and production acceptance scope. The separate sample preview is not a live admin system.
 
-This extends the [campaign approval contract](admin-campaign-moderation-contract.md). It adds account suspension/reactivation, review history, removal from public view and recoverable campaign deletion. Unice handles the frontend; coordinate the backend implementation with Kim and Rajita. These extra endpoints do not change the agreed dedicated-admin setup: there is no role editor, admin promotion, public admin registration or account-deletion feature.
+This extends the [campaign approval contract](admin-campaign-moderation-contract.md) with account suspension/reactivation, review history, removal from public view and recoverable campaign deletion. These extra endpoints do not change the dedicated-admin setup: there is no role editor, admin promotion, public admin registration or account-deletion feature.
 
 ## Frontend entry points
 
 | Page | What it needs |
 |---|---|
 | `/admin/users` | Search/filter accounts; suspend or reactivate ordinary users and business owners |
-| `/admin/campaigns/:id` | Existing campaign detail; proposed approval API; paginated review history; remove approved content from public view; soft-delete a campaign |
+| `/admin/campaigns/:id` | Campaign detail and approval; paginated review history; remove approved content from public view; soft-delete a campaign |
 
 All requests need a valid Bearer token, a matching active session and an active database user whose current role is `admin`. Browser role checks are not permission enforcement. Never rely only on a role saved in local storage or an old JWT claim.
 
@@ -59,7 +59,7 @@ Return `200` with `{ "user": ... }`, using the complete account shape from the l
 
 Suspension must update the user and expire **every active session belonging to that user** in the same transaction. Set each affected session's `status` to `expired` and `logoutAt` to the server time. Login and protected-request middleware must check current account status, so a suspended user cannot receive a new session or reuse an older one. Reactivation allows a new login; it must not restore old sessions. Keep the account, campaigns and other records intact.
 
-Record who changed the status, the target account, previous/new status and server time. Lock and recheck the user inside the transaction so session updates and the audit event match the actual transition. This endpoint sets the requested state; it does not include an optimistic browser-version token. Return `409 ACCOUNT_STATE_CHANGED` if a transition cannot be applied under the server's current rules. The frontend reloads after `409`.
+Record who changed the status, the target account, previous/new status and server time. The transaction locks and rechecks the current admin and session, then the target user so session updates and the audit event match the transition. This endpoint sets the requested state without a browser-version token. Repeated target states return the existing state without another audit event. The frontend also handles a future `409` by reloading; the current status-set implementation does not emit `ACCOUNT_STATE_CHANGED`.
 
 ## 3. Campaign review history
 
@@ -127,11 +127,11 @@ Return **`204` with no body** only after the transaction commits. Do not call a 
 
 Advance `updatedAt` alongside the deletion metadata. Keep the deletion/audit schema shared with owner deletion. Both routes require a saved-version check; the admin endpoint additionally requires a reason.
 
-All normal campaign reads and actions—including owner/admin lists, public detail, participation, enquiries and image-link issuance—must exclude or reject soft-deleted campaigns. Retain related records for audit; any existing related history read must not expose now-restricted campaign content. Recovery is a controlled backend operation; no restore UI is included in this frontend.
+Normal campaign reads, owner/admin lists, public detail, new joins/rejoins, enquiries and image delivery exclude or reject soft-deleted campaigns. Existing own participation remains readable and withdrawable; history uses `campaign:null` instead of exposing restricted content. Related records are retained. Recovery is a controlled backend operation; no restore UI is included.
 
 ## Database work
 
-The current schema already has user status, sessions and campaign review records. It does **not** implement the proposed deletion metadata or management audit log below. Add migrations and update model mappings rather than creating tables manually.
+User status, sessions and campaign reviews already exist. Migration `20261013220000-add-campaign-management.js` adds shared deletion metadata and management audit, with matching Campaign and ManagementAudit models. Apply migrations rather than creating tables manually.
 
 | API value | Existing model attribute | Existing SQL column |
 |---|---|---|
@@ -143,7 +143,7 @@ The current schema already has user status, sessions and campaign review records
 
 `UserSession` and `CampaignReview` use `timestamps: false`; do not query non-existent `created_at` or `updated_at` columns on those tables.
 
-Proposed migrations:
+The shared migration:
 
 1. Add nullable `campaigns.deleted_at` (UTC timestamp), `deleted_by` (actor user ID), and `deletion_reason` (text, API-limited to 2,000 characters). Add matching Sequelize attributes `deletedAt`, `deletedBy`, `deletionReason` and a consistent non-deleted query scope. Coordinate with owner-management work so the deletion columns are created **once**, not in conflicting migrations.
 2. Add a `management_audit_events` table with generated ID, actor user ID, target type/ID, action, previous/new state, reason where required, and server UTC time. Actions include `campaign_unpublished`, `campaign_deleted`, `user_suspended` and `user_reactivated`. Do not overload `CampaignReview.action`, which remains `approved|rejected`.
@@ -157,7 +157,7 @@ Use the [shared error envelope](shared-conventions.md): `401` for invalid sessio
 
 On an unreadable response or uncertain network failure, the frontend does not claim success or offer an immediate repeat. It asks the admin to reload current data first; the original request may have committed.
 
-Before connecting the real API, test:
+Regression and post-deployment checks:
 
 - Guests, ordinary users, business owners, suspended users and expired sessions cannot access any admin data/action.
 - An admin cannot change their own or another admin account, even with a hand-written request; extra role/actor fields are rejected.

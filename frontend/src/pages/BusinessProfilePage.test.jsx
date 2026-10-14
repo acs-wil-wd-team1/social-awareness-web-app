@@ -9,6 +9,20 @@ beforeEach(() => vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(json({ bus
 afterEach(() => { cleanup(); localStorage.clear(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
 
 describe('Business profile', () => {
+  it.each(['load', 'save'])('treats a missing profile %s route as unavailable, not an empty profile or retryable form', async phase => {
+    if (phase === 'load') fetch.mockReset().mockResolvedValueOnce(json({ code: 'API_ROUTE_NOT_FOUND', message: 'API route not found.' }, 404))
+    else fetch.mockResolvedValueOnce(json({ code: 'API_ROUTE_NOT_FOUND', message: 'API route not found.' }, 404))
+    render(<BusinessProfilePage token="test" />)
+    if (phase === 'save') {
+      fireEvent.change(await screen.findByLabelText('Business name'), { target: { value: values.businessName } })
+      fireEvent.submit(screen.getByRole('form'))
+    }
+    expect((await screen.findByRole('alert')).textContent).toContain('Business profile setup is not available yet')
+    expect(screen.queryByRole('button', { name: /Retry|Save business profile|Reload/ })).toBeNull()
+    expect(screen.queryByRole('form')).toBeNull()
+    expect(screen.queryByText('API route not found.')).toBeNull()
+  })
+
   it.each(['load', 'save'])('preserves the profile destination after a rejected %s', async phase => {
     if (phase === 'load') fetch.mockReset().mockResolvedValueOnce(json({ message: 'Session expired.' }, 401))
     else fetch.mockResolvedValueOnce(json({ message: 'Session expired.' }, 401))

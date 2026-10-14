@@ -2,10 +2,13 @@
 
 const { getCampaigns, campaignById  } = require("../services/campaignServices");
 const { apiErrorResponse } = require("../utils/apiErrorResponse");
-const { Campaign, Category } = require("../database/models");
+const models = require("../database/models");
 const { createCampaignSubmissionService } = require("../services/campaignSubmission");
-
-const submissionService = createCampaignSubmissionService({ Campaign, Category });
+const { createCampaignQueryService } = require("../services/campaignQueries");
+const { sendServiceError } = require("../utils/serviceError");
+const { attachImage, buildImageUrl } = require("../services/campaignImages");
+const submissionService = createCampaignSubmissionService(models, { attachImage, buildImageUrl });
+const queryService = createCampaignQueryService(models, { buildImageUrl });
 
 const getCampaignCategories = async (req, res) => {
   try {
@@ -17,38 +20,36 @@ const getCampaignCategories = async (req, res) => {
 
 const submitCampaign = async (req, res) => {
   try {
-    return res.status(201).json(await submissionService.submit(req.body, req.user));
+    return res.status(201).json(await submissionService.submit(req.body, req.user, req.token));
   } catch (err) {
-    if (err.status === 422 && err.code === "VALIDATION_FAILED") {
-      return apiErrorResponse(res, 422, err.code, err.message, err.fieldErrors);
-    }
-    return apiErrorResponse(res, 500, "INTERNAL_SERVER_ERROR", "Something went wrong", null);
+    return sendServiceError(res, err);
+  }
+};
+
+// Owner view: only campaigns created by the signed-in account, any status.
+const getMyCampaigns = async (req, res) => {
+  try {
+    return res.status(200).json(await queryService.list(req.query, { createdBy: req.user.id, audience: "owner", currentUser: req.user, token: req.token }));
+  } catch (err) {
+    return sendServiceError(res, err);
+  }
+};
+
+const getMyCampaignById = async (req, res) => {
+  try {
+    return res.status(200).json(await queryService.findById(req.params.id, { createdBy: req.user.id, audience: "owner", currentUser: req.user, token: req.token }));
+  } catch (err) {
+    return sendServiceError(res, err);
   }
 };
 
 const getPublicCampaigns = async (req, res) => {
   try {
-    const { page = 1, pageSize = 20, category, search } = req.query;
-
-    const result = await getCampaigns({
-      page,
-      pageSize,
-      category,
-      search,
-      status: "approved",
-    });
+    const result = await getCampaigns(req.query);
 
     return res.status(200).json(result);
   } catch (err) {
-    console.error(err);
-
-    return apiErrorResponse(
-      res,
-      500,
-      "INTERNAL_SERVER_ERROR",
-      "Something went wrong",
-      null,
-    );
+    return sendServiceError(res, err);
   }
 };
 
@@ -63,63 +64,7 @@ const getPublicCampaignById = async (req, res) => {
 
     return res.status(200).json(result);
   } catch (err) {
-    console.error(err);
-
-    return apiErrorResponse(
-      res,
-      err.status || 500,
-      err.code || "INTERNAL_SERVER_ERROR",
-      err.message || "Something went wrong",
-      err.fieldErrors ?? null
-    );
-  }
-};
-
-const getAdminCampaigns = async (req, res) => {
-  try {
-    const { page = 1, pageSize = 2, category, search, status } = req.query;
-
-    const result = await getCampaigns({
-      page,
-      pageSize,
-      category,
-      search,
-      status,
-    });
-
-    return res.status(200).json(result);
-  } catch (err) {
-    console.error(err);
-
-    return apiErrorResponse(
-      res,
-      500,
-      "INTERNAL_SERVER_ERROR",
-      "Something went wrong",
-      null,
-    );
-  }
-};
-
-const getAdminCampaignById = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const result = await campaignById(
-      id,
-    );
-
-    return res.status(200).json(result);
-  } catch (err) {
-    console.error(err);
-
-    return apiErrorResponse(
-      res,
-      err.status || 500,
-      err.code || "INTERNAL_SERVER_ERROR",
-      err.message || "Something went wrong",
-      err.fieldErrors ?? null
-    );
+    return sendServiceError(res, err);
   }
 };
 
@@ -128,6 +73,6 @@ module.exports = {
   submitCampaign,
   getPublicCampaigns,
   getPublicCampaignById,
-  getAdminCampaigns,
-  getAdminCampaignById
+  getMyCampaigns,
+  getMyCampaignById,
 };

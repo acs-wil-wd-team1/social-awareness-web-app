@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { apiRequest, ApiError } from '../services/apiClient.js'
 import { authPagePath } from '../services/authSession.js'
 
@@ -17,8 +17,19 @@ export default function RegistrationPage() {
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [apiError, setApiError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [validationAnnouncement, setValidationAnnouncement] = useState('')
+  const form = useRef(null)
+  const focusError = useRef(false)
+  const inFlight = useRef(false)
 
-  function validateField(name, value) {
+  useEffect(() => {
+    if (focusError.current && !isSubmitting) {
+      form.current?.querySelector('[aria-invalid="true"]')?.focus()
+      focusError.current = false
+    }
+  }, [errors, isSubmitting])
+
+  function validateField(name, value, values = formValues) {
     if (!value.trim()) {
       return 'This field is required.'
     }
@@ -35,7 +46,15 @@ export default function RegistrationPage() {
       return 'Please enter a valid email address.'
     }
 
-    if (name === 'confirmPassword' && value !== formValues.password) {
+    if (name === 'password' && Array.from(value).length < 6) {
+      return 'Use at least 6 characters. A longer passphrase is easier to remember.'
+    }
+
+    if (name === 'password' && new TextEncoder().encode(value).length > 72) {
+      return 'Use a password of 72 UTF-8 bytes or fewer. Emoji and some characters use more than one byte.'
+    }
+
+    if (name === 'confirmPassword' && value !== values.password) {
       return 'Passwords do not match.'
     }
 
@@ -52,17 +71,18 @@ export default function RegistrationPage() {
     setFormValues(nextValues)
     setIsSubmitted(false)
     setApiError('')
+    setValidationAnnouncement('')
 
-    if (errors[name]) {
-      setErrors({
-        ...errors,
-        [name]: validateField(name, value),
-      })
-    }
+    setErrors(current => ({
+      ...current,
+      ...(current[name] ? { [name]: validateField(name, value, nextValues) } : {}),
+      ...(name === 'password' && current.confirmPassword ? { confirmPassword: validateField('confirmPassword', nextValues.confirmPassword, nextValues) } : {}),
+    }))
   }
 
   async function handleSubmit(event) {
     event.preventDefault()
+    if (inFlight.current) return
 
     const nextErrors = {
       name: validateField('name', formValues.name),
@@ -74,11 +94,15 @@ export default function RegistrationPage() {
     setErrors(nextErrors)
     setIsSubmitted(false)
     setApiError('')
+    setValidationAnnouncement('')
 
     if (Object.values(nextErrors).some(Boolean)) {
+      focusError.current = true
+      setValidationAnnouncement('Please correct the highlighted fields before registering.')
       return
     }
 
+    inFlight.current = true
     setIsSubmitting(true)
 
     try {
@@ -99,9 +123,12 @@ export default function RegistrationPage() {
 
       setIsSubmitted(true)
     } catch (error) {
-      setErrors(current => ({ ...current, ...error.fieldErrors }))
+      const fields = Object.fromEntries(Object.entries(error.fieldErrors || {}).filter(([name]) => Object.hasOwn(initialValues, name)))
+      setErrors(current => ({ ...current, ...fields }))
+      focusError.current = Object.keys(fields).length > 0
       setApiError(error.message || 'The registration service could not be reached.')
     } finally {
+      inFlight.current = false
       setIsSubmitting(false)
     }
   }
@@ -111,14 +138,15 @@ export default function RegistrationPage() {
       <div className="auth-card">
         <h1 id="register-title">Create your account</h1>
 
-        <form onSubmit={handleSubmit} noValidate>
+        <form ref={form} onSubmit={handleSubmit} noValidate>
+          <p className="visually-hidden" aria-live="polite" aria-atomic="true">{validationAnnouncement}</p>
           <div className="auth-field">
             <label htmlFor="register-type">Account type</label>
-            <select id="register-type" name="accountType" value={formValues.accountType} onChange={handleChange}>
+            <select id="register-type" name="accountType" value={formValues.accountType} onChange={handleChange} aria-invalid={Boolean(errors.accountType)} aria-describedby={errors.accountType ? 'register-type-error' : undefined}>
               <option value="user">Community member</option>
               <option value="business">Small business owner</option>
             </select>
-            {errors.accountType ? <p className="auth-field__error">{errors.accountType}</p> : null}
+            {errors.accountType ? <p id="register-type-error" className="auth-field__error">{errors.accountType}</p> : null}
           </div>
           <div className="auth-field">
             <label htmlFor="register-name">Name</label>
@@ -127,12 +155,14 @@ export default function RegistrationPage() {
               name="name"
               type="text"
               maxLength={100}
+              autoComplete="name"
               value={formValues.name}
               onChange={handleChange}
               placeholder="e.g. Kim Gesite"
               aria-invalid={Boolean(errors.name)}
+              aria-describedby={errors.name ? 'register-name-error' : undefined}
             />
-            {errors.name ? <p className="auth-field__error">{errors.name}</p> : null}
+            {errors.name ? <p id="register-name-error" className="auth-field__error">{errors.name}</p> : null}
           </div>
 
           <div className="auth-field">
@@ -142,12 +172,14 @@ export default function RegistrationPage() {
               name="email"
               type="email"
               maxLength={150}
+              autoComplete="email"
               value={formValues.email}
               onChange={handleChange}
               placeholder="e.g. kim@example.com"
               aria-invalid={Boolean(errors.email)}
+              aria-describedby={errors.email ? 'register-email-error' : undefined}
             />
-            {errors.email ? <p className="auth-field__error">{errors.email}</p> : null}
+            {errors.email ? <p id="register-email-error" className="auth-field__error">{errors.email}</p> : null}
           </div>
 
           <div className="auth-field">
@@ -156,12 +188,15 @@ export default function RegistrationPage() {
               id="register-password"
               name="password"
               type="password"
+              autoComplete="new-password"
               value={formValues.password}
               onChange={handleChange}
               placeholder="Password"
               aria-invalid={Boolean(errors.password)}
+              aria-describedby={`register-password-help${errors.password ? ' register-password-error' : ''}`}
             />
-            {errors.password ? <p className="auth-field__error">{errors.password}</p> : null}
+            <p id="register-password-help" className="auth-form__help">Use at least 6 characters, up to 72 UTF-8 bytes. Longer passwords are safer. Emoji and some characters use more than one byte.</p>
+            {errors.password ? <p id="register-password-error" className="auth-field__error">{errors.password}</p> : null}
           </div>
 
           <div className="auth-field">
@@ -170,12 +205,14 @@ export default function RegistrationPage() {
               id="register-confirm-password"
               name="confirmPassword"
               type="password"
+              autoComplete="new-password"
               value={formValues.confirmPassword}
               onChange={handleChange}
               placeholder="Confirm password"
               aria-invalid={Boolean(errors.confirmPassword)}
+              aria-describedby={errors.confirmPassword ? 'register-confirm-password-error' : undefined}
             />
-            {errors.confirmPassword ? <p className="auth-field__error">{errors.confirmPassword}</p> : null}
+            {errors.confirmPassword ? <p id="register-confirm-password-error" className="auth-field__error">{errors.confirmPassword}</p> : null}
           </div>
 
           <button className="auth-button" type="submit" disabled={isSubmitting || isSubmitted}>

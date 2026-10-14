@@ -100,6 +100,7 @@ export default function BusinessProfilePage({ token = localStorage.getItem('toke
       setErrors(fields)
       focusError.current = Boolean(Object.keys(fields).length)
       setError(failure)
+      if (failure.code === 'BUSINESS_PROFILE_UNAVAILABLE') setState('error')
     } finally {
       if (version === requestVersion.current) {
         inFlight.current = false
@@ -117,7 +118,7 @@ export default function BusinessProfilePage({ token = localStorage.getItem('toke
         {!token ? <><p>Log in to manage your business profile.</p><a className="text-link" href={loginPath}>Log in</a></>
           : !allowed ? <><p>A business-owner account is needed to manage a business profile.</p><a className="text-link" href="/">Back to home</a></>
             : state === 'loading' ? <p role="status">Loading your business profile…</p>
-              : state === 'error' ? <div role="alert"><p>{error.message}</p>{error.status === 401 ? <a className="text-link" href={loginPath}>Log in again</a> : <button className="campaign-secondary-button" type="button" onClick={() => setRetry((value) => value + 1)}>Retry business profile</button>}</div>
+              : state === 'error' ? <div role="alert"><p>{error.message}</p>{error.status === 401 ? <a className="text-link" href={loginPath}>Log in again</a> : ![403, 404].includes(error.status) ? <button className="campaign-secondary-button" type="button" onClick={() => setRetry((value) => value + 1)}>Retry business profile</button> : <a className="text-link" href="/my-campaigns">My campaigns</a>}</div>
                 : <>
                   {saved ? <div ref={success} className="campaign-form-success" role="status" tabIndex="-1"><h2>Business profile saved</h2><p>Your business details are ready to use.</p><a className="text-link" href="/business/campaigns/new">Create a business campaign</a></div> : null}
                   <form ref={form} aria-label="Business profile form" noValidate onSubmit={submit}>
@@ -127,7 +128,7 @@ export default function BusinessProfilePage({ token = localStorage.getItem('toke
                       <div className="campaign-form-field"><label htmlFor="business-abn">ABN <span>(optional)</span></label><input id="business-abn" maxLength="20" {...fieldProps('abn')} />{fieldError('abn')}</div>
                       <div className="campaign-form-field"><label htmlFor="business-website">Website <span>(optional)</span></label><input id="business-website" type="url" placeholder="https://example.com" maxLength="255" {...fieldProps('website')} />{fieldError('website')}</div>
                       <div className="campaign-form-field campaign-form-field--full"><label htmlFor="business-description">About your business <span>(optional)</span></label><textarea id="business-description" rows="5" maxLength="2000" {...fieldProps('description')} />{fieldError('description')}</div>
-                      <div className="campaign-form-actions campaign-form-field--full business-profile-actions"><button type="submit" disabled={isSaving}>{isSaving ? 'Saving…' : 'Save business profile'}</button><a className="text-link" href="/my-campaigns">My campaigns</a></div>
+                      <div className="campaign-form-actions campaign-form-field--full business-profile-actions"><button type="submit" disabled={isSaving || error?.code === 'BUSINESS_PROFILE_UNAVAILABLE'}>{isSaving ? 'Saving…' : 'Save business profile'}</button><a className="text-link" href="/my-campaigns">My campaigns</a></div>
                     </fieldset>
                     {error ? <div role="alert" className="campaign-submission-error"><p>{error.message}</p>
                       {error.status === 401 ? <a className="text-link" href={loginPath}>Log in again</a> : null}

@@ -1,6 +1,8 @@
-# Admin campaign moderation API proposal
+# Admin campaign moderation API
 
-**Status:** The admin frontend is implemented against this contract. The status-write backend is still proposed and has not been verified against a real database. Existing admin reads are identified separately below.
+**Status, 14 October 2026:** Core approval and expanded admin reads, plus PR #19 review history, soft deletion and private image delivery, are merged and deployed at [CauseConnect on AWS](https://52.62.2.87). Tests live in `backend/test/integration/campaignModeration.test.js` and `campaignManagement.test.js`; the [release evidence](../evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) records the tested revision and production acceptance scope.
+
+Every admin route uses the current-account guard: Bearer token, matching active session, and the account's *current* database role/status (suspended or demoted admins get `403`). `campaigns.updated_at` is stored with millisecond precision (migration `20261013090000`) so it round-trips as the `expectedUpdatedAt` version.
 
 **Agreed ownership:** Unice handles the admin frontend; Kim and Rajita share the admin campaign-approval API. Coordinate shared image/read dependencies with the user-posting API (Rajita) and business-posting API (Kim).
 
@@ -12,14 +14,15 @@ The single-account setup does not remove the need for transaction/conflict handl
 
 ## Existing admin reads
 
-- `GET /api/campaigns/admin` — authenticated admin; returns `campaigns`, `page` and `pageSize`.
+- `GET /api/campaigns/admin` — authenticated admin; returns `campaigns`, `page`, `pageSize` and `total`.
 - `GET /api/campaigns/admin/:id` — authenticated admin; returns the campaign object.
 
 The list accepts `page`, `pageSize`, `search`, `category` and `status`. Existing admin reads can include pending, approved or rejected campaigns. These routes do not change a campaign's status.
 
-The frontend pages are `/admin/campaigns` and `/admin/campaigns/:id`. Expand read responses using the [campaign read contract](campaign-read-contract.md), including business information, target audience/dates, latest review, and authorised signed URLs for private images. The existing projection currently omits those extra fields. Keep the direct detail object and the `campaigns` list key.
+The frontend pages are `/admin/campaigns` and `/admin/campaigns/:id`. Reads use the [campaign read contract](campaign-read-contract.md), including business information, target audience/dates, latest review, and authorised signed URLs for private images. Keep the direct detail object and the `campaigns` list key.
 
-## Proposed review action
+<a id="proposed-review-action"></a>
+## Review action
 
 `PATCH /api/campaigns/admin/:id/status` — authenticated user with current admin permission
 
@@ -31,7 +34,7 @@ The frontend pages are `/admin/campaigns` and `/admin/campaigns/:id`. Expand rea
 }
 ```
 
-Proposed rules:
+Rules:
 
 - `status` must be `approved` or `rejected`; only a pending campaign can transition.
 - A rejection requires a trimmed, non-empty reason in `comments`. Approval comments may be omitted or `null`. A supplied comment must be a string of at most 2,000 characters after trimming.
@@ -42,7 +45,7 @@ Proposed rules:
 - If another review already won, return `409 CAMPAIGN_ALREADY_REVIEWED` without inserting a second review. If either write fails, roll back both writes.
 - Approval allows public campaign/image delivery. Rejection leaves both restricted. Authorised owner views should show the outcome and rejection reason.
 
-Proposed `200` response:
+`200` response:
 
 ```json
 {
@@ -64,13 +67,13 @@ Proposed `200` response:
 
 The returned `campaign.updatedAt` must be newer than the submitted version, so a subsequent admin action uses the newly saved state. Preserve millisecond precision and advance the version even for changes in the same millisecond, as specified in [owner management](owned-campaign-management-contract.md#version-checks-and-transactions).
 
-Errors use the [proposed shared envelope](shared-conventions.md): `401` for missing/invalid authentication, `403 FORBIDDEN` for non-admin access, `404 CAMPAIGN_NOT_FOUND`, `409 CAMPAIGN_CHANGED` / `CAMPAIGN_ALREADY_REVIEWED`, or `422 VALIDATION_FAILED` for invalid status/comments/version.
+Errors use the [shared envelope](shared-conventions.md): `401` for missing/invalid authentication, `403 FORBIDDEN` for non-admin access, `404 CAMPAIGN_NOT_FOUND`, `409 CAMPAIGN_CHANGED` / `CAMPAIGN_ALREADY_REVIEWED`, or `422 VALIDATION_FAILED` for invalid status/comments/version.
 
 ## Database and dependent reads
 
-The existing `campaigns.status` and `campaign_reviews` fields cover the core decision data. Final transaction, review-history and image-access requirements still need implementation and database testing; additional migrations may be needed for the agreed workflow.
+The existing `campaigns.status` and `campaign_reviews` fields cover the core decision data. Moderation shares version locking, deletion metadata and image metadata with the owner/admin extensions. Apply the listed migrations before integration tests or a new deployment.
 
-The [owner-submissions/read contract](campaign-read-contract.md) defines `GET /api/campaigns/mine` and the latest `review` object. The expanded admin frontend additionally consumes review history and content-management actions from the [admin-management contract](admin-management-contract.md). Owner editing/resubmission and soft deletion are covered separately in the [owner-management contract](owned-campaign-management-contract.md). These supporting APIs remain proposed; the approval endpoint alone does not implement them.
+The [owner-submissions/read contract](campaign-read-contract.md) defines `GET /api/campaigns/mine` and the latest `review` object. The admin frontend also consumes review history and content-management actions from the [admin-management contract](admin-management-contract.md). Owner editing/resubmission and soft deletion are covered in the [owner-management contract](owned-campaign-management-contract.md). These supporting APIs are separate implemented routes; the approval endpoint alone does not provide them.
 
 Map the result to the existing schema:
 
@@ -87,7 +90,7 @@ Map the result to the existing schema:
 
 `campaign_reviews` has no `created_at` or `updated_at`; its Sequelize model already uses `timestamps: false`. The current migration has no unique campaign-review constraint, so the pending-state lock/conditional update is essential. Keep previous rows across later edits/unpublish/reapproval: there can be several valid reviews over a campaign's lifetime, but only one successful decision per pending transition. Within one transaction: verify current admin access, lock/find a non-deleted campaign, check the loaded version and pending status, write status/new version, insert review, commit, then serialize the saved result. A conditional update alternative must match both version and pending status, check the affected-row count and insert a review only when exactly one matching row transitioned.
 
-On a conflict or uncertain network response, the frontend reloads the campaign before another decision. It must never receive a successful response containing the opposite decision or a mismatched campaign/review ID. Restricted image delivery must enforce campaign status when issuing URLs; approval does not make every upload in the storage bucket public.
+On a conflict or uncertain network response, the frontend reloads the campaign before another decision. It must never receive a successful response containing the opposite decision or a mismatched campaign/review ID. Restricted image delivery checks campaign status and the attachment; approving one campaign does not make other stored uploads public.
 
 ## Acceptance checks for implementation
 

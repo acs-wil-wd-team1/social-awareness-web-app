@@ -4,6 +4,13 @@ Import `CauseConnect-Stage3.postman_collection.json` and the blank `CauseConnect
 
 These are requests and response checks, **not a backend implementation**. Pending endpoints should fail until you implement them. The collection has been checked offline; it has not been run against your API or used to claim that your database, storage or security works.
 
+The core and AWT-175 supporting routes are implemented; use the
+[dated release evidence](../../evidence/stage-3/README.md) for what was actually
+tested and deployed. Kim's GET/PUT `/api/business/me` remains missing. Browser
+business posting is blocked even for an existing business record until that
+lookup works. This collection is still a local-only check tool, not hosted
+acceptance evidence.
+
 ## Before sending anything
 
 1. Point your backend at a **separate disposable test database**. Apply the repository migrations and create the fixture accounts described in the handoff. Do not use a shared development database, production data or another person's account. The collection cannot inspect or verify your backend's database connection.
@@ -33,14 +40,14 @@ Do not run the whole collection expecting a setup/cleanup sequence. Unarmed writ
 - `targetUserId` is a separate disposable **non-admin** account to suspend/reactivate. Never use your current admin or another teammate's account.
 - Owner/admin detail requests capture the exact `updatedAt` into run-local `ownerVersion`/`adminVersion`. For individual Sends, copy it unchanged into the private environment value. Never invent a version. For the stale-edit probe, keep a genuinely older value in `staleVersion`, make a successful change, then send the stale request.
 - The dates default to seven/eight days after the run date. Set run/environment `startDate` and `endDate` if a different valid fixture is needed.
-- Upload has **no file selected**. Choose one disposable local JPEG, PNG or WebP (at most 5,000,000 bytes). Capture the returned `imageId`; it is an opaque string, not a numeric ID. Never put a personal image, signed download URL or machine-specific file path into the committed collection.
+- Upload has **no file selected**. Choose one disposable non-animated local JPEG, PNG or WebP (at most 5,000,000 bytes and 16 megapixels). Capture the returned `imageId`; it is an opaque string, not a numeric ID. Never put a personal image, signed download URL or machine-specific file path into the committed collection.
 
-## Suggested implementation checks
+## Suggested checks
 
 1. Keep current login/logout, categories and text-only public submission passing. Existing-core reads are separate from the stricter Stage 3 read targets.
-2. Implement profile GET/PUT and business posting. Verify server-selected ownership and a pending creation response.
-3. Implement owner reads/editing and admin decisions. Load a current version before each change; check returned versions advance. Reread the public detail to confirm pending content is hidden and approved content is public.
-4. Implement image upload/attachment, participation, enquiries and admin management using the linked contracts. Choose those requests individually as each endpoint becomes available.
+2. Complete the remaining profile GET/PUT, then retest the existing business-posting route and full browser journey. Verify server-selected ownership and a pending creation response.
+3. Check owner reads/editing and admin decisions. Load a current version before each change; check returned versions advance. Reread the public detail to confirm pending content is hidden and approved content is public.
+4. Check image upload/attachment, participation, enquiries and admin management using the linked contracts. Choose the requests individually with meaningful disposable fixtures.
 5. Run selected negative probes. Their shared error format is the **Stage 3 target**; older middleware may fail until normalised. A green HTTP response is not enough: the tests check status, JSON envelope, field types, IDs, state and versions.
 
 The tests deliberately do not treat a missing endpoint, wrong wrapper, mismatched ID, HTML response or malformed successful response as success. Responses are captured only after their assertions pass. Follow up logout/suspension with a protected request using the old token and verify rejection; reactivation must require a fresh login.

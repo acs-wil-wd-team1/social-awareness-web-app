@@ -1,17 +1,17 @@
 # Campaign reads and owner submissions
 
-**Status:** Public and admin read routes exist. The owner route and the expanded fields described here are proposed backend work consumed by the completed frontend. Existing `campaignServices.js` currently returns only `id`, `title`, `description`, `category`, `imageUrl`, `createdBy`, `status` and `createdAt`.
+**Status, 14 October 2026:** Public, admin and owner (`/mine`, `/mine/:id`) reads, including PR #19 public projection, private image delivery and soft-delete filtering, are merged and deployed at [CauseConnect on AWS](https://52.62.2.87). `campaignQueries.js` and `campaignSerializer.js` supply the fields below and list `total`. See the [release evidence](../evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) for the tested revision and scope.
 
 ## Routes and access
 
 | Request | Status | Access |
 |---|---|---|
-| `GET /api/campaigns` | Existing route; extend response fields | Public, approved only |
-| `GET /api/campaigns/:id` | Existing route; extend response fields | Public, approved only; pending/rejected/missing return `404` |
-| `GET /api/campaigns/admin` | Existing route; extend response fields | Current active admin, all statuses |
-| `GET /api/campaigns/admin/:id` | Existing route; extend response fields | Current active admin, all statuses |
-| `GET /api/campaigns/mine` | New proposed route | Current active `public` or `business_owner`, only rows with `created_by = currentUser.id` |
-| `GET /api/campaigns/mine/:id` | New proposed route | Current active owner only; full editable fields and exact `updatedAt` version |
+| `GET /api/campaigns` | Implemented | Public, approved only |
+| `GET /api/campaigns/:id` | Implemented | Public, approved only; pending/rejected/missing return `404` |
+| `GET /api/campaigns/admin` | Implemented | Current active admin, all statuses |
+| `GET /api/campaigns/admin/:id` | Implemented | Current active admin, all statuses |
+| `GET /api/campaigns/mine` | Implemented | Current active `public` or `business_owner`, only rows with `created_by = currentUser.id` |
+| `GET /api/campaigns/mine/:id` | Implemented | Current active owner only; full editable fields and exact `updatedAt` version |
 
 The owner list expands each item to show submitted details. The edit page additionally needs the owner-detail endpoint specified in the [owner-management contract](owned-campaign-management-contract.md). A business owner's rows are still scoped by `created_by`, not a client business ID. Public queries cannot use `status=pending` to escape the approved filter. All these routes exclude soft-deleted campaigns.
 
@@ -19,7 +19,7 @@ The owner list expands each item to show submitted details. The edit page additi
 
 The frontend sends `page` and `pageSize` explicitly. Owner/admin screens use `pageSize=10`. For new/updated routes: default page `1`, page size `20`; positive integers only, `pageSize` at most `100`. Preserve compatibility with existing callers that request `100`.
 
-Optional `status` is `pending`, `approved` or `rejected` for owner/admin. Optional `search` is a trimmed title search. Existing `category` is a positive category ID in the URL, not a category name. Public reads remain approved regardless of optional filters. Reject invalid recognised values with `422`; ignore unknown query keys. Apply all ownership/status filters before counting or paginating.
+Optional `status` is `pending`, `approved` or `rejected` for owner/admin. Optional `search` is a trimmed title search of at most 150 characters; the browser input and API use that same limit. Existing `category` is a positive category ID in the URL, not a category name. Public reads remain approved regardless of optional filters. Reject invalid recognised values with `422`; ignore unknown query keys. Apply all ownership/status filters before counting or paginating.
 
 Sort by `createdAt DESC`, then numeric `id DESC`. Return `200` with this envelope:
 

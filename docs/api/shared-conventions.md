@@ -1,8 +1,8 @@
 # Shared API conventions
 
-**Status:** Proposed for Stage 3. These rules are not a claim that every current route already implements them.
+**Status, 14 October 2026:** Conventions used by the campaign, management, engagement and image routes in deployed application commit `fc9f9594b9f27e70ad5dc0b2d8f1ee1d754e0949` at [CauseConnect on AWS](https://52.62.2.87). The business-profile implementation is in open, conflicting PR #22, not merged or deployed. See the [current release evidence](../evidence/stage-3/signup-minimum-six/README.md) for the exact revision and bounded verification; the [PR #21 receipt](../evidence/stage-3/review-hardening/README.md) remains historical.
 
-The implemented public-user submission backend has its request and error rules in the [campaign contract](campaign-posting-contract.md). The [Stage 3 API integration guide](../handoff/stage3-api-handoff.md) maps the remaining extensions. Oversized JSON uses `413 REQUEST_TOO_LARGE`; upload codes and the other new endpoints remain backend proposals.
+Submission rules are in the [campaign contract](campaign-posting-contract.md). The [Stage 3 API integration guide](../handoff/stage3-api-handoff.md) maps implemented routes and remaining work. Oversized JSON uses `413 REQUEST_TOO_LARGE`; image errors are documented separately.
 
 ## Requests and permissions
 
@@ -14,15 +14,15 @@ The implemented public-user submission backend has its request and error rules i
 - Date-only values use `YYYY-MM-DD`; timestamps use ISO 8601 UTC.
 - Roles are `public`, `business_owner` and `admin`. Check the user's current permissions for protected actions, including suspension and changed roles.
 
-The current `campaignAuthorAuthentication.js` already looks up a session matching both token and user ID and loads the current account; its role allowance is still public-only. Older `authentication.js` / `adminAuthentication.js` do not yet perform all those current-account checks. Reuse or consolidate the stronger pattern for each protected Stage 3 route, including existing admin reads. Merely adding `requireAdmin` after the older middleware does not implement suspension/current-role enforcement.
+`currentAccountAuthentication.js` checks JWT validity, a session matching token and user ID, and the current account role/status. Campaign authors allow `public` and `business_owner`; admin routes allow `admin`. State-changing services recheck account and session under transaction locks before locking the campaign/upload/participation. New private management/engagement reads also use transactional rechecks. Do not rely on browser roles or stale JWT claims.
 
 The server determines the creator and business ownership. Ordinary campaign submissions cannot set `createdBy`, `businessId`, `status`, `role` or administrator privilege. The admin moderation endpoint is the explicit exception for `status`: an authorised admin may request an allowed transition, which the server validates.
 
 Check JSON types before trimming or converting values. Reject unsupported request fields. Each endpoint defines required fields, nullable fields and limits.
 
-## Proposed error response
+## Error response
 
-Stage 3 API errors should use:
+Stage 3 API errors use:
 
 ```json
 {
@@ -39,32 +39,40 @@ Stage 3 API errors should use:
 
 | Status | Code | Meaning |
 |---:|---|---|
-| `400` | `INVALID_JSON` / `INVALID_CAMPAIGN_ID` | Malformed JSON or an invalid path ID |
+| `400` | `INVALID_CAMPAIGN_ID` / `INVALID_USER_ID` | Invalid path ID |
 | `401` | `AUTH_REQUIRED` / `INVALID_TOKEN` | Missing, expired or invalid authentication |
 | `403` | `FORBIDDEN` / `ACCOUNT_SUSPENDED` | Current account cannot perform the action |
-| `404` | `CAMPAIGN_NOT_FOUND` / `ROUTE_NOT_FOUND` | No visible campaign or API route matches |
+| `404` | `CAMPAIGN_NOT_FOUND` / `IMAGE_NOT_FOUND` / `NOT_FOUND` | No visible campaign/image or API route matches |
 | `409` | Endpoint-specific code | The request conflicts with current state |
 | `413` | `IMAGE_TOO_LARGE` | Uploaded file exceeds the documented limit |
 | `413` | `REQUEST_TOO_LARGE` | JSON body exceeds the configured limit |
 | `415` | `UNSUPPORTED_IMAGE_TYPE` | Uploaded file is not a supported image |
-| `422` | `VALIDATION_FAILED` | Invalid fields or unusable image reference |
+| `422` | `VALIDATION_FAILED` | Invalid fields, malformed JSON or unusable image reference |
+| `429` | `IMAGE_OWNER_QUOTA_REACHED` | Retained owner photo count/bytes reached; cleanup must actually remove old files/rows to free space |
+| `429` | `IMAGE_UPLOAD_LIMIT` | Earlier release's active-unattached cap; retained for older response compatibility |
 | `500` | `INTERNAL_SERVER_ERROR` | Unexpected server failure |
-| `503` | `SERVICE_UNAVAILABLE` | API/storage dependency temporarily unavailable |
+| `503` | `SERVICE_UNAVAILABLE` / `IMAGE_STORAGE_FULL` / `UPLOAD_BUSY` | API/storage dependency temporarily unavailable |
 
-Current controllers use this envelope for many errors, but main's authentication middleware and Express parser/unknown-route errors do not consistently follow it. Common error handling must be implemented and tested before relying on it everywhere. See [current authentication](current-authentication.md) for the existing responses.
+API parser and unknown-route errors are normalised to JSON. The legacy logout middleware still has its older error shape; see [current authentication](current-authentication.md). Use status/code where supplied rather than matching error prose.
+
+The current image decoder distinguishes `422 IMAGE_DIMENSIONS_TOO_LARGE`,
+`IMAGE_DECODE_FAILED`, `IMAGE_TYPE_MISMATCH` and `ANIMATED_IMAGE_NOT_SUPPORTED` so
+the user can resize or export a still supported photo. These changes are included
+in the current deployed source. The dated release receipt separately records
+which checks were actually executed; the earlier PR #19 receipt stays historical.
 
 The frontend also handles network failure or cancellation when no API response exists. It must not treat an unreadable response or failed request as a successful save.
 
 ## Visibility
 
-Public campaign reads return approved campaigns only. A public request for a pending or rejected campaign returns `404`. Proposed owner/admin routes may return records their authenticated user is allowed to see.
+Public campaign reads return approved, non-deleted campaigns only. Pending/rejected/deleted detail returns `404`. Owner/admin routes return only records their current authenticated user is allowed to see.
 
 Pending or rejected campaign images must also remain restricted to their owner and authorised reviewers. Hiding a campaign page alone does not protect a publicly accessible image URL.
 
 ## Response rules used by the frontend
 
 - Exact success codes matter: category/profile/list/detail reads `200`, profile PUT `200`, campaign/image POST `201`, admin PATCH `200`, logout PUT `204` with no body.
-- List envelopes use `campaigns`, `page`, `pageSize` and proposed `total`; details return one object directly. Creation returns `{ "campaign": ... }`. See the [read contract](campaign-read-contract.md).
+- List envelopes use `campaigns`, `page`, `pageSize` and `total`; details return one object directly. Creation returns `{ "campaign": ... }`. See the [read contract](campaign-read-contract.md).
 - Do not return HTML for unknown API paths. Return a JSON error before any frontend SPA fallback.
 - Return only strings as error messages/field-error values. The frontend preserves input and focuses known invalid fields on `422`.
 - Frontend role checks are navigation aids; every protected read/write must verify the token, matching active session and current database user role/status.

@@ -252,6 +252,32 @@ describe('Campaign submission', () => {
     expect(screen.queryByRole('form')).toBeNull()
   })
 
+  it('explains the missing business profile API without a futile retry or false campaign form', async () => {
+    fetch.mockResolvedValueOnce(json({ code: 'API_ROUTE_NOT_FOUND', message: 'API route not found.' }, 404))
+    render(<CreateCampaignPage mode="business" role="business_owner" />)
+    expect((await screen.findByRole('alert')).textContent).toContain('Business profile setup is not available yet')
+    expect(screen.queryByRole('button', { name: 'Retry business profile' })).toBeNull()
+    expect(screen.queryByRole('form')).toBeNull()
+    expect(screen.queryByText('API route not found.')).toBeNull()
+  })
+
+  it.each([
+    [422, 'IMAGE_DIMENSIONS_TOO_LARGE', 'Resize the photo to 16 megapixels or fewer.'],
+    [429, 'IMAGE_OWNER_QUOTA_REACHED', 'Your photo storage limit has been reached. Remove unused campaign photos before uploading more.'],
+  ])('shows actionable upload errors before any campaign write: %s %s', async (status, code, message) => {
+    fetch.mockResolvedValueOnce(json({ code, message, fieldErrors: { file: message } }, status))
+    render(<CreateCampaignPage />)
+    await readyForm()
+    fireEvent.change(screen.getByLabelText(/Campaign photo/), { target: { files: [new File(['photo'], 'garden.png', { type: 'image/png' })] } })
+    fireEvent.click(submitButton())
+    await waitFor(() => expect(screen.getByLabelText(/Campaign photo/).getAttribute('aria-invalid')).toBe('true'))
+    expect(screen.getByLabelText(/Campaign photo/).getAttribute('aria-describedby')).toContain('submission-image-error')
+    expect(document.getElementById('submission-image-error').textContent).toBe(message)
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual(['/api/campaigns/categories', '/api/campaign-images'])
+    expect(screen.queryByRole('heading', { name: 'Campaign submitted' })).toBeNull()
+    expect(screen.queryByText(/may already have been saved/)).toBeNull()
+  })
+
   it('posts a business campaign with no client-selected business, user, type or status', async () => {
     fetch.mockResolvedValueOnce(json({ business: { id: 3, businessName: 'Local shop' } })).mockResolvedValueOnce(json(saved, 201))
     render(<CreateCampaignPage mode="business" role="business_owner" />)

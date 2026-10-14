@@ -1,0 +1,39 @@
+[Unit]
+Description=CauseConnect API
+After=network.target mysql.service
+Requires=mysql.service
+
+[Service]
+Type=simple
+User=causeconnect
+Group=causeconnect
+WorkingDirectory=/srv/causeconnect/current/backend
+EnvironmentFile=/etc/causeconnect/app.env
+Environment=PATH=/opt/node/bin:/usr/bin:/bin
+ExecStart=/opt/node/bin/node /opt/causeconnect-host/serve.cjs
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/srv/causeconnect/shared/uploads
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+IPAddressDeny=169.254.169.254/32
+IPAddressDeny=fd00:ec2::254/128
+CapabilityBoundingSet=
+MemoryMax=512M
+TasksMax=100
+LimitNOFILE=4096
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

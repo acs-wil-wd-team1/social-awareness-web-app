@@ -5,6 +5,14 @@ import CampaignImageInput, { validateCampaignImage } from './CampaignImageInput.
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
 describe('Campaign photo input', () => {
+  it('explains the server pixel and animation limits and how to resize a phone photo', () => {
+    render(<CampaignImageInput onChange={vi.fn()} />)
+    const help = screen.getByText(/Use a non-animated JPG, PNG or WebP photo/)
+    expect(help.textContent).toContain('5 MB and 16 megapixels')
+    expect(help.textContent).toContain('phone photos need to be resized')
+    expect(screen.getByLabelText(/Campaign photo/).getAttribute('aria-describedby')).toBe(help.id)
+  })
+
   it('accepts JPG, PNG and WebP up to 5 MB but rejects empty, oversized and unsupported files', () => {
     for (const type of ['image/jpeg', 'image/png', 'image/webp']) expect(validateCampaignImage({ type, size: 5000000 })).toBe('')
     expect(validateCampaignImage({ type: 'image/png', size: 5000001 })).toMatch(/5 MB/)

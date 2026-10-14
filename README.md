@@ -6,11 +6,11 @@ The application will help people discover campaigns supporting social causes and
 
 ## Current stage
 
-**Stage 3 — campaign frontend and API integration work**
+**Stage 3 — frontend, backend integration and cloud deployment**
 
 The Stage 2 prototype provided public campaign browsing, registration and login/logout. Its submission deadline was Sunday 20 September 2026.
 
-This branch adds frontend screens for:
+The frontend covers:
 
 1. Public-user and business campaign posting, business profiles and campaign photos
 2. My campaigns, owner edits/resubmission, photo replacement/removal and soft deletion
@@ -19,7 +19,9 @@ This branch adds frontend screens for:
 5. Admin approval/rejection, review history, content removal and user suspension/reactivation
 6. Automatic updates on the public campaign list/detail and owner submission status
 
-These are frontend implementations, not a claim that all their backend APIs are ready. Category lookup and text-only public submission are implemented in this branch's backend. Other new endpoints, image storage and the final integrated cloud deployment remain pending; the AWS sample frontend is already available. See the [feature coverage](docs/handoff/stage3-feature-coverage.md), [frontend README](frontend/README.md), [API handoff](docs/handoff/stage3-api-handoff.md) and [deployment preparation](infra/README.md).
+The real frontend, API and database are live at [CauseConnect on AWS](https://52.62.2.87). The current application commit is `fc9f9594b9f27e70ad5dc0b2d8f1ee1d754e0949`, release `2026-10-14T09-34-26-691Z-fc9f9594b9f2`. PR #23 sets the new-signup minimum to six characters while retaining the earlier review fixes. Exact release identity, eight fresh hosted API acceptance groups and the hosted five-/six-character signup and login/logout checks passed; see the [current release evidence](docs/evidence/stage-3/signup-minimum-six/README.md). The [PR #21 review-fix receipt](docs/evidence/stage-3/review-hardening/README.md) and [PR #19 receipt](docs/evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) remain historical evidence.
+
+Kim's GET/PUT `/api/business/me` is not merged or deployed and still returns `404` (AWT-141/AWT-173). [PR #22](https://github.com/acs-wil-wd-team1/social-awareness-web-app/pull/22) provides a profile implementation but is open with conflicts and awaits resolution/review. Direct API posting works for an existing linked Business row, but the browser form first needs GET `/api/business/me`: browser business submission is blocked for existing as well as new owners. The full hosted business registration → profile → posting → approval → enquiry/inbox journey has not passed. See the [feature coverage](docs/handoff/stage3-feature-coverage.md), [frontend README](frontend/README.md), current [API handoff](docs/handoff/stage3-api-handoff.md) and [deployment preparation](infra/README.md).
 
 ## Looking ahead to Stage 3
 
@@ -34,7 +36,7 @@ Stage 3 is due **Sunday 25 October 2026, 11:59 pm**. It extends the running Stag
 - Cloud IaaS deployment
 - User, developer and testing documentation
 
-The list above is the overall Stage 3 scope. This branch provides the application frontend and API handoff; real backend integration, cloud testing, manuals and the final recording remain separate deliverables. Jira remains the place for team task allocation. There is no public admin signup, role-promotion screen, payment system or full CRM.
+The list above is the overall Stage 3 scope. Local implementation and regression evidence do not replace cloud/browser testing, manuals or the final recording. Jira remains the place for team task allocation and review status. There is no public admin signup, role-promotion screen, payment system or full CRM.
 
 ## Why this repository was created
 
@@ -113,6 +115,6 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) before making changes.
 
 ## Current status
 
-The Stage 3 frontend and API handoff are prepared in this branch, including the original team logo. The [AWS sample preview](https://d10e86f5qx46up.cloudfront.net) is available for interface review; use **Preview as** to explore the roles. It uses disposable browser data, not the real backend. New backend features, final backend/cloud deployment and real integration testing remain open. Technical notes for the manual/demo owner are in [the frontend handoff](docs/handoff/stage3-frontend-notes.md).
+The [live AWS application](https://52.62.2.87) uses real accounts, API calls and persistent data. The older [AWS preview](https://d10e86f5qx46up.cloudfront.net) is a separate **Preview as** sample build using browser-only data; it is not the live application or backend evidence. The [current receipt](docs/evidence/stage-3/signup-minimum-six/README.md) records the six-character signup release and its bounded checks. Earlier hosted photo submission/approval, backup integrity and restart persistence remain in their dated receipts. Kim's profile routes still return `404`; PR #22 needs conflict resolution/review before integration, so business browser posting remains blocked. Independent tester acceptance, manuals and recording remain separate deliverables. Technical notes for the manual/demo owner are in [the frontend handoff](docs/handoff/stage3-frontend-notes.md).
 
 No feature should be described as complete until its implementation and evidence are present.

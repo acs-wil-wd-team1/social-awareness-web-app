@@ -110,6 +110,24 @@ describe('API requests', () => {
     await expect(apiRequest('/api/campaigns')).rejects.toMatchObject({ status: 503, message: expect.stringContaining('not available') })
   })
 
+  it('explains how to recover from a non-JSON rate-limit response without exposing proxy HTML', async () => {
+    const reply = response(429, null)
+    reply.json.mockRejectedValue(new SyntaxError('Proxy HTML'))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply))
+    await expect(apiRequest('/api/auth/login', { method: 'POST' })).rejects.toMatchObject({
+      status: 429, code: 'RATE_LIMITED', message: 'Too many requests. Please wait a minute before trying again.',
+    })
+  })
+
+  it('preserves actionable JSON photo-quota errors instead of replacing them with a timed retry', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(429, {
+      code: 'IMAGE_OWNER_QUOTA_REACHED', message: 'Your photo storage limit has been reached. Remove unused campaign photos before uploading more.',
+    })))
+    await expect(apiRequest('/api/campaign-images', { method: 'POST' })).rejects.toMatchObject({
+      status: 429, code: 'IMAGE_OWNER_QUOTA_REACHED', message: expect.stringContaining('Remove unused'),
+    })
+  })
+
   it('announces which token was rejected so a newer session is not cleared', async () => {
     const listener = vi.fn()
     window.addEventListener('causeconnect:unauthorized', listener)

@@ -1,6 +1,6 @@
 # Owner campaign editing and removal
 
-This contract supports the implemented frontend at `/my-campaigns/:id/edit`. The browser screens and sample-data flow are merged into `main`; the backend routes below still need implementation and database verification.
+This contract supports `/my-campaigns/:id/edit`. Owner reads, edit/resubmit and soft-delete are merged through PR #19 and deployed at [CauseConnect on AWS](https://52.62.2.87). Local regression and scoped production edit/conflict/deletion checks passed. The [release evidence](../evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) records the exact revision and limits.
 
 Both public users and small-business owners can manage their own campaigns. Admin review stays on the separate [admin endpoints](admin-campaign-moderation-contract.md). See the [campaign read contract](campaign-read-contract.md) for the owner list and the [photo extension](campaign-posting-future-proposal.md) for upload references.
 
@@ -76,14 +76,14 @@ On success, return `{ "campaign": <updated campaign object> }`. Its ID must matc
 
 Within one transaction:
 
-1. Load and lock the non-deleted campaign and check ownership/current access.
+1. Lock and recheck the current account, then its active session, then the non-deleted campaign and ownership. This ordering is shared with moderation, engagement and image writes.
 2. Compare its exact saved version with `expectedUpdatedAt`. If different, return `409 CAMPAIGN_CHANGED` and make no change.
 3. Validate the new data and image reference, then apply the edit or soft deletion.
 4. Advance `updatedAt` beyond the previous version, commit, and only then send success.
 
 Persist millisecond precision for this protocol, and make the version advance even when two changes occur in the same millisecond. Do not truncate the saved version to whole seconds or compare only the date. An atomic conditional update with a checked affected-row count is another valid way to enforce the same concurrency rule. Admin decisions must also advance the version so an owner cannot overwrite a newer review unnoticed.
 
-The current create-campaigns migration uses `Sequelize.DATE` without a fractional precision, and the Campaign model relies on implicit timestamp fields. Add a **new shared migration** changing `campaigns.updated_at` to MySQL `DATETIME(3)` / Sequelize `DATE(3)` and explicitly preserve that precision in the model. Keep its non-null/default behaviour and existing rows; do not modify the old applied migration or recreate the table. Owner and admin APIs must use this same version column. Generate the next timestamp as at least the previous saved version plus one millisecond, inside the transaction, and serialize the actual saved value. A database round-trip test must prove milliseconds are not lost. This schema change is proposed and has not been applied by the frontend work.
+Migration `20261013090000-campaign-updated-at-milliseconds.js` and the Campaign model preserve `updatedAt` with MySQL `DATETIME(3)` / Sequelize `DATE(3)`. Owner and admin APIs use this same version column. The next timestamp is at least the previous saved version plus one millisecond, generated inside the transaction and returned from the saved state. Do not modify the older applied create-table migration or add a second version column.
 
 Approval/rejection, unpublish and admin deletion also send `expectedUpdatedAt`. An owner edit committed first must invalidate an already-open admin review; checking only `status:pending` would let the admin approve content they never saw. Apply the [admin version rules](admin-campaign-moderation-contract.md#proposed-review-action) as well as the owner version check.
 
@@ -95,7 +95,7 @@ The frontend asks the author to type the campaign title before issuing DELETE:
 { "expectedUpdatedAt": "2026-10-02T02:00:00.000Z" }
 ```
 
-Use a soft-delete marker such as `deleted_at`; this is not a permanent database deletion. Exclude removed campaigns from public browsing, owner active lists and normal review queues, and return `404` from their detail/edit routes. Participation and enquiry writes must reject removed campaigns too. Keep existing reviews and engagement history according to the agreed retention rules. The title confirmation is a browser safeguard, not a replacement for server authorization/version checks.
+Use `deleted_at`; this is not a permanent database deletion. Removed campaigns are excluded from public browsing, owner active lists and normal review queues, and return `404` from detail/edit routes. New joins/rejoins and enquiries reject removed campaigns. An existing participant can still read or withdraw their own record, without private campaign content. Reviews and engagement history are retained. The title confirmation is a browser safeguard, not a replacement for server authorization/version checks.
 
 Use the shared deletion metadata and audit migration described in [admin management](admin-management-contract.md#database-work), not a separate owner-deletion schema. Set `deleted_by` to the authenticated owner, allow `deletion_reason` to remain `NULL` for this route, and record the owner actor in the deletion audit event.
 
@@ -124,8 +124,8 @@ The frontend also blocks further edits/removal when a mutation returns an unexpe
 - A stored timestamp retains milliseconds after reload, and two immediate changes still produce strictly increasing versions. An owner edit committed before a stale admin approval does not get approved.
 - Omitted photo fields keep the current photo; replacement/removal works; wrong-owner, expired and conflicting references are rejected without partial changes.
 - Approved content disappears from public routes after an edit or removal, and remains unavailable until the edited campaign is approved again.
-- Soft deletion preserves history, excludes the record from active lists and blocks further engagement writes.
+- Soft deletion preserves history, excludes the record from active lists and blocks new joins/rejoins and enquiries; existing own participation remains withdrawable.
 - Validation failures do not mutate data. Return the exact success status and body only after commit.
 - Test browser recovery after a lost response: no duplicate save/delete is sent until the author reloads.
 
-These are backend acceptance checks, not a statement that they have passed against a deployed API.
+This checklist defines the acceptance scope; use the dated release evidence for what was actually run locally and in production. Do not infer that every checklist case was repeated on the deployed API.

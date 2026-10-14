@@ -68,6 +68,12 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+it('keeps the public search input within the API 150-character limit', async () => {
+  render(<HomePage />)
+  await screen.findByText('Books for Kids')
+  expect(screen.getByLabelText('Find a campaign').maxLength).toBe(150)
+})
+
 describe('campaign list background refresh', () => {
   beforeEach(() => {
     vi.useFakeTimers()

@@ -102,7 +102,7 @@ export default function AdminUsersPage({ token, role, currentUserId, userLoader 
       {reloadRequired ? <button type="button" onClick={() => { setSaveError(''); setRetry((value) => value + 1) }}>Reload account list</button> : null}
       {state === 'loading' ? <p role="status">Loading accounts…</p> : null}
       {state === 'error' ? <div className="campaign-management__notice" role="alert">
-        <p>{error?.status === 401 ? 'Your session has expired. Please log in again.' : error?.status === 403 ? 'Your account does not have permission to manage users.' : error?.status === 404 ? 'The account or account-management service is unavailable.' : 'Accounts could not be loaded. Please try again.'}</p>
+        <p>{error?.status === 401 ? 'Your session has expired. Please log in again.' : error?.status === 403 ? 'Your account does not have permission to manage users.' : error?.status === 404 ? 'The account or account-management service is unavailable.' : error?.status === 429 ? error.message : 'Accounts could not be loaded. Please try again.'}</p>
         {error?.status === 401 ? <a className="text-link" href="/login?returnTo=%2Fadmin%2Fusers">Log in again</a> : error?.status !== 403 ? <button type="button" onClick={() => setRetry((value) => value + 1)}>Try again</button> : null}
       </div> : null}
       {state === 'success' && result ? <>
