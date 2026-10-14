@@ -2,7 +2,7 @@
 
 Node.js, Express, Sequelize and MySQL. APIs cover authentication, categories, public/business campaign submission, owner/admin reads and campaign approval, plus AWT-175 photos, owner edits/removal, participation, business enquiries and admin account/content management. PR #19 is merged, and application commit `ffe3df679e5d8d1dc43c8bd1669b96aed757ad86` is deployed at [CauseConnect on AWS](https://52.62.2.87). See the [release evidence](../docs/evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) for exact verification scope.
 
-GET/PUT `/api/business/me` is still missing and remains Kim's AWT-141/AWT-173 work. Posting against an existing Business row works; a newly registered owner cannot yet complete the profile and first-post journey through the app.
+GET/PUT `/api/business/me` is still missing and remains Kim's AWT-141/AWT-173 work. Direct API posting against an existing linked Business row works. Browser business submission first needs GET `/api/business/me`, so it is blocked for existing as well as new owners; the full hosted business journey has not passed.
 
 ## Prerequisites
 
@@ -37,6 +37,12 @@ docker compose up -d
 ```
 
 This reads `DB_NAME`, `DB_NAME_TEST`, `DB_USER`, `DB_PORT` and `DB_PASSWORD` from `.env`. On first initialization it creates the configured databases. Data persists in a named volume across restarts.
+
+The mapped MySQL port binds to `127.0.0.1` only, so other computers on the network
+cannot connect to this local development database. Use `DB_HOST=127.0.0.1` from the
+host; `DB_PORT` may still be changed if another local database uses 3306. This
+configuration change does not alter a container that is already running. Restart
+the project's Compose service when ready; do not delete its volume to change ports.
 
 Check the container is healthy before running migrations or starting the server:
 
@@ -81,6 +87,15 @@ The PR #19 release passed 76 backend unit tests, 64 HTTP/MySQL checks, 18 actual
 
 The [campaign submission contract](../docs/api/campaign-posting-contract.md) lists the endpoints, validation rules and API-to-database field mapping. Public users and business owners (with a business profile) can submit; owners read their own submissions through `GET /api/campaigns/mine`.
 
+## Authentication
+
+The review-hardening source requires new signup passwords to contain at least
+15 Unicode code points and no more than 72 UTF-8 bytes, without trimming. The
+server and registration form share that rule. Existing accounts keep their old
+login passwords; this is not a password reset or hash migration. Deploy and verify
+the new source before claiming this safeguard is active on AWS. See the
+[authentication contract](../docs/api/current-authentication.md).
+
 ## Admin campaign approval
 
 `PATCH /api/campaigns/admin/:id/status` approves or rejects a pending campaign. See the [moderation contract](../docs/api/admin-campaign-moderation-contract.md). Run `npx sequelize-cli db:migrate` after pulling: migration `20261013090000` gives `campaigns.updated_at` millisecond precision for the review version check.
@@ -108,4 +123,41 @@ Payloads and exact status codes are in the [API integration guide](../docs/hando
 
 Images use a private persistent directory on the existing server, not a new S3 bucket. Production requires an absolute `CAMPAIGN_UPLOAD_DIR` outside the checkout/web root, with server-only permissions and backup coverage. Defaults are 512 MiB total uploads and a 2 GiB free-disk reserve (`CAMPAIGN_UPLOAD_MAX_BYTES`, `CAMPAIGN_UPLOAD_MIN_FREE_BYTES`). No new cloud resource is required by this implementation.
 
-Accept one JPEG, PNG or WebP up to 5,000,000 bytes and 16 million decoded pixels. Unattached references expire after 24 hours; an account may hold up to 20 active unattached uploads. Private delivery uses five-minute signed tickets and rechecks the current account/session; approved public delivery rechecks campaign visibility. Cleanup targets only expired unattached generated files and metadata. Cloud storage, paired backup integrity and API-restart photo persistence passed the recorded checks; full restoration and offsite recovery were not tested. See the [image contract](../docs/api/campaign-posting-future-proposal.md), [deployment preparation](../infra/README.md) and [release evidence](../docs/evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026).
+Accept one JPEG, PNG or WebP up to 5,000,000 bytes and 16 million decoded pixels.
+Larger phone photos must be resized; HEIC/HEIF must be exported in a supported
+format. Unattached references expire after 24 hours. The review-hardening source
+adds default **20 retained photos/50 MiB per owner**: every owner image row counts
+until safe cleanup removes its file and metadata, including attached, expired,
+replaced/removed and soft-deleted-campaign images. Expiry/removal does not instantly
+free the quota. Configure `CAMPAIGN_UPLOAD_OWNER_MAX_PHOTOS` (1–100) and
+`CAMPAIGN_UPLOAD_OWNER_MAX_BYTES` (1–268,435,456 bytes); no attached image is purged.
+These new safeguards need a reviewed deployment before they are live.
+
+Private delivery uses five-minute signed tickets and rechecks the current
+account/session; approved public delivery rechecks campaign visibility. Cleanup
+targets only expired unattached generated files and metadata. Cloud storage,
+paired backup integrity and API-restart photo persistence passed the recorded
+PR #19 checks; full restoration and offsite recovery were not tested. See the
+[image contract](../docs/api/campaign-posting-future-proposal.md),
+[deployment preparation](../infra/ec2/host/README.md) and
+[release evidence](../docs/evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026).
+
+### Read-only local photo report
+
+For an already-configured local database and upload folder, run from `backend`:
+
+```sh
+node scripts/report-campaign-images.js
+```
+
+This diagnostic requires a loopback `DB_HOST` and non-production `NODE_ENV`.
+It reports totals for missing, untracked, size-mismatched and unsafe entries,
+including every retained ledger reference regardless of expiry or campaign status.
+It never deletes, repairs or reads photo content, and prints no filenames, private
+paths or account details. The scan is bounded to 10,000 rows and directory entries
+and is best-effort, not a transactional snapshot. Repeat in a quiet window before
+investigating discrepancies: **untracked does not mean disposable**.
+
+The command is intentionally excluded from the production release's script
+allowlist. It helps diagnose the file-write/database-commit crash window; it does
+not eliminate it or establish backup/restore proof.

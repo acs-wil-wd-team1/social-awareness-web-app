@@ -1,5 +1,20 @@
 # CauseConnect deployment
 
+The real Stage 3 application is already hosted at [CauseConnect on AWS](https://52.62.2.87)
+with same-origin API calls, private MySQL and persistent uploads. Use the
+[current EC2 guide](ec2/README.md) and [host package](ec2/host/README.md) to update
+that existing server. Its root is `/srv/causeconnect/current/frontend/dist`.
+The [dated release evidence](../docs/evidence/stage-3/additional-apis/README.md)
+separates what was verified from the remaining business-profile dependency.
+
+## Historical frontend-only preview instructions
+
+The steps below and `infra/nginx/` files are retained from the earlier preview
+phase. They use a different `/var/www/causeconnect/` layout and are **not** the
+live server's upload/privacy/rate-limit configuration. Do not copy those templates
+over the current HTTPS site, or use a frontend-only symlink rollback to revert
+backend code. Follow the current host guide's schema-compatibility and backup rules.
+
 The frontend can be hosted on AWS before the remaining APIs are finished. Use a **demo build** for that first preview: it displays sample data, makes no real submissions and stays visibly labelled as a preview. Use the live build once the backend is available.
 
 These files prepare deployment; they do not create AWS resources or deploy automatically.

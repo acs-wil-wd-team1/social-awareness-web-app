@@ -48,11 +48,18 @@ Stage 3 API errors use:
 | `413` | `REQUEST_TOO_LARGE` | JSON body exceeds the configured limit |
 | `415` | `UNSUPPORTED_IMAGE_TYPE` | Uploaded file is not a supported image |
 | `422` | `VALIDATION_FAILED` | Invalid fields, malformed JSON or unusable image reference |
-| `429` | `IMAGE_UPLOAD_LIMIT` | Too many active unattached uploads for this account |
+| `429` | `IMAGE_OWNER_QUOTA_REACHED` | Review-hardening source: retained owner photo count/bytes reached; cleanup must actually remove old files/rows to free space |
+| `429` | `IMAGE_UPLOAD_LIMIT` | Earlier release's active-unattached cap; retained for older response compatibility |
 | `500` | `INTERNAL_SERVER_ERROR` | Unexpected server failure |
 | `503` | `SERVICE_UNAVAILABLE` / `IMAGE_STORAGE_FULL` / `UPLOAD_BUSY` | API/storage dependency temporarily unavailable |
 
 API parser and unknown-route errors are normalised to JSON. The legacy logout middleware still has its older error shape; see [current authentication](current-authentication.md). Use status/code where supplied rather than matching error prose.
+
+The review-hardening image decoder distinguishes `422 IMAGE_DIMENSIONS_TOO_LARGE`,
+`IMAGE_DECODE_FAILED`, `IMAGE_TYPE_MISMATCH` and `ANIMATED_IMAGE_NOT_SUPPORTED` so
+the user can resize or export a still supported photo. These source changes need
+a new deployment; the PR #19 receipt above is historical evidence, not proof they
+are live.
 
 The frontend also handles network failure or cancellation when no API response exists. It must not treat an unreadable response or failed request as a successful save.
 

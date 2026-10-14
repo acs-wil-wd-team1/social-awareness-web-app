@@ -9,7 +9,7 @@ const vm = require("node:vm");
 const express = require("express");
 const { validateRegistrationInput, validateLoginInput } = require("../../src/utils/authValidation");
 
-const valid = { name: "  Alex Member  ", email: "  ALEX@EXAMPLE.COM  ", password: " keep spaces ", accountType: "user" };
+const valid = { name: "  Alex Member  ", email: "  ALEX@EXAMPLE.COM  ", password: " keep spaces intact ", accountType: "user" };
 const plain = (value) => JSON.parse(JSON.stringify(value));
 
 function invalid(validate, body, field) {
@@ -34,7 +34,7 @@ function isolatedModule(relativePath, substitutes, logs = []) {
   return module.exports;
 }
 
-function services({ existing = null, fresh = existing, compare = true, updateRows = 1, databaseError = null } = {}) {
+function services({ existing = null, fresh = existing, compare = true, updateRows = 1, databaseError = null, createError = null } = {}) {
   const calls = [];
   const User = {
     findByPk: async (id, options) => { calls.push(["lockedAccount", id, options]); return fresh; },
@@ -43,7 +43,7 @@ function services({ existing = null, fresh = existing, compare = true, updateRow
       if (databaseError) throw databaseError;
       return existing;
     },
-    create: async (values) => { calls.push(["create", values]); return { userId: 7, ...values }; },
+    create: async (values) => { calls.push(["create", values]); if (createError) throw createError; return { userId: 7, ...values }; },
     scope: (scope) => { calls.push(["scope", scope]); return User; },
   };
   const UserSession = {
@@ -97,11 +97,19 @@ async function parserServer(t, { routeError = null } = {}) {
 
 test("registration normalizes name/email but preserves the password exactly", () => {
   assert.deepEqual(validateRegistrationInput(valid), {
-    name: "Alex Member", email: "alex@example.com", password: " keep spaces ", accountType: "user",
+    name: "Alex Member", email: "alex@example.com", password: " keep spaces intact ", accountType: "user",
   });
   assert.equal(validateRegistrationInput({ ...valid, accountType: "business" }).accountType, "business");
-  // The current form has no minimum-length/complexity policy. Do not invent one.
-  assert.equal(validateRegistrationInput({ ...valid, password: "a" }).password, "a");
+});
+
+test("new registrations require 15 Unicode characters while existing short-password logins remain valid", () => {
+  for (const password of ["a", "a".repeat(14), "🔒".repeat(8), "🔒".repeat(14)]) {
+    invalid(validateRegistrationInput, { ...valid, password }, "password");
+    assert.equal(validateLoginInput({ email: valid.email, password }).password, password);
+  }
+  for (const password of ["a".repeat(15), "🔒".repeat(15), "a long pass phrase with spaces"]) {
+    assert.equal(validateRegistrationInput({ ...valid, password }).password, password);
+  }
 });
 
 test("registration rejects non-object bodies and missing/wrongly typed account fields", () => {
@@ -189,6 +197,25 @@ test("duplicate email retains the existing 409 error envelope and never hashes/i
     error.status === 409 && error.code === "EMAIL_EXISTS" && typeof error.fieldErrors.email === "string"
   ));
   assert.deepEqual(calls.map(([name]) => name), ["findOne"]);
+});
+
+test("a concurrent email insert conflict returns the same 409 without exposing database details", async () => {
+  const { UniqueConstraintError } = require("sequelize");
+  const error = new UniqueConstraintError({ fields: { email: valid.email }, message: "private SQL details" });
+  const { service, calls } = services({ createError: error });
+  await assert.rejects(service.registerUser(valid), (failure) => (
+    failure.status === 409 && failure.code === "EMAIL_EXISTS"
+    && typeof failure.fieldErrors.email === "string" && !failure.message.includes("SQL")
+  ));
+  assert.deepEqual(calls.map(([name]) => name), ["findOne", "hash", "create"]);
+});
+
+test("registration does not disguise unrelated unique constraints or database failures as duplicate email", async () => {
+  const { UniqueConstraintError } = require("sequelize");
+  for (const error of [new UniqueConstraintError({ fields: { user_id: 7 } }), new Error("database unavailable")]) {
+    const { service } = services({ createError: error });
+    await assert.rejects(service.registerUser(valid), (failure) => failure === error);
+  }
 });
 
 test("valid login normalizes lookup, preserves password, and stores the real session", async () => {

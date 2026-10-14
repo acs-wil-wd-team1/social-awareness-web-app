@@ -6,7 +6,7 @@ Category lookup and campaign submission are implemented for signed-in `public` u
 
 **Owner reads:** `GET /api/campaigns/mine` and `GET /api/campaigns/mine/:id` return only the signed-in creator's campaigns in every status, using the [campaign read contract](campaign-read-contract.md) object including `updatedAt` and the latest `review` feedback.
 
-The frontend uses `/campaigns/new` for public submission and `/business/campaigns/new` for business submission. The latter still needs Kim's GET/PUT `/api/business/me` to complete the profile step for a new owner; supporting an existing Business row is not the whole new-business journey.
+The frontend uses `/campaigns/new` for public submission and `/business/campaigns/new` for business submission. The latter first calls GET `/api/business/me`, so browser business posting is blocked for both new and existing owners until Kim's profile API is available. Direct POST against an existing linked Business row is implemented and fixture-tested; it is not a completed hosted business browser journey.
 
 Related rules are in the [business posting and image extension](campaign-posting-future-proposal.md), [business profile contract](business-profile-contract.md), [campaign read contract](campaign-read-contract.md) and [admin contract](admin-campaign-moderation-contract.md). The [API integration guide](../handoff/stage3-api-handoff.md) separates implemented work from remaining integration and deployment checks.
 

@@ -58,6 +58,18 @@ afterEach(() => { cleanup(); localStorage.clear() })
 afterAll(async () => { await db.sequelize.close() })
 
 describe.sequential('frontend → real Express → disposable MySQL', () => {
+  it('rejects a short signup password on the page without creating a database row', async () => {
+    const shortEmail = `short-frontend-${tag}@example.test`
+    render(<RegistrationPage />)
+    registerForm(shortEmail)
+    change('Password', 'TooShort123!')
+    change('Confirm password', 'TooShort123!')
+    fireEvent.click(screen.getByRole('button', { name: 'Register' }))
+    expect(await screen.findByText('Use at least 15 characters. A longer passphrase is easier to remember.')).toBeTruthy()
+    expect(screen.queryByText(/Registration successful/)).toBeNull()
+    expect(await db.User.count({ where: { email: shortEmail } })).toBe(0)
+  })
+
   it('registers through the actual page and stores a hashed password with public role', async () => {
     render(<RegistrationPage />)
     registerForm()
@@ -220,13 +232,14 @@ describe.sequential('additional frontend flows → real API → disposable MySQL
 
   it('shows the unavailable business-profile API honestly without changing the fixture', async () => {
     const before = (await db.Business.findByPk(businessA.id)).get({ plain: true })
-    await expect(loadBusinessProfile({ token: ownerAToken })).rejects.toMatchObject({ status: 404 })
+    await expect(loadBusinessProfile({ token: ownerAToken })).rejects.toMatchObject({ status: 404, code: 'BUSINESS_PROFILE_UNAVAILABLE' })
     render(<BusinessProfilePage token={ownerAToken} role="business_owner" />)
     expect(await screen.findByRole('alert')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Retry business profile' })).toBeTruthy()
+    expect(screen.getByRole('alert').textContent).toContain('not available yet')
+    expect(screen.queryByRole('button', { name: 'Retry business profile' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Save business profile' })).toBeNull()
     expect(screen.queryByRole('heading', { name: 'Business profile saved' })).toBeNull()
-    await expect(saveBusinessProfile({ businessName: `Must not save ${tag}`, abn: '', website: '', description: '' }, { token: ownerAToken })).rejects.toMatchObject({ status: 404 })
+    await expect(saveBusinessProfile({ businessName: `Must not save ${tag}`, abn: '', website: '', description: '' }, { token: ownerAToken })).rejects.toMatchObject({ status: 404, code: 'BUSINESS_PROFILE_UNAVAILABLE' })
     expect((await db.Business.findByPk(businessA.id)).get({ plain: true })).toEqual(before)
     expect(await db.Business.count({ where: { ownerId: ownerA.userId } })).toBe(1)
   })

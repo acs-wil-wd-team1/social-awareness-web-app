@@ -9,7 +9,7 @@ HOST = Path(__file__).resolve().parents[1] / 'host'
 
 class UploadHostTests(unittest.TestCase):
     def test_shell_scripts_parse(self):
-        for name in ['configure-uploads.sh', 'update-host.sh', 'prune-images.sh', 'backup.sh', 'deploy.sh']:
+        for name in ['configure-uploads.sh', 'update-host.sh', 'prune-images.sh', 'backup.sh', 'deploy.sh', 'activate-release.sh', 'tests/deploy-rollback.test.sh']:
             subprocess.run(['bash', '-n', str(HOST / name)], check=True, capture_output=True)
 
     def test_only_upload_directory_is_writable(self):
@@ -54,6 +54,17 @@ class UploadHostTests(unittest.TestCase):
         self.assertIn('causeconnect-backup.lock', backup)
         self.assertIn('tail -n +8', backup)
         self.assertNotIn("-name 'causeconnect-*.sql.gz'", backup)
+
+    def test_backup_timer_runs_during_sydney_overnight_window(self):
+        timer = (HOST / 'causeconnect-backup.timer').read_text()
+        self.assertIn('OnCalendar=*-*-* 16:00:00 UTC', timer)
+        self.assertIn('RandomizedDelaySec=30m', timer)
+        self.assertIn('Persistent=true', timer)
+
+    def test_local_mysql_compose_port_is_loopback_only(self):
+        compose = (HOST.parents[2] / 'backend/docker-compose.yml').read_text()
+        self.assertIn("'127.0.0.1:${DB_PORT:-3306}:3306'", compose)
+        self.assertNotIn("- '${DB_PORT:-3306}:3306'", compose)
 
     def test_cleanup_is_bounded_and_runs_with_private_runtime_environment(self):
         runner = (HOST / 'prune-images.sh').read_text()

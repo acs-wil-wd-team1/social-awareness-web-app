@@ -1,6 +1,10 @@
 # Cloud deployment model
 
-**Status:** Stage 2 planning draft
+**Status:** Historical Stage 2 planning draft, retained as the original planning
+record. It is not the current deployment instruction set. The selected live
+single-server EC2 model, HTTPS, private API/MySQL, persistent images and backup
+procedure are documented in [the EC2 guide](../../infra/ec2/README.md) and
+[host package](../../infra/ec2/host/README.md). Use those references for Stage 3.
 
 Meeting 1 recorded AWS as the initial cloud choice.
 
@@ -22,7 +26,7 @@ AWS EC2 is the current proposed IaaS option. It remains subject to team review a
 - Logging and health checks
 - Backup and recovery approach
 
-## Decisions still required
+## Decisions still required at the time of this draft
 
 - Final AWS service and EC2 topology
 - Whether the frontend and backend share an instance

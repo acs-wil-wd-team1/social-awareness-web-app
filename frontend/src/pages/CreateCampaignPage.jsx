@@ -221,7 +221,7 @@ export default function CreateCampaignPage({ token = localStorage.getItem('token
           <div className="campaign-profile-state" role={businessState === 'error' ? 'alert' : 'status'}>
             {businessState === 'loading' ? <p>Loading your business profile…</p> : null}
             {businessState === 'empty' ? <><h2>Add your business details first</h2><p>Your campaign needs a business profile so people know who is behind it.</p><a className="text-link" href="/business/profile">Set up business profile</a></> : null}
-            {businessState === 'error' ? <><p>{businessError.message}</p>{businessError.status === 401 ? <a className="text-link" href={loginPath}>Log in again</a> : <button className="campaign-secondary-button" type="button" onClick={() => setBusinessRetry((value) => value + 1)}>Retry business profile</button>}</> : null}
+            {businessState === 'error' ? <><p>{businessError.message}</p>{businessError.status === 401 ? <a className="text-link" href={loginPath}>Log in again</a> : ![403, 404].includes(businessError.status) ? <button className="campaign-secondary-button" type="button" onClick={() => setBusinessRetry((value) => value + 1)}>Retry business profile</button> : <a className="text-link" href="/my-campaigns">My campaigns</a>}</> : null}
           </div>
         ) : savedCampaign ? (
           <div ref={success} className="campaign-form-success" role="status" tabIndex="-1">

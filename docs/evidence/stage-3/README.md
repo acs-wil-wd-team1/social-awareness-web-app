@@ -6,6 +6,7 @@ PR #19 is merged and application commit `ffe3df679e5d8d1dc43c8bd1669b96aed757ad8
 
 ## Evidence index
 
+- [14 October review fixes](review-hardening/README.md) — local corrections and regression/browser evidence; not yet merged or deployed.
 - [Additional APIs](additional-apis/README.md) — local regression, real API/database checks and dated AWS release acceptance.
 - [Frontend preview](frontend-preview/README.md) — historical sample-preview and early real-API checks; not evidence of the current live release.
 - [UX polish](ux-polish/README.md) — dated layout and interaction checks.

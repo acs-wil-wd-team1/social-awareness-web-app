@@ -10,7 +10,7 @@ const sharp = require("sharp");
 const jwt = require("jsonwebtoken");
 const express = require("express");
 const { createCampaignImageRouter } = require("../../src/router/campaignImageRoutes");
-const { createCampaignImageService, decodeImage, signTicket, readTicket, MAX_IMAGE_BYTES } = require("../../src/services/campaignImages");
+const { createCampaignImageService, decodeImage, signTicket, readTicket, MAX_IMAGE_BYTES, DEFAULT_OWNER_MAX_PHOTOS, DEFAULT_OWNER_MAX_BYTES } = require("../../src/services/campaignImages");
 const { createImageStorage } = require("../../src/services/campaignImageStorage");
 
 const secret = "isolated-unit-image-secret-not-a-real-key";
@@ -36,8 +36,67 @@ test("rejects empty, oversized, mismatched, malformed and unsupported files", as
   await assert.rejects(decodeImage({ ...file, buffer: Buffer.alloc(MAX_IMAGE_BYTES + 1) }), (error) => error.status === 413);
   await assert.rejects(decodeImage({ ...file, originalname: "photo.svg" }), (error) => error.status === 415);
   await assert.rejects(decodeImage({ ...file, mimetype: "image/jpeg" }), (error) => error.status === 415);
-  await assert.rejects(decodeImage({ ...file, mimetype: "image/jpeg", originalname: "photo.jpg" }), (error) => error.status === 422);
-  await assert.rejects(decodeImage({ ...file, buffer: file.buffer.subarray(0, 35) }), (error) => error.status === 422);
+  await assert.rejects(decodeImage({ ...file, mimetype: "image/jpeg", originalname: "photo.jpg" }), (error) => error.status === 422 && error.code === "IMAGE_TYPE_MISMATCH");
+  await assert.rejects(decodeImage({ ...file, buffer: file.buffer.subarray(0, 35) }), (error) => error.status === 422 && error.code === "IMAGE_DECODE_FAILED");
+});
+
+test("a compressed 24 MP phone JPEG receives an explicit resize error without decoding all pixels", async () => {
+  const buffer = await sharp({ create: { width: 6000, height: 4000, channels: 3, background: "green" } }).jpeg({ quality: 30 }).toBuffer();
+  assert.ok(buffer.length < MAX_IMAGE_BYTES);
+  await assert.rejects(decodeImage({ buffer, originalname: "phone.jpg", mimetype: "image/jpeg" }), (error) => {
+    assert.equal(error.status, 422);
+    assert.equal(error.code, "IMAGE_DIMENSIONS_TOO_LARGE");
+    assert.match(error.message, /16 megapixels.*Resize.*4000/);
+    return true;
+  });
+  const withinLimit = await sharp(buffer).resize({ width: 4000, height: 4000, fit: "inside" }).toBuffer();
+  assert.equal((await decodeImage({ buffer: withinLimit, originalname: "phone.jpg", mimetype: "image/jpeg" })).contentType, "image/jpeg");
+});
+
+test("rejects animated WebP with a still-photo instruction", async () => {
+  const buffer = await sharp(Buffer.from([255, 0, 0, 0, 255, 0]), { raw: { width: 1, height: 2, channels: 3, pageHeight: 1 } }).webp().toBuffer();
+  assert.equal((await sharp(buffer).metadata()).pages, 2);
+  await assert.rejects(decodeImage({ buffer, originalname: "animated.webp", mimetype: "image/webp" }), (error) => error.status === 422 && error.code === "ANIMATED_IMAGE_NOT_SUPPORTED");
+});
+
+function quotaUploadFixture({ count = 0, size = 0, ownerMaxPhotos, ownerMaxBytes } = {}) {
+  const token = jwt.sign({ id: 2 }, secret, { expiresIn: "1h" });
+  const operations = [];
+  const queries = [];
+  const storage = { write: async () => { operations.push("write"); }, remove: async () => { operations.push("remove"); } };
+  const models = {
+    sequelize: { transaction: async (work) => work(transaction) },
+    User: { findByPk: async (id, options) => { assert.equal(options.lock, transaction.LOCK.UPDATE); operations.push("account-lock"); return { userId: id, status: "active", role: "public" }; } },
+    UserSession: { findOne: async () => ({ token, userId: 2, status: "active" }) },
+    CampaignImage: {
+      count: async (options) => { queries.push(options); operations.push("count"); return count; },
+      sum: async (field, options) => { assert.equal(field, "sizeBytes"); queries.push(options); operations.push("sum"); return size; },
+      create: async (values) => { operations.push("create"); return values; },
+    },
+  };
+  return { service: createCampaignImageService(models, { storage, now: () => now, secret: () => secret, ownerMaxPhotos, ownerMaxBytes }), operations, queries, token };
+}
+
+test("retained-photo count and bytes are checked under the account lock before a file is written", async () => {
+  const file = await makeFile();
+  const decoded = await decodeImage(file);
+  for (const limits of [{ count: DEFAULT_OWNER_MAX_PHOTOS }, { size: DEFAULT_OWNER_MAX_BYTES - decoded.bytes.length + 1 }]) {
+    const data = quotaUploadFixture(limits);
+    await assert.rejects(data.service.upload(file, { id: 2 }, data.token), (error) => error.status === 429 && error.code === "IMAGE_OWNER_QUOTA_REACHED");
+    assert.deepEqual(data.operations, ["account-lock", "count", "sum"]);
+    assert.equal(data.queries.length, 2);
+    assert.ok(data.queries.every((options) => options.transaction === transaction && options.where.ownerId === 2));
+    assert.deepEqual(data.queries[0].where, { ownerId: 2 });
+  }
+  const allowed = quotaUploadFixture({ count: 1, size: null, ownerMaxPhotos: 2, ownerMaxBytes: decoded.bytes.length });
+  const result = await allowed.service.upload(file, { id: 2 }, allowed.token);
+  assert.equal(result.sizeBytes, decoded.bytes.length);
+  assert.deepEqual(allowed.operations, ["account-lock", "count", "sum", "write", "create"]);
+});
+
+test("per-account quota overrides are bounded positive integers", () => {
+  for (const value of [0, -1, 1.5, "bad", 101]) assert.throws(() => quotaUploadFixture({ ownerMaxPhotos: value }), /Invalid per-account image quota/);
+  for (const value of [0, -1, 1.5, "bad", 256 * 1024 * 1024 + 1]) assert.throws(() => quotaUploadFixture({ ownerMaxBytes: value }), /Invalid per-account image quota/);
 });
 
 test("removes EXIF metadata from stored photos", async () => {

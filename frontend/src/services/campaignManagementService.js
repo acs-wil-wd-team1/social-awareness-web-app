@@ -1,4 +1,5 @@
 import { apiRequest } from './apiClient.js'
+import { formatDisplayDate } from './dateFormatting.js'
 
 export const CAMPAIGN_STATUSES = ['pending', 'approved', 'rejected']
 
@@ -183,11 +184,8 @@ export async function deleteCampaign(id, reason, { token, signal, expectedUpdate
   })
 }
 
-export function formatCampaignDate(value) {
-  if (!value || !Number.isFinite(Date.parse(value))) return 'Not provided'
-  return new Intl.DateTimeFormat('en-AU', {
-    day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC',
-  }).format(new Date(value))
+export function formatCampaignDate(value, options = {}) {
+  return formatDisplayDate(value, { ...options, fallback: 'Not provided' })
 }
 
 export function campaignListHasNext(result) {
@@ -197,6 +195,7 @@ export function campaignListHasNext(result) {
 }
 
 export function managementErrorMessage(error) {
+  if (error?.status === 429) return error.message || 'Too many requests. Please wait a minute before trying again.'
   if (error?.status === 401) return 'Your session has expired. Please log in again.'
   if (error?.status === 403) return 'Your account does not have access to this page.'
   if (error?.status === 404) return 'The requested campaign or page is unavailable.'

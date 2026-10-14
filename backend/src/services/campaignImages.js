@@ -10,6 +10,8 @@ const { serviceError, validationError } = require("../utils/serviceError");
 
 const MAX_IMAGE_BYTES = 5_000_000;
 const MAX_IMAGE_PIXELS = 16_000_000;
+const DEFAULT_OWNER_MAX_PHOTOS = 20;
+const DEFAULT_OWNER_MAX_BYTES = 50 * 1024 * 1024;
 const UPLOAD_TTL_MS = 24 * 60 * 60 * 1000;
 const PRIVATE_TTL_SECONDS = 300;
 const IMAGE_ID = /^img_[a-f0-9]{48}$/;
@@ -28,16 +30,29 @@ async function decodeImage(file) {
   if (!declaredFormat) throw serviceError(415, "UNSUPPORTED_IMAGE_TYPE", "Use a JPEG, PNG or WebP photo with a matching filename and content type");
   try {
     const inputOptions = { failOn: "warning", limitInputPixels: MAX_IMAGE_PIXELS, animated: false };
-    const metadata = await sharp(file.buffer, inputOptions).metadata();
-    if (metadata.format !== declaredFormat || !metadata.width || !metadata.height || (metadata.pages || 1) !== 1) throw new Error("Invalid decoded image");
+    // Read headers only, so a valid oversized photo gets actionable feedback
+    // instead of the decoder's generic pixel-limit exception. The full decode
+    // below still enforces the 16 MP safety limit.
+    const metadata = await sharp(file.buffer, { ...inputOptions, limitInputPixels: false }).metadata();
+    if (metadata.format !== declaredFormat) throw serviceError(422, "IMAGE_TYPE_MISMATCH", "The photo contents do not match its filename and file type. Export it as JPEG, PNG or WebP and try again");
+    if ((metadata.pages || 1) !== 1) throw serviceError(422, "ANIMATED_IMAGE_NOT_SUPPORTED", "Use a still JPEG, PNG or WebP photo, not an animated image");
+    if (!Number.isSafeInteger(metadata.width) || !Number.isSafeInteger(metadata.height) || metadata.width < 1 || metadata.height < 1) throw new Error("Invalid image dimensions");
+    if (metadata.width > MAX_IMAGE_PIXELS / metadata.height) throw serviceError(422, "IMAGE_DIMENSIONS_TOO_LARGE", "Use a photo up to 16 megapixels. Resize it to fit within 4000 × 4000 pixels and try again");
     // Decode and re-encode, stripping metadata and untrusted trailing content.
     const bytes = await sharp(file.buffer, inputOptions).rotate().toFormat(declaredFormat).toBuffer();
     if (bytes.length > MAX_IMAGE_BYTES) throw serviceError(413, "IMAGE_TOO_LARGE", "The decoded photo exceeds 5 MB; choose a smaller photo");
     return { bytes, contentType: formats[declaredFormat].mime, extension: formats[declaredFormat].extension };
   } catch (error) {
-    if (error.status === 413) throw error;
-    throw validationError({ file: "The photo could not be decoded. Use a non-animated JPEG, PNG or WebP up to 16 megapixels" });
+    if (["IMAGE_TOO_LARGE", "IMAGE_TYPE_MISMATCH", "ANIMATED_IMAGE_NOT_SUPPORTED", "IMAGE_DIMENSIONS_TOO_LARGE"].includes(error.code)) throw error;
+    throw serviceError(422, "IMAGE_DECODE_FAILED", "The photo could not be read. Export it as a still JPEG, PNG or WebP and try again", { file: "Choose a valid JPEG, PNG or WebP photo" });
   }
+}
+
+function ownerQuotaLimit(value, fallback, maximum) {
+  if (value === undefined || value === "") return fallback;
+  const limit = Number(value);
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > maximum) throw new Error("Invalid per-account image quota");
+  return limit;
 }
 
 function signTicket(payload, secret) {
@@ -62,8 +77,10 @@ function readTicket(ticket, { imageId, campaignId, nowSeconds, secret }) {
   return payload;
 }
 
-function createCampaignImageService(models, { storage = createImageStorage(), now = () => new Date(), secret = () => process.env.JWT_SECRET } = {}) {
+function createCampaignImageService(models, { storage = createImageStorage(), now = () => new Date(), secret = () => process.env.JWT_SECRET, ownerMaxPhotos, ownerMaxBytes } = {}) {
   const { sequelize, CampaignImage, Campaign, User, UserSession } = models;
+  const maxOwnerPhotos = ownerQuotaLimit(ownerMaxPhotos ?? process.env.CAMPAIGN_UPLOAD_OWNER_MAX_PHOTOS, DEFAULT_OWNER_MAX_PHOTOS, 100);
+  const maxOwnerBytes = ownerQuotaLimit(ownerMaxBytes ?? process.env.CAMPAIGN_UPLOAD_OWNER_MAX_BYTES, DEFAULT_OWNER_MAX_BYTES, 256 * 1024 * 1024);
   async function authorInTransaction(user, token, transaction) {
     const account = validId(user?.id) && await User.findByPk(user.id, { transaction, lock: transaction.LOCK.UPDATE });
     if (!account || account.status !== "active" || !["public", "business_owner"].includes(account.role)) throw serviceError(403, "FORBIDDEN", "Only active campaign authors can upload photos");
@@ -97,8 +114,17 @@ function createCampaignImageService(models, { storage = createImageStorage(), no
       try {
         const row = await sequelize.transaction(async (transaction) => {
           await authorInTransaction(user, token, transaction);
-          const pendingCount = await CampaignImage.count({ where: { ownerId: user.id, campaignId: null, expiresAt: { [Op.gt]: now() } }, transaction });
-          if (pendingCount >= 20) throw serviceError(429, "IMAGE_UPLOAD_LIMIT", "Use or wait for your previous uploads to expire before uploading more photos");
+          // The account lock serializes upload/attachment/edit transactions for
+          // this owner. Attached photos count even on soft-deleted campaigns;
+          // attaching, replacing or expiring a photo must not reset the quota.
+          // Expired detached rows count until safe cleanup removes their files
+          // and records; otherwise repeated replacements can fill the disk.
+          const retainedWhere = { ownerId: user.id };
+          const count = await CampaignImage.count({ where: retainedWhere, transaction });
+          const size = Number(await CampaignImage.sum("sizeBytes", { where: retainedWhere, transaction }) || 0);
+          if (!Number.isSafeInteger(size) || count >= maxOwnerPhotos || size + decoded.bytes.length > maxOwnerBytes) {
+            throw serviceError(429, "IMAGE_OWNER_QUOTA_REACHED", "Your account has reached its photo limit. Remove a photo from an existing campaign and wait for scheduled cleanup, or wait for unused uploads to expire and be cleaned up");
+          }
           await storage.write(storageKey, decoded.bytes);
           written = true;
           return CampaignImage.create({ imageId, ownerId: user.id, storageKey, contentType: decoded.contentType, sizeBytes: decoded.bytes.length, expiresAt: new Date(now().getTime() + UPLOAD_TTL_MS), campaignId: null }, { transaction });
@@ -201,6 +227,7 @@ function getCampaignImageService() {
 module.exports = {
   createCampaignImageService, getCampaignImageService, decodeImage, signTicket, readTicket,
   MAX_IMAGE_BYTES, MAX_IMAGE_PIXELS, UPLOAD_TTL_MS, PRIVATE_TTL_SECONDS, IMAGE_ID,
+  DEFAULT_OWNER_MAX_PHOTOS, DEFAULT_OWNER_MAX_BYTES,
   attachImage: (...args) => getCampaignImageService().attachImage(...args),
   applyCampaignImageChange: (...args) => getCampaignImageService().applyCampaignImageChange(...args),
   buildImageUrl: (...args) => getCampaignImageService().buildImageUrl(...args),

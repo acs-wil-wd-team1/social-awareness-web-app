@@ -67,7 +67,7 @@ export default function HomePage({ campaignLoader = listCampaigns, categoryLoade
           }}>
             <div>
               <label htmlFor="public-campaign-search">Find a campaign</label>
-              <input id="public-campaign-search" type="search" placeholder="Search by title" maxLength={200}
+              <input id="public-campaign-search" type="search" placeholder="Search by title" maxLength={150}
                 value={searchInput} onChange={(event) => setSearchInput(event.target.value)} />
             </div>
             <div>
@@ -93,7 +93,7 @@ export default function HomePage({ campaignLoader = listCampaigns, categoryLoade
             </div>
             {live.refreshing && live.data ? <p role="status">Checking for campaign updates…</p> : null}
             {live.paused === 'offline' ? <p role="status">You’re offline. Campaign updates will resume when you reconnect.</p> : null}
-            {live.error && live.data ? <p role="alert">Campaign updates could not be loaded. Showing the last loaded campaigns. <button type="button" onClick={live.refresh}>Retry updates</button></p> : null}
+            {live.error && live.data ? <p role="alert">{live.error.status === 429 ? live.error.message : 'Campaign updates could not be loaded.'} Showing the last loaded campaigns. <button type="button" onClick={live.refresh}>Retry updates</button></p> : null}
           </div>
           {!isLoading && !hasError ? (
             <p className="visually-hidden" role="status">
@@ -104,7 +104,7 @@ export default function HomePage({ campaignLoader = listCampaigns, categoryLoade
           {hasError ? (
             <div className="campaign-state campaign-state--error" role="alert">
               <h3>Campaigns could not be loaded</h3>
-              <p>Please try again.</p>
+              <p>{live.error?.status === 429 ? live.error.message : 'Please try again.'}</p>
               <button type="button" onClick={live.refresh}>Try again</button>
             </div>
           ) : (

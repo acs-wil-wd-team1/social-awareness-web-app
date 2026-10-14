@@ -5,6 +5,10 @@ Express API and MySQL run on one host. Only Nginx ports 80 and 443 need public
 access. Port 80 serves certificate challenges and a 503 until HTTPS is enabled;
 afterwards it redirects to HTTPS. Neither API port 3000 nor MySQL port 3306 is public.
 
+This is the live Stage 3 host layout under `/srv/causeconnect/`. The older
+`infra/nginx/` examples and `/var/www/causeconnect/` frontend-only preview steps
+are retained for historical reference; do not install them over this live site.
+
 ## Installation order
 
 Upload the reviewed package through the approved private artifact location and
@@ -62,6 +66,12 @@ move/delete photos. `configure-uploads.sh` adds the fixed directory, a 512 MiB
 upload cap and a 2 GiB free-space reserve to `app.env` without printing or changing
 existing secrets. It rejects a different existing upload path rather than moving data.
 
+The review-hardening source also bounds each owner's retained photos: default
+20 files/50 MiB, using `CAMPAIGN_UPLOAD_OWNER_MAX_PHOTOS` (1–100) and
+`CAMPAIGN_UPLOAD_OWNER_MAX_BYTES` (1–256 MiB). Attached and cleanup-pending images
+count; no attached files are purged to make space. These new source safeguards
+need a reviewed deployment before they are live.
+
 Only `/api/campaign-images` gets Nginx's 6 MiB multipart ceiling; Express still
 enforces the 5,000,000-byte photo limit. Uploads are limited to 3/minute per IP with
 a burst of 4. Other API bodies keep the 1 MiB ceiling. Image content always passes
@@ -113,9 +123,15 @@ app. Share admin credentials only through an agreed private channel.
 ## Backups and rollback
 
 Each deployment takes a paired DB/upload snapshot **before** migration. During the
-snapshot the API stops briefly and restarts even when backup fails; cleanup is
+snapshot the **whole API stops: both reads and writes are unavailable**, not just
+submissions. The static frontend can still load but its API calls cannot succeed.
+The API restarts even when backup fails; cleanup is
 locked out so database rows and image files match. The daily timer uses the same
-procedure, so expect brief daily downtime on this single server. Each `.tar.gz`
+procedure, so expect brief daily downtime on this single server. The reviewed
+source timer schedules 16:00 UTC with up to 30 minutes' jitter: 03:00–03:30 AEDT or
+02:00–02:30 AEST the following morning in Sydney. `Persistent=true` can run a missed
+backup after boot, outside that window. This source timer change is not a claim
+that the existing host has already been updated. Each `.tar.gz`
 contains `database.sql.gz` and `uploads/`. The newest seven paired snapshots stay
 in `/var/backups/causeconnect/` (root only); previous SQL-only backups are retained
 unchanged. They include private images, personal data and session tokens. Disk encryption protects storage at rest;
@@ -131,8 +147,19 @@ restore backups or delete old releases/data.
 A failed migration keeps the previous code selected, but MySQL schema changes may
 already have committed. Never run migration undo or restore a dump automatically.
 Inspect the migration and backup first. A failed API startup restores the previous
-code symlink when available; it does **not** reverse schema changes. Reverting code
-is safe only after confirming compatibility with the current database schema.
+code symlink **only when the known schema/runtime requirements match**; it does
+**not** reverse schema changes. The activation guard refuses a pre-PR19 candidate
+before changing a healthy current pointer/service. Such older code ignores
+soft-deletion/private-image rules even if its health endpoint passes. After a
+failed new startup, an incompatible previous release is not reactivated: the
+API stops and needs recovery inspection instead. Compatible PR19-or-later code
+rollback remains available.
+
+`check-release-compatibility.py` compares the known management/image migrations
+and required runtime modules against verified current/candidate release sources.
+It does not query MySQL, undo migrations, restore data or prove compatibility with
+arbitrary future schema changes. Later migration changes still require review.
+This new source guard also requires deployment before it protects the live host.
 
 Current and previous releases are `/srv/causeconnect/current` and
 `/srv/causeconnect/previous`. Historical releases are retained for inspection;

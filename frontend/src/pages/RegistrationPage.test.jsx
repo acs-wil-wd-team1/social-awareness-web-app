@@ -5,11 +5,11 @@ import RegistrationPage from './RegistrationPage.jsx'
 
 const response = (status, body) => ({ status, ok: status >= 200 && status < 300, json: vi.fn().mockResolvedValue(body) })
 const publicUser = { id: 5, name: 'Alex', role: 'public' }
-function fillRegistration({ type = 'user', name = ' Alex ', email = 'alex@example.test', confirmPassword = 'Password123!' } = {}) {
+function fillRegistration({ type = 'user', name = ' Alex ', email = 'alex@example.test', password = 'FrontendTestPass123!', confirmPassword = password } = {}) {
   fireEvent.change(screen.getByLabelText('Account type'), { target: { value: type } })
   fireEvent.change(screen.getByLabelText('Name'), { target: { value: name } })
   fireEvent.change(screen.getByLabelText('Email'), { target: { value: email } })
-  fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'Password123!' } })
+  fireEvent.change(screen.getByLabelText('Password'), { target: { value: password } })
   fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: confirmPassword } })
 }
 
@@ -46,6 +46,9 @@ describe('CauseConnect registration page', () => {
     render(<RegistrationPage />)
     fireEvent.click(screen.getByRole('button', { name: 'Register' }))
     expect(screen.getAllByText('This field is required.')).toHaveLength(4)
+    expect(document.activeElement).toBe(screen.getByLabelText('Name'))
+    expect(screen.getByLabelText('Name').getAttribute('aria-describedby')).toBe('register-name-error')
+    expect(screen.getByText('Please correct the highlighted fields before registering.').getAttribute('aria-live')).toBe('polite')
     fillRegistration({ confirmPassword: 'Different password' })
     fireEvent.click(screen.getByRole('button', { name: 'Register' }))
     expect(screen.getByText('Passwords do not match.')).toBeTruthy()
@@ -115,7 +118,7 @@ describe('CauseConnect registration page', () => {
     expect((await screen.findByRole('status')).textContent).toContain('Registration successful')
     expect(fetch).toHaveBeenCalledWith('/api/auth/register', expect.objectContaining({
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'Alex', email: 'alex@example.test', password: 'Password123!', accountType: type }),
+      body: JSON.stringify({ name: 'Alex', email: 'alex@example.test', password: 'FrontendTestPass123!', accountType: type }),
     }))
     expect(screen.getByRole('link', { name: 'Continue to login' }).getAttribute('href')).toBe('/login')
     expect(screen.getByRole('button', { name: 'Register' }).disabled).toBe(true)
@@ -204,5 +207,55 @@ describe('CauseConnect registration page', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('could not be reached')
     expect(screen.queryByRole('status')).toBeNull()
     expect(screen.getByRole('button', { name: 'Register' }).disabled).toBe(false)
+  })
+
+  it.each(['short123', '😀'.repeat(14)])('rejects a new password under 15 Unicode characters: %s', password => {
+    render(<RegistrationPage />)
+    fillRegistration({ password })
+    fireEvent.click(screen.getByRole('button', { name: 'Register' }))
+    expect(screen.getByText(/Use at least 15 characters\. A longer/)).toBeTruthy()
+    expect(screen.getByLabelText('Password').getAttribute('aria-describedby')).toBe('register-password-help register-password-error')
+    expect(document.activeElement).toBe(screen.getByLabelText('Password'))
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it.each(['a'.repeat(73), '😀'.repeat(19)])('rejects passwords over 72 UTF-8 bytes without truncating them', password => {
+    render(<RegistrationPage />)
+    fillRegistration({ password })
+    fireEvent.click(screen.getByRole('button', { name: 'Register' }))
+    expect(screen.getByText(/Use a password of 72 UTF-8 bytes or fewer/)).toBeTruthy()
+    expect(screen.getByLabelText('Password').value).toBe(password)
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it.each(['a'.repeat(15), 'a'.repeat(72), '😀'.repeat(18)])('accepts a policy-compliant new password without requiring arbitrary character types', async password => {
+    fetch.mockResolvedValue(response(201, { user: publicUser }))
+    render(<RegistrationPage />)
+    fillRegistration({ password })
+    fireEvent.click(screen.getByRole('button', { name: 'Register' }))
+    expect((await screen.findByRole('status')).textContent).toContain('Registration successful')
+    expect(JSON.parse(fetch.mock.calls[0][1].body).password).toBe(password)
+  })
+
+  it('rechecks a confirmation error when the password is changed to match', () => {
+    render(<RegistrationPage />)
+    fillRegistration({ password: 'First long passphrase', confirmPassword: 'Other long passphrase' })
+    fireEvent.click(screen.getByRole('button', { name: 'Register' }))
+    expect(screen.getByText('Passwords do not match.')).toBeTruthy()
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'Other long passphrase' } })
+    expect(screen.queryByText('Passwords do not match.')).toBeNull()
+  })
+
+  it('does not send duplicate registration writes while a creation request is pending', async () => {
+    let finish
+    fetch.mockReturnValue(new Promise(resolve => { finish = resolve }))
+    render(<RegistrationPage />)
+    fillRegistration()
+    const form = screen.getByRole('button', { name: 'Register' }).form
+    fireEvent.submit(form)
+    fireEvent.submit(form)
+    expect(fetch).toHaveBeenCalledTimes(1)
+    await act(async () => finish(response(201, { user: publicUser })))
+    expect(screen.getByRole('status').textContent).toContain('Registration successful')
   })
 })

@@ -54,4 +54,39 @@ unexpected_root="$test_root/unexpected"
 mkdir -p "$unexpected_root/current" "$unexpected_root/releases/new"
 if activate_release "$unexpected_root/releases/new" "$unexpected_root"; then exit 1; fi
 [[ -d "$unexpected_root/current" && ! -L "$unexpected_root/current" ]]
+
+# Known PR19 migrations make pre-PR19 code unsafe even if its /health works.
+privacy_root="$test_root/privacy"
+mkdir -p "$privacy_root/releases/pre19" "$privacy_root/releases/pr19/backend/src/database/migrations"
+for migration in 20261013220000-add-campaign-management.js 20261013221000-create-campaign-images.js; do
+  printf '// schema fixture\n' > "$privacy_root/releases/pr19/backend/src/database/migrations/$migration"
+done
+for file in database/models/managementAudit.js services/campaignQueries.js services/ownerCampaignManagement.js \
+  services/adminManagement.js middleware/currentAccountAuthentication.js database/models/campaignImage.js \
+  services/campaignImages.js services/campaignImageStorage.js router/campaignImageRoutes.js; do
+  mkdir -p "$privacy_root/releases/pr19/backend/src/$(dirname -- "$file")"
+  printf '// runtime fixture\n' > "$privacy_root/releases/pr19/backend/src/$file"
+done
+ln -s "$privacy_root/releases/pr19" "$privacy_root/current"
+restart_count=0
+stop_count=0
+if activate_release "$privacy_root/releases/pre19" "$privacy_root"; then exit 1; fi
+[[ $(readlink -e "$privacy_root/current") == "$privacy_root/releases/pr19" ]]
+[[ "$restart_count" == 0 && "$stop_count" == 0 ]]
+
+# After a new migration, failed startup must not expose old deletion-blind reads.
+ln -sfn "$privacy_root/releases/pre19" "$privacy_root/current"
+restart_result=0
+health_result=1
+if activate_release "$privacy_root/releases/pr19" "$privacy_root"; then exit 1; fi
+[[ $(readlink -e "$privacy_root/current") == "$privacy_root/releases/pr19" ]]
+[[ "$restart_count" == 1 && "$stop_count" == 1 ]]
+
+# A release with the same schema/runtime requirements remains a valid fallback.
+cp -a "$privacy_root/releases/pr19" "$privacy_root/releases/pr19-next"
+restart_count=0
+stop_count=0
+if activate_release "$privacy_root/releases/pr19-next" "$privacy_root"; then exit 1; fi
+[[ $(readlink -e "$privacy_root/current") == "$privacy_root/releases/pr19" ]]
+[[ "$restart_count" == 2 && "$stop_count" == 0 ]]
 echo 'DEPLOYMENT_ROLLBACK_REGRESSIONS_PASSED'

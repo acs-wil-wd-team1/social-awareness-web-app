@@ -19,6 +19,7 @@ const sharp = require("sharp");
 const { Op } = require("sequelize");
 const db = require("../../src/database/models");
 const app = require("../../src/app");
+const { DEFAULT_OWNER_MAX_PHOTOS } = require("../../src/services/campaignImages");
 db.sequelize.options.logging = false;
 
 const fixtureTag = `image-submit-${randomBytes(8).toString("hex")}`;
@@ -47,14 +48,19 @@ async function request(route, { method = "GET", key, value } = {}) {
   return { status: response.status, body: response.status === 204 ? null : await response.json() };
 }
 
-async function upload(key = "owner") {
+async function sendUpload(key = "owner") {
   const form = new FormData();
   form.append("file", new Blob([png], { type: "image/png" }), "campaign-photo.png");
   const response = await fetch(`${origin}/api/campaign-images`, {
     method: "POST", headers: { Authorization: `Bearer ${tokens[key]}` }, body: form,
   });
   const body = await response.json();
-  assert.equal(response.status, 201, JSON.stringify(body));
+  return { status: response.status, body };
+}
+
+async function upload(key = "owner") {
+  const { status, body } = await sendUpload(key);
+  assert.equal(status, 201, JSON.stringify(body));
   assert.match(body.imageId, /^img_[a-f0-9]{48}$/);
   return body;
 }
@@ -105,7 +111,7 @@ describe("full application image upload, campaign submission and public reads", 
     directory = await fs.mkdtemp(path.join(os.tmpdir(), "causeconnect-image-submission-"));
     process.env.CAMPAIGN_UPLOAD_DIR = directory;
     png = await sharp({ create: { width: 5, height: 4, channels: 3, background: "green" } }).png().toBuffer();
-    for (const [key, role] of [["owner", "public"], ["other", "public"], ["business", "business_owner"], ["admin", "admin"]]) {
+    for (const [key, role] of [["owner", "public"], ["other", "public"], ["business", "business_owner"], ["admin", "admin"], ["quota", "public"]]) {
       users[key] = await db.User.create({ fullName: fixtureTag, email: `${fixtureTag}-${key}@example.test`, passwordHash: "unused-fixture-hash", role, status: "active" });
       tokens[key] = jwt.sign({ id: users[key].userId, role, status: "active" }, process.env.JWT_SECRET, { expiresIn: "1h", jwtid: randomBytes(8).toString("hex") });
       await db.UserSession.create({ userId: users[key].userId, token: tokens[key], ipAddress: "127.0.0.1", userAgent: fixtureTag, status: "active" });
@@ -126,6 +132,7 @@ describe("full application image upload, campaign submission and public reads", 
         const campaigns = await db.Campaign.findAll({ where: { createdBy: { [Op.in]: ids } }, attributes: ["campaignId"] });
         const campaignIds = campaigns.map((row) => row.campaignId);
         await db.CampaignImage.destroy({ where: { ownerId: { [Op.in]: ids } } });
+        await db.ManagementAudit.destroy({ where: { actorId: { [Op.in]: ids } } });
         if (campaignIds.length) await db.CampaignReview.destroy({ where: { campaignId: { [Op.in]: campaignIds } } });
         await db.Campaign.destroy({ where: { createdBy: { [Op.in]: ids } } });
         if (business) await business.destroy();
@@ -253,5 +260,26 @@ describe("full application image upload, campaign submission and public reads", 
       assert.ok(result.body.fieldErrors);
       assert.equal(result.body.stack, undefined);
     }
+  });
+
+  it("does not reset the default account quota when uploads become campaign photos or campaigns are deleted", async () => {
+    const cap = Number(process.env.CAMPAIGN_UPLOAD_OWNER_MAX_PHOTOS || DEFAULT_OWNER_MAX_PHOTOS);
+    let first;
+    for (let index = 0; index < cap; index += 1) {
+      const reference = await upload("quota");
+      const created = await submit(reference.imageId, "quota");
+      assert.equal(created.status, 201, JSON.stringify(created.body));
+      if (!first) first = created.body.campaign;
+    }
+    assert.equal(await db.CampaignImage.count({ where: { ownerId: users.quota.userId, campaignId: { [Op.ne]: null } } }), cap);
+    let blocked = await sendUpload("quota");
+    assert.equal(blocked.status, 429);
+    assert.equal(blocked.body.code, "IMAGE_OWNER_QUOTA_REACHED");
+    const removed = await request(`/api/campaigns/mine/${first.id}`, { method: "DELETE", key: "quota", value: { expectedUpdatedAt: first.updatedAt } });
+    assert.equal(removed.status, 204, JSON.stringify(removed.body));
+    blocked = await sendUpload("quota");
+    assert.equal(blocked.status, 429);
+    assert.equal(blocked.body.code, "IMAGE_OWNER_QUOTA_REACHED");
+    assert.equal(await db.CampaignImage.count({ where: { ownerId: users.quota.userId } }), cap);
   });
 });

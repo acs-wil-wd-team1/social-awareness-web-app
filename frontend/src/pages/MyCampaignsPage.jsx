@@ -55,7 +55,7 @@ export default function MyCampaignsPage({ token, role, campaignLoader = loadMyCa
       {live.paused === 'offline' ? <p role="status">You’re offline. Updates will resume when you reconnect.</p> : null}
       {error ? (
         <div className="campaign-management__notice" role="alert">
-          <p>{result ? 'Updates could not be loaded. Showing your last loaded campaigns.' : managementErrorMessage(error)}</p>
+          <p>{error?.status === 429 ? managementErrorMessage(error) : result ? 'Updates could not be loaded. Showing your last loaded campaigns.' : managementErrorMessage(error)}</p>
           {error?.status === 401 ? <a className="text-link" href="/login?returnTo=%2Fmy-campaigns">Log in again</a>
             : error?.status !== 403 ? <button type="button" onClick={live.refresh}>Try again</button> : null}
         </div>

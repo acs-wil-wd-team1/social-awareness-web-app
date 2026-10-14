@@ -44,6 +44,9 @@ describe('CauseConnect login page', () => {
     render(<LoginPage />)
     fireEvent.click(screen.getByRole('button', { name: 'Login' }))
     expect(screen.getAllByText('This field is required.')).toHaveLength(2)
+    expect(document.activeElement).toBe(screen.getByLabelText('Email'))
+    expect(screen.getByLabelText('Email').getAttribute('aria-describedby')).toBe('login-email-error')
+    expect(screen.getByText('Please correct the highlighted fields before logging in.').getAttribute('aria-live')).toBe('polite')
     expect(fetch).not.toHaveBeenCalled()
   })
 
@@ -129,5 +132,15 @@ describe('CauseConnect login page', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('could not be reached')
     await waitFor(() => expect(screen.getByRole('button', { name: 'Login' }).disabled).toBe(false))
     expect(localStorage.getItem('token')).toBeNull()
+  })
+
+  it('still submits existing short passwords without applying new registration policy to login', async () => {
+    fetch.mockResolvedValue(response(401, { message: 'Email or password is incorrect.' }))
+    render(<LoginPage />)
+    fillLogin({ password: 'oldpass' })
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }))
+    await screen.findByRole('alert')
+    expect(JSON.parse(fetch.mock.calls[0][1].body).password).toBe('oldpass')
+    expect(screen.queryByText(/Use at least 15/)).toBeNull()
   })
 })
