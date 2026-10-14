@@ -1,6 +1,6 @@
 # CauseConnect API contracts
 
-This index describes the API after PR #19 merged into `main`. Application commit `ffe3df679e5d8d1dc43c8bd1669b96aed757ad86` is live at [CauseConnect on AWS](https://52.62.2.87). The [release evidence](../evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) records local checks and eight passed production acceptance groups. The [Stage 3 API integration guide](../handoff/stage3-api-handoff.md) maps remaining work, including Kim's missing business-profile GET/PUT routes.
+This index describes the current application API, commit `e612d1b448a31cd6639f161740c31a9e22f63ed6`, release `2026-10-14T08-35-53-193Z-e612d1b448a3`, at [CauseConnect on AWS](https://52.62.2.87). The [current release evidence](../evidence/stage-3/review-hardening/README.md) records local checks, exact hosted identity and eight fresh hosted API acceptance groups. The [PR #19 receipt](../evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) remains dated historical evidence. The [Stage 3 API integration guide](../handoff/stage3-api-handoff.md) maps remaining work, including Kim's missing business-profile GET/PUT routes.
 
 | Document | Status and purpose |
 |---|---|

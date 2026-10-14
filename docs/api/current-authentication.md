@@ -1,6 +1,6 @@
 # Current authentication API
 
-**Reference, 14 October 2026:** Authentication service/controllers in the merged and deployed PR #19 release. Examples describe implemented responses; the [release evidence](../evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) records bounded verification, not an exhaustive security audit.
+**Reference, 14 October 2026:** Authentication service/controllers in deployed application commit `e612d1b448a31cd6639f161740c31a9e22f63ed6`. Examples describe implemented responses; the [current release evidence](../evidence/stage-3/review-hardening/README.md) records bounded verification, not an exhaustive security audit.
 
 ## Register
 
@@ -30,7 +30,7 @@ Registration does not return a token or create a business profile. Controller er
 
 The frontend limits the trimmed name to 100 characters and email to 150, matching the existing user columns. It confirms registration only when the returned role matches the submitted account type. These browser checks do not replace server-side validation.
 
-**Review-hardening source change; new deployment still required:** new signups
+**Current registration rule:** new signups
 require **at least 15 Unicode code points and at most 72 UTF-8 bytes**
 in the password. Spaces and Unicode are allowed; the password is not trimmed.
 Both browser and server enforce the same registration rule. The byte ceiling

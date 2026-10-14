@@ -66,11 +66,13 @@ move/delete photos. `configure-uploads.sh` adds the fixed directory, a 512 MiB
 upload cap and a 2 GiB free-space reserve to `app.env` without printing or changing
 existing secrets. It rejects a different existing upload path rather than moving data.
 
-The review-hardening source also bounds each owner's retained photos: default
+The current deployed source also bounds each owner's retained photos: default
 20 files/50 MiB, using `CAMPAIGN_UPLOAD_OWNER_MAX_PHOTOS` (1–100) and
 `CAMPAIGN_UPLOAD_OWNER_MAX_BYTES` (1–256 MiB). Attached and cleanup-pending images
-count; no attached files are purged to make space. These new source safeguards
-need a reviewed deployment before they are live.
+count; no attached files are purged to make space. These safeguards are included
+in application release `2026-10-14T08-35-53-193Z-e612d1b448a3`; see the
+[current release evidence](../../../docs/evidence/stage-3/review-hardening/README.md)
+for the actual checks and limits.
 
 Only `/api/campaign-images` gets Nginx's 6 MiB multipart ceiling; Express still
 enforces the 5,000,000-byte photo limit. Uploads are limited to 3/minute per IP with
@@ -159,7 +161,9 @@ rollback remains available.
 and required runtime modules against verified current/candidate release sources.
 It does not query MySQL, undo migrations, restore data or prove compatibility with
 arbitrary future schema changes. Later migration changes still require review.
-This new source guard also requires deployment before it protects the live host.
+This guard is included in the current deployment kit. Isolated rollback harness
+results do not mean a real hosted rollback or restoration has been performed;
+keep those checks separate in the release evidence.
 
 Current and previous releases are `/srv/causeconnect/current` and
 `/srv/causeconnect/previous`. Historical releases are retained for inspection;
