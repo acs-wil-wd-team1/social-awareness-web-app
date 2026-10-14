@@ -1,6 +1,6 @@
 # Current authentication API
 
-**Reference, 14 October 2026:** Authentication service/controllers in deployed application commit `fc9f9594b9f27e70ad5dc0b2d8f1ee1d754e0949`. Examples describe implemented responses; the [current release evidence](../evidence/stage-3/signup-minimum-six/README.md) records bounded verification, not an exhaustive security audit.
+**Reference, 14 October 2026:** Authentication service/controllers in deployed application commit `ab1bef2c1b2e55c401a78543d4034cd2e85d0a2c`, release `2026-10-14T10-17-18-153Z-ab1bef2c1b2e`. Examples describe implemented responses; the [current release evidence](../evidence/stage-3/business-profile-integration/README.md) records local, hosted API and actual Chrome checks, not an exhaustive security audit or independent tester acceptance.
 
 ## Register
 
@@ -38,8 +38,8 @@ avoids bcrypt silently ignoring a suffix. Existing accounts retain their existin
 login passwords; login does not impose the new-signup minimum or rewrite hashes.
 The six-character minimum is the requested assessment setting; longer unique
 passwords are safer. This is not a security-certification claim. The earlier
-PR #21 `e612d1b` release used 15 characters. PR #23 deploys the six-character
-minimum; the hosted browser rejected five characters, accepted exactly six, and
+PR #21 `e612d1b` release used 15 characters. PR #23 introduced the six-character
+minimum retained by the current release; its hosted browser check rejected five characters, accepted exactly six, and
 completed login/logout. Existing accounts keep their original passwords.
 
 ## Login

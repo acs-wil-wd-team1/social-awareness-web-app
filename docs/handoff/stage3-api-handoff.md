@@ -2,9 +2,9 @@
 
 The frontend covers public/business campaign posting, photos, owner editing, participation, business enquiries, admin campaign/account management and automatic campaign refresh. This guide maps those screens to backend routes, validation, database changes and integration checks. The labelled sample preview uses browser data; live mode calls the real endpoints and reports errors when they are unavailable.
 
-Application commit `fc9f9594b9f27e70ad5dc0b2d8f1ee1d754e0949`, release `2026-10-14T09-34-26-691Z-fc9f9594b9f2`, is live at [CauseConnect on AWS](https://52.62.2.87). It retains the supporting APIs and review fixes; PR #23 sets the new-signup minimum to six characters. The [current release evidence](../evidence/stage-3/signup-minimum-six/README.md) records local checks, exact served identity, eight fresh hosted API groups and the five-/six-character signup and login/logout browser checks. The [PR #21 receipt](../evidence/stage-3/review-hardening/README.md) and [PR #19 receipt](../evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) remain historical evidence.
+Application commit `ab1bef2c1b2e55c401a78543d4034cd2e85d0a2c`, release `2026-10-14T10-17-18-153Z-ab1bef2c1b2e`, is live at [CauseConnect on AWS](https://52.62.2.87). PR #22 is merged with the repaired profile/compatibility integration, while the six-character signup setting and review fixes are retained. The [current release evidence](../evidence/stage-3/business-profile-integration/README.md) records local checks, exact identity, eight supporting-API and eight business-API groups, plus the passing actual hosted Chrome business journey. Independent tester acceptance remains separate. Earlier PR #23/#21/#19 receipts remain historical.
 
-The tables map each API group to its current code. Linked contracts define the payloads and rules, and `frontend/src/services/` contains the callers. GET/PUT `/api/business/me` is not merged or deployed and still returns `404`. Kim's open, conflicting [PR #22](https://github.com/acs-wil-wd-team1/social-awareness-web-app/pull/22) provides a profile implementation awaiting resolution/review. Existing owners are blocked by the form's profile GET too, although direct API posting with an existing linked Business row and its independent inbox work.
+The tables map each API group to its current code. Linked contracts define the payloads/rules, and `frontend/src/services/` contains the callers. Kim's [PR #22](https://github.com/acs-wil-wd-team1/social-awareness-web-app/pull/22) is merged and deployed after conflict resolution and integration repairs by Unice. GET/PUT `/api/business/me` now supports first setup and later editing; the old missing-profile blocker is removed. Both posting forms keep canonical POST `/api/campaigns`, while the business-only compatibility alias uses that same photo-aware transaction.
 
 ## Agreed responsibilities
 
@@ -16,7 +16,7 @@ The tables map each API group to its current code. Linked contracts define the p
 | Business campaign-posting API | Kim |
 | Admin campaign-approval API | Kim and Rajita |
 | Additional APIs — images, owner management, engagement and admin management (AWT-175) | Unice |
-| Remaining business-profile GET/PUT and full new-business journey (AWT-141/AWT-173) | Kim |
+| Business-profile GET/PUT and new-business journey (AWT-141/AWT-173) | Kim; original PR #22 contribution retained |
 
 Use Jira for current dates and review/assignment status. This code reference does not mark a Jira task done or assume Nithya has reviewed the additional work. Existing posting/approval assignments are unchanged.
 
@@ -31,8 +31,8 @@ When a session expires, private page state is cleared and the frontend offers si
 | Frontend page | API calls | Current backend position |
 |---|---|---|
 | `/campaigns/new` | GET categories, optional POST image, POST campaign | Deployed public POST with optional image upload/attachment |
-| `/business/profile` | GET/PUT `/api/business/me` | **Not merged/deployed — Kim (AWT-141/AWT-173)**; PR #22 awaits conflict resolution/review; reuse the existing Business table |
-| `/business/campaigns/new` | GET profile + categories, optional POST image, POST campaign | Direct POST accepts an existing own Business row; browser submission is blocked for new **and existing** owners on profile GET/PUT |
+| `/business/profile` | GET/PUT `/api/business/me` | Merged/deployed; safe current-owner first save/update in the existing Business table |
+| `/business/campaigns/new` | GET profile + categories, optional POST image, canonical POST `/api/campaigns` | New/existing owners can set up their profile and post; compatibility POST `/api/campaigns/business` shares the transaction and allows business owners only |
 | `/my-campaigns` | GET `/api/campaigns/mine?page=1&pageSize=10&status=pending` | Implemented owner read; omit status for all statuses |
 | `/my-campaigns/:id/edit` | GET/PATCH/DELETE `/api/campaigns/mine/:id` | Deployed detail, edit/resubmit and soft-delete |
 | Approved cause detail; `/my-participation` | GET/PUT `/api/campaigns/:id/participation`; GET `/api/participations/mine` | Deployed; existing own records stay readable/withdrawable after unpublishing or deletion |
@@ -44,10 +44,10 @@ When a session expires, private page state is cleared and the frontend offers si
 
 ## What remains
 
-1. **Resolve and review the profile implementation (Kim's PR #22).** It supplies GET/PUT but is not merged or deployed. Keep the current shared auth, posting/image services and routes when resolving conflicts. Use the unique `businesses.owner_id` from the authenticated account. A missing profile returns `200 {"business":null}`; PUT returns `200` for both first save and update. Follow the [profile contract](../api/business-profile-contract.md), then test a freshly registered owner through profile setup and [business posting](../api/campaign-posting-future-proposal.md#business-posting). Do not add another profile endpoint or Business table.
-2. **Use the current verified release as the testing baseline.** Deployed `fc9f959` passed exact identity, eight fresh hosted API groups and five-/six-character signup and login/logout browser checks. Local checks passed 631 frontend tests, 89 backend units, 73 HTTP/MySQL checks and 20 frontend/API/MySQL checks. The unchanged host/tooling tree retains historical PR #21 results of 41 host checks, 21 runner/routing/argument-guard checks and 15 offline Postman assertions, not fresh AWS/API execution. See the [current receipt](../evidence/stage-3/signup-minimum-six/README.md) and historical [PR #21 receipt](../evidence/stage-3/review-hardening/README.md). The earlier [PR #19 closeout](../evidence/stage-3/additional-apis/README.md#hosted-browser-and-backuprestart-closeout--14-october-2026) is not a full restoration or offsite-recovery test. The [image contract](../api/campaign-posting-future-proposal.md#upload-one-campaign-image) and [deployment preparation](../../infra/README.md) remain the configuration references.
-3. **Finish independent testing and submission material.** Use the tested release for cross-role browser checks, including visible/online refresh, expired sessions and mobile behaviour. Record actual results and remaining defects in the team testing document; then finish manuals and the video. The full new-business journey waits for item 1.
-4. **Keep regression checks passing when profiles arrive.** Retest authentication, posting, [reads](../api/campaign-read-contract.md), [approval](../api/admin-campaign-moderation-contract.md), images and ownership against Kim's real implementation. Merge/deploy that change separately, then verify fresh business onboarding on the deployed site.
+1. **Run independent business/browser acceptance.** Profile GET/PUT and posting integration are merged/deployed, and the developer's actual hosted Chrome journey passed. Meet and Prince should independently test freshly registered and existing owners through profile setup, photo posting, approval, enquiry/inbox, owner removal and logout protection. Follow the [profile contract](../api/business-profile-contract.md), record actual browser/device results and do not seed a Business row to bypass onboarding.
+2. **Use the current verified release as the baseline.** Deployed `ab1bef2` passed exact identity, eight supporting-API groups, eight business-API groups and the actual hosted Chrome business journey. Local checks passed 631 frontend tests, 106 backend units, 87 HTTP/MySQL and 26 real frontend/API/MySQL checks; also 41 local host, 35 CLI/stub/routing and 15 offline Postman checks, not live API calls. See the [current receipt](../evidence/stage-3/business-profile-integration/README.md). Earlier PR #23/#21/#19 evidence stays historical. Full restoration and offsite recovery are unverified.
+3. **Finish independent testing and submission material.** Use the tested release for cross-role browser checks, visible/online refresh, expired sessions and mobile behaviour. Record results and remaining defects in the testing document; then finish manuals and the video. Developer API checks do not replace Meet and Prince's independent acceptance.
+4. **Keep regressions passing for later changes.** Retest authentication, posting, [reads](../api/campaign-read-contract.md), [approval](../api/admin-campaign-moderation-contract.md), images, profiles and ownership; publish/deploy later code separately and verify the served revision.
 
 Reuse the implemented [owner-management](../api/owned-campaign-management-contract.md), [engagement](../api/engagement-contract.md) and [admin-management](../api/admin-management-contract.md) services instead of duplicating their controllers or migrations. Implementation here does not automatically change Jira review or assignment status.
 
@@ -68,7 +68,7 @@ The examples use illustrative IDs. Fetch real categories and use IDs returned by
 
 ### Request and success-response quick reference
 
-For all protected calls, send `Authorization: Bearer <login token>`. JSON bodies use `Content-Type: application/json`; image upload uses browser-built multipart. IDs are JSON integers, not numeric strings. Every route must enforce its role/ownership rules on the server. **GET/PUT `/api/business/me` below describes the remaining contract, not an implemented endpoint.**
+For protected calls, send `Authorization: Bearer <login token>`. JSON bodies use `Content-Type: application/json`; image upload uses browser-built multipart. IDs are JSON integers, not numeric strings. Every route enforces role/ownership rules on the server. GET/PUT `/api/business/me` below describes the implemented profile endpoints.
 
 | Request | Body or query | Exact success shape |
 |---|---|---|
@@ -146,7 +146,7 @@ The repository also includes a [real-backend regression runner](../../infra/real
 npm run test:real-backend
 ```
 
-It creates a separate temporary MySQL container, applies migrations, runs backend tests and checks actual frontend components/services against Express, then removes only its own container. No project database is reused. The suite covers authentication, posting/reads/moderation and the additional owner/admin, participation, enquiry and image routes. The frontend integration uses jsdom rather than a full browser. Business fixtures are created directly for these tests: the still-missing profile API is checked as an error, not faked or counted as a completed business journey. Record the current run result, then run the deployed browser journeys below.
+It creates a separate temporary MySQL container, applies migrations, runs backend tests and checks real frontend components/services against Express, then removes its own container/uploads. No project database is reused. The suite covers authentication, posting/reads/moderation, owner/admin management, engagement, images and profiles. The new-owner journey uses actual registration/login/profile APIs; older seeded-business fixtures remain separate isolation checks. The frontend integration uses jsdom, not a full browser. Record results, then execute deployed browser/independent tester checks.
 
 ### Backend unit and database tests
 
@@ -157,7 +157,7 @@ npm ci
 npm test
 ```
 
-The unit suite includes authentication, campaign submission/reads/moderation, owner/admin management, engagement and images. Unit success alone does not establish database or deployed-browser correctness.
+The unit suite includes authentication, business profiles, campaign submission/reads/moderation, owner/admin management, engagement and images. Unit success alone does not establish database or deployed-browser correctness.
 
 Before integration tests, configure `DB_HOST` as `localhost`, `127.0.0.1` or `::1`, an existing **separate local** `DB_NAME_TEST` ending in `_test`, the matching local MySQL credentials and `JWT_SECRET`. `DB_NAME_TEST` must differ from `DB_NAME`. Apply migrations to that test database from `backend/`:
 
@@ -208,7 +208,7 @@ In each API PR/handoff, include the endpoints implemented, exact migration filen
 
 | Symptom | Check first |
 |---|---|
-| New page reports unavailable / `404` | Check the deployed revision, applied migrations, exact route and router order. GET/PUT `/api/business/me` is still missing and must not be reported as working. |
+| New page reports unavailable / `404` | Check the served revision, migrations and router order. Profile GET/PUT is included in `ab1bef2`; an older served release may still return `404`. A new owner's absent profile correctly returns `200 {business:null}`. |
 | Login appears successful but a protected call fails | Use the actual login token; confirm the matching active session and current database role/status. Sample-role tokens are intentionally invalid in the real backend. |
 | Admin detail says its version cannot be read | Add `updatedAt` to the admin detail serializer, preserve milliseconds in MySQL/model, and return canonical UTC text. Do not substitute the current time in the response. |
 | Save succeeds in the server log but the UI refuses confirmation | Match the exact HTTP status, envelope, numeric IDs and returned status/version. In particular, DELETE is empty `204`; create is `201`; review/unpublish must return an advanced version. Check saved data before retrying. |

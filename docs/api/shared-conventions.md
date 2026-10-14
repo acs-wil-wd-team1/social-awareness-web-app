@@ -1,6 +1,6 @@
 # Shared API conventions
 
-**Status, 14 October 2026:** Conventions used by the campaign, management, engagement and image routes in deployed application commit `fc9f9594b9f27e70ad5dc0b2d8f1ee1d754e0949` at [CauseConnect on AWS](https://52.62.2.87). The business-profile implementation is in open, conflicting PR #22, not merged or deployed. See the [current release evidence](../evidence/stage-3/signup-minimum-six/README.md) for the exact revision and bounded verification; the [PR #21 receipt](../evidence/stage-3/review-hardening/README.md) remains historical.
+**Status, 14 October 2026:** Conventions used by the campaign, profile, management, engagement and image routes in deployed application commit `ab1bef2c1b2e55c401a78543d4034cd2e85d0a2c` at [CauseConnect on AWS](https://52.62.2.87), release `2026-10-14T10-17-18-153Z-ab1bef2c1b2e`. PR #22's business-profile integration is merged and deployed. See the [current release evidence](../evidence/stage-3/business-profile-integration/README.md) for local checks, hosted API groups and the passing hosted Chrome business journey. Independent tester acceptance remains separate; earlier PR #23/#21 receipts are historical.
 
 Submission rules are in the [campaign contract](campaign-posting-contract.md). The [Stage 3 API integration guide](../handoff/stage3-api-handoff.md) maps implemented routes and remaining work. Oversized JSON uses `413 REQUEST_TOO_LARGE`; image errors are documented separately.
 
@@ -14,7 +14,7 @@ Submission rules are in the [campaign contract](campaign-posting-contract.md). T
 - Date-only values use `YYYY-MM-DD`; timestamps use ISO 8601 UTC.
 - Roles are `public`, `business_owner` and `admin`. Check the user's current permissions for protected actions, including suspension and changed roles.
 
-`currentAccountAuthentication.js` checks JWT validity, a session matching token and user ID, and the current account role/status. Campaign authors allow `public` and `business_owner`; admin routes allow `admin`. State-changing services recheck account and session under transaction locks before locking the campaign/upload/participation. New private management/engagement reads also use transactional rechecks. Do not rely on browser roles or stale JWT claims.
+`currentAccountAuthentication.js` checks JWT validity, a session matching token and user ID, and the current account role/status. Campaign authors allow `public` and `business_owner`; profile routes allow `business_owner`; admin routes allow `admin`. State-changing services recheck account and session under transaction locks before locking the campaign/upload/participation or owned profile. Private profile/management/engagement reads also use transactional rechecks. Do not rely on browser roles or stale JWT claims.
 
 The server determines the creator and business ownership. Ordinary campaign submissions cannot set `createdBy`, `businessId`, `status`, `role` or administrator privilege. The admin moderation endpoint is the explicit exception for `status`: an authorised admin may request an allowed transition, which the server validates.
 

@@ -1,12 +1,12 @@
 # Stage 3 frontend notes for the manual and demonstration
 
-These notes describe the current frontend and remaining integration steps at [CauseConnect on AWS](https://52.62.2.87), application commit `fc9f9594b9f27e70ad5dc0b2d8f1ee1d754e0949`. They provide source material for the developers manual, user manual and video; final submission documents remain separate deliverables. The [current release evidence](../evidence/stage-3/signup-minimum-six/README.md) identifies the tested commit and verification limits.
+These notes describe the frontend/API integration at [CauseConnect on AWS](https://52.62.2.87), application commit `ab1bef2c1b2e55c401a78543d4034cd2e85d0a2c`. They support the developers manual, user manual and video; final submission documents remain separate deliverables. The [current receipt](../evidence/stage-3/business-profile-integration/README.md) identifies the tested commit and verification limits.
 
 ## Agreed delivery split
 
 Unice owns all remaining frontend work and frontend/backend cloud deployment, using her own AWS account, with a target of **20 October 2026**. Rajita owns the user campaign-posting API; Kim owns the business campaign-posting API; Kim and Rajita share the admin campaign-approval API.
 
-Unice implemented the AWT-175 image, owner-management, participation, enquiry and additional admin APIs. Kim's GET/PUT business-profile implementation is in open, conflicting [PR #22](https://github.com/acs-wil-wd-team1/social-awareness-web-app/pull/22), awaiting resolution/review under AWT-141/AWT-173; it is not on main/live. The [API handoff](stage3-api-handoff.md#agreed-responsibilities) retains the agreed split; these notes do not reassign the finished manuals/video or mark Jira review complete.
+Unice implemented the AWT-175 image, owner-management, participation, enquiry and additional admin APIs. Kim's original [PR #22](https://github.com/acs-wil-wd-team1/social-awareness-web-app/pull/22) contribution is preserved; Unice resolved its conflicts, repaired validation/privacy/concurrency/photo integration and deployed the tested result. The [API handoff](stage3-api-handoff.md#agreed-responsibilities) retains agreed responsibilities; these notes do not reassign manuals/video or mark Jira review complete.
 
 ## What changed
 
@@ -25,7 +25,7 @@ Unice implemented the AWT-175 image, owner-management, participation, enquiry an
 - Included the original team logo in the shared header.
 - Prepared frontend release packaging and hosting configuration in [infra](../../infra/README.md).
 
-The [coverage table](stage3-feature-coverage.md) maps the broader Confluence requirements to the implemented frontend and remaining APIs. Frontend/sample tests do not prove backend completion, cloud deployment or final acceptance.
+The [coverage table](stage3-feature-coverage.md) maps the Confluence requirements to the implemented frontend/API flows and remaining acceptance work. Frontend/sample tests do not prove cloud or independent tester acceptance.
 
 ## Pages and expected user journeys
 
@@ -33,7 +33,7 @@ The [coverage table](stage3-feature-coverage.md) maps the broader Confluence req
 |---|---|
 | Visitor | Open `/`, browse approved campaigns, open `/campaigns/:id`, register or log in |
 | Public user | Submit/manage an owned campaign; join/withdraw/rejoin an approved cause campaign; send a business enquiry |
-| Business owner | Browser business submission is blocked for new and existing owners on Kim's profile GET/PUT. Direct existing-profile campaign APIs and private enquiries are implemented; cause participation is available |
+| Business owner | Register/login, save or edit their profile, post/manage a photo-backed business campaign and read private enquiries; cause participation remains available |
 | Administrator | Review campaigns and decision history; remove published content or soft-delete with a reason; suspend/reactivate non-admin accounts |
 
 New or edited submissions show pending review and remain hidden publicly. After approval, the owner can open the public page. After rejection, the owner can read the reason and edit/resubmit. The frontend shows the exact account role's links; admins do not use the ordinary submission forms. Soft deletion removes normal access while retaining records for backend-controlled recovery/audit.
@@ -60,7 +60,7 @@ The exact calls, bodies, response shapes and database mappings are in the [API i
 
 `VITE_DEMO_MODE=false` is the default and calls the real backend. `VITE_API_BASE_URL=/api` uses the same website origin/local proxy. A separate hosted API needs its full HTTPS prefix, including `/api`, plus matching backend CORS. These values are public build configuration; passwords and cloud/signing credentials must never be included. A changed value needs a new build.
 
-The real backend supports authentication, categories, public/owner/admin reads, public and existing-profile business posting, images, owner management, participation, enquiries and admin actions/history/accounts. These routes are merged and deployed. Existing-profile posting works through direct API calls. The business form first requests GET `/api/business/me`, which still returns `404`, so browser posting is blocked for existing as well as new owners. Local fixture-backed enquiry tests and sample-preview success must not be recorded as a completed hosted business journey.
+The real backend supports authentication, categories, public/owner/admin reads, business profiles, public/business posting, images, owner management, participation, enquiries and admin controls. These routes are merged/deployed. The business form loads GET `/api/business/me`, offers setup for `business:null`, then posts through canonical POST `/api/campaigns`. The business-only compatibility alias shares the same transaction. Fresh onboarding passed in real React/API/MySQL, hosted API checks and actual hosted Chrome; independent tester acceptance remains separate. Sample success is never production evidence.
 
 Automatic updates use the existing read endpoints every 30 seconds while visible/online, plus focus/reconnection and manual refresh. This is polling, not WebSockets. Admin/history/engagement lists refresh through explicit buttons or following actions; do not describe every screen as continuously live.
 
@@ -69,7 +69,7 @@ Automatic updates use the existing read endpoints every 30 seconds while visible
 1. Identify whether the recording uses sample mode or the tested live release. For final integration evidence, use the real release and agreed test accounts.
 2. Show the visitor homepage and one approved campaign.
 3. Log in as a public user, submit a campaign and show its pending status in My campaigns. Demonstrate a field validation error before the successful request.
-4. Once Kim's profile API is implemented, deployed and tested, show a freshly registered business owner saving a profile and submitting a campaign. Until then, identify this step as blocked; do not substitute sample mode or a seeded profile as evidence that onboarding works.
+4. Show a freshly registered business owner saving/reloading their profile and submitting a photo-backed campaign. The APIs are now deployed; use the served release and agreed test accounts, not a manually seeded profile or sample mode. Record the actual browser result.
 5. Log in as admin, inspect a pending submission and approve it. Return to the public page to show that it is now visible.
 6. Reject a second submission with a reason, then show that reason from its owner's account while the campaign remains absent publicly.
 7. Edit and resubmit a rejected campaign; explain that edited approved content also needs another approval.
@@ -102,4 +102,4 @@ The supplied original logo PNG is included at `frontend/public/images/brand/caus
 
 The [AWS sample frontend](https://d10e86f5qx46up.cloudfront.net) was deployed on 1 October using Unice's account, private S3 storage and the CloudFront Free plan. All 15 routes and all 15 deployed files passed hosting checks; the original logo and sample photos load. This historical preview uses **Preview as** to switch roles. Sample changes stay in that browser tab and can be reset; no real accounts or backend submissions are saved.
 
-The real IaaS application is live at [CauseConnect on AWS](https://52.62.2.87), deployed application commit `fc9f9594b9f27e70ad5dc0b2d8f1ee1d754e0949`, release `2026-10-14T09-34-26-691Z-fc9f9594b9f2`. Exact identity, eight fresh hosted API groups and five-/six-character signup/login/logout browser checks passed. Local checks passed 631 frontend tests, 89 backend units, 73 HTTP/MySQL checks and 20 frontend/API/MySQL checks. The unchanged host/tooling tree retains historical [PR #21](../evidence/stage-3/review-hardening/README.md) results of 41 host checks, 21 runner/routing/argument-guard checks and 15 offline Postman assertions, not fresh AWS/API execution. Earlier PR #19 photo/approval, backup integrity and restart results remain in its [dated receipt](../evidence/stage-3/additional-apis/README.md). Full restoration and offsite recovery are not claimed. Free-tier eligibility or credits are not a zero-cost guarantee. See [deployment instructions](../../infra/README.md), [current release evidence](../evidence/stage-3/signup-minimum-six/README.md) and historical [preview evidence](../evidence/stage-3/frontend-preview/README.md).
+The real IaaS application is live at [CauseConnect on AWS](https://52.62.2.87), application `ab1bef2c1b2e55c401a78543d4034cd2e85d0a2c`, release `2026-10-14T10-17-18-153Z-ab1bef2c1b2e`. Exact identity, eight supporting-API groups, eight business-API groups and the actual hosted Chrome business journey passed. Local checks passed 631 frontend tests, 106 backend units, 87 HTTP/MySQL and 26 frontend/API/MySQL checks; also 41 local host, 35 CLI/stub/routing and 15 offline Postman checks, not live API execution. Chrome covered fresh registration/profile refresh, pending-photo privacy, approval/public details, enquiry/inbox refresh, owner soft removal with retained enquiries and logout protection. The [current receipt](../evidence/stage-3/business-profile-integration/README.md) records scope; Meet/Prince's independent testing, manuals and recording remain separate. Earlier [PR #23](../evidence/stage-3/signup-minimum-six/README.md), [PR #21](../evidence/stage-3/review-hardening/README.md) and [PR #19](../evidence/stage-3/additional-apis/README.md) results remain historical. Full restoration/offsite recovery and zero costs are not guaranteed. See [deployment instructions](../../infra/README.md) and historical [preview evidence](../evidence/stage-3/frontend-preview/README.md).

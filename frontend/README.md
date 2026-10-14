@@ -2,9 +2,9 @@
 
 React frontend for CauseConnect. It includes campaign browsing and posting, business profiles, owner edits, participation, business enquiries, admin campaign/account management and registration/login/logout.
 
-The layout follows the CauseConnect storyboard and web design standards. The frontend calls the [API contracts](../docs/api/api-contract.md). The current application is live at [CauseConnect on AWS](https://52.62.2.87), commit `fc9f9594b9f27e70ad5dc0b2d8f1ee1d754e0949`, release `2026-10-14T09-34-26-691Z-fc9f9594b9f2`. The [current release evidence](../docs/evidence/stage-3/signup-minimum-six/README.md), [API integration guide](../docs/handoff/stage3-api-handoff.md) and [feature coverage](../docs/handoff/stage3-feature-coverage.md) separate verified work from remaining checks. The [PR #21 review-fix receipt](../docs/evidence/stage-3/review-hardening/README.md) is historical.
+The layout follows the CauseConnect storyboard and web design standards. The frontend calls the [API contracts](../docs/api/api-contract.md). The current application is live at [CauseConnect on AWS](https://52.62.2.87), commit `ab1bef2c1b2e55c401a78543d4034cd2e85d0a2c`, release `2026-10-14T10-17-18-153Z-ab1bef2c1b2e`. The [current release evidence](../docs/evidence/stage-3/business-profile-integration/README.md), [API integration guide](../docs/handoff/stage3-api-handoff.md) and [feature coverage](../docs/handoff/stage3-feature-coverage.md) separate verified work from remaining checks. Earlier PR #23/#21 receipts remain historical.
 
-GET/PUT `/api/business/me` is not merged or deployed and still returns `404` (Kim's AWT-141/AWT-173). [PR #22](https://github.com/acs-wil-wd-team1/social-awareness-web-app/pull/22) provides an implementation but is open with conflicts and awaits resolution/review. Direct API posting works with an existing Business row, but the browser form first loads the profile: browser posting is blocked for both new and existing owners. An existing linked business's implemented inbox works independently. The complete new-owner registration → profile → campaign → enquiry/inbox journey has not passed.
+[PR #22](https://github.com/acs-wil-wd-team1/social-awareness-web-app/pull/22) is merged and deployed after integration repairs. GET/PUT `/api/business/me` now creates or edits the current owner's profile; the previous missing-profile blocker is removed. Fresh registration → profile → photo campaign → approval → enquiry/inbox passed in the real React/Express/MySQL suite, hosted API checks and actual hosted Chrome. Independent tester/device acceptance remains separate.
 
 ## Run locally
 
@@ -13,7 +13,7 @@ npm ci
 npm run dev
 ```
 
-The development server forwards `/api` requests to `http://127.0.0.1:3000`. Live mode needs the backend and database. Use the explicitly labelled sample mode below to review the frontend before the remaining endpoints are ready.
+The development server forwards `/api` requests to `http://127.0.0.1:3000`. Live mode needs the backend and database. Use the explicitly labelled sample mode below only for interface review without a backend.
 
 Use Node.js 22.12 or newer. Backend configuration is in the [backend README](../backend/README.md).
 
@@ -43,7 +43,7 @@ npm run build
 
 For API/database checks, use `npm run test:real-backend`. It runs actual components/services against Express and fresh disposable MySQL, then removes its own container and upload fixtures. It needs a running Docker engine, cached `mysql:8` image and installed backend dependencies. Read the [runner instructions and limits](../infra/real-backend-testing.md) first.
 
-Local verification for this release: **631 frontend tests, 89 backend unit tests, 73 backend HTTP/MySQL checks and 20 real frontend/API/database checks passed**. The real frontend/API suite uses jsdom, not a full browser. The prior PR #21 results for the unchanged host/tooling tree remain 41 host checks, 21 runner/routing/argument-guard checks and 15 offline Postman assertion checks; they were not fresh AWS/API execution for PR #23. Exact release identity, eight fresh hosted API groups and hosted five-/six-character signup and login/logout checks passed separately; see the [current result and limits](../docs/evidence/stage-3/signup-minimum-six/README.md). The unmerged profile API is not counted as a completed business journey. Independent team/cross-browser testing remains separate.
+Local verification for this release: **631 frontend tests, 106 backend units, 87 HTTP/MySQL checks and 26 real frontend/API/database checks passed**. The real frontend/API suite uses jsdom, not a full browser, and registers the new business owner/profile through the API rather than seeding that journey. Also passed: 41 local host checks, 35 CLI/stub/routing checks and 15 offline Postman assertions; none are live API execution. Exact release identity, eight supporting-API groups, eight business-API journey groups and the actual hosted Chrome business journey passed separately. Chrome covered profile refresh, pending-photo privacy, approval/public details, enquiry/inbox refresh, owner soft removal with retained enquiries and logout protection. See the [current results and limits](../docs/evidence/stage-3/business-profile-integration/README.md); independent team, cross-browser and accessibility acceptance remain required.
 
 ## Routes
 
@@ -55,8 +55,8 @@ Local verification for this release: **631 frontend tests, 89 backend unit tests
 | `/register` | Registration | Calls `POST /api/auth/register` for a public or business-owner account; preserves `returnTo` in the login links |
 | `/logout` | Logout | Clears the browser session immediately, calls `PUT /api/auth/logout` and offers retry if server revocation is unconfirmed |
 | `/campaigns/new` | Public-user campaign posting | GET categories; optional POST `/api/campaign-images`; POST `/api/campaigns` |
-| `/business/profile` | Business profile | GET/PUT `/api/business/me` — not merged/deployed; PR #22 awaits conflict resolution/review |
-| `/business/campaigns/new` | Business campaign posting | POST works with an existing profile; browser profile step still needs GET/PUT business API |
+| `/business/profile` | Business profile | GET/PUT `/api/business/me`; empty profile returns `200 {business:null}`, first save/update returns the saved profile |
+| `/business/campaigns/new` | Business campaign posting | GET profile/categories, optional image upload, then canonical POST `/api/campaigns` |
 | `/my-campaigns` | Own submissions and review feedback | GET `/api/campaigns/mine`, with pagination and status filter |
 | `/my-campaigns/:id/edit` | Edit/resubmit or soft-delete an owned campaign | GET/PATCH/DELETE `/api/campaigns/mine/:id`; optional image upload |
 | `/my-participation` | Own participation history and withdrawal, including unavailable campaigns | GET `/api/participations/mine`; GET/PUT `/api/campaigns/:id/participation` for existing own records |
@@ -96,6 +96,6 @@ Campaign image and type values come from API responses. The live UI does not inf
 
 The original team logo PNG is included at `public/images/brand/causeconnect-logo.png` and used by the shared header.
 
-Use the [live AWS application](https://52.62.2.87) for real API integration. The older [AWS preview](https://d10e86f5qx46up.cloudfront.net) is a separate **Preview as** sample build using disposable browser data, not the current API deployment. The [current release evidence](../docs/evidence/stage-3/signup-minimum-six/README.md) records the live revision and passed checks. Deployment instructions are in [infra](../infra/README.md). AWS free-tier eligibility or credits do not guarantee zero charges; review the approved resource plan and actual usage.
+Use the [live AWS application](https://52.62.2.87) for real API integration. The older [AWS preview](https://d10e86f5qx46up.cloudfront.net) is a separate **Preview as** sample build using disposable browser data, not the current API deployment. The [current release evidence](../docs/evidence/stage-3/business-profile-integration/README.md) records the live revision and passed checks. Deployment instructions are in [infra](../infra/README.md). AWS free-tier eligibility or credits do not guarantee zero charges; review the approved resource plan and actual usage.
 
 Notes for the developers manual and demonstration are in [the frontend handoff](../docs/handoff/stage3-frontend-notes.md).

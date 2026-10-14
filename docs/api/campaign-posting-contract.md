@@ -1,12 +1,12 @@
 # Campaign submission API
 
-Category lookup and canonical campaign submission are implemented for signed-in `public` users (cause campaigns) and `business_owner` users (business campaigns). Photo attachment is already deployed at [CauseConnect on AWS](https://52.62.2.87). The reviewed PR #22 integration branch adds business-profile GET/PUT and the business compatibility route described below; these additions are not deployed yet. See the [integration evidence](../evidence/stage-3/business-profile-integration/README.md) for completed checks and the [current deployed receipt](../evidence/stage-3/signup-minimum-six/README.md) for the earlier live version.
+Category lookup and canonical campaign submission are implemented for signed-in `public` users (cause campaigns) and `business_owner` users (business campaigns). Photo attachment, business-profile GET/PUT and the compatibility route below are deployed at [CauseConnect on AWS](https://52.62.2.87), application `ab1bef2c1b2e55c401a78543d4034cd2e85d0a2c`, release `2026-10-14T10-17-18-153Z-ab1bef2c1b2e`. See the [current integration evidence](../evidence/stage-3/business-profile-integration/README.md) for local and hosted API checks. Earlier signup/review receipts stay historical.
 
 **Business owners:** the server links the campaign to the owner's own `businesses` row, returning `type: "business"` and that `businessId`. An owner without a business profile receives `409 BUSINESS_PROFILE_REQUIRED` and no row is created. The client still cannot send `businessId`, `createdBy`, `type` or `status`. Admins cannot use this route (`403`). Optional `imageId` must belong to the authenticated user, be unexpired and not already attached.
 
 **Owner reads:** `GET /api/campaigns/mine` and `GET /api/campaigns/mine/:id` return only the signed-in creator's campaigns in every status, using the [campaign read contract](campaign-read-contract.md) object including `updatedAt` and the latest `review` feedback.
 
-The frontend uses `/campaigns/new` for public submission and `/business/campaigns/new` for business submission; both send canonical `POST /api/campaigns`. The business form first calls GET `/api/business/me`. That profile route is implemented on the PR #22 integration branch but still returns `404` on live AWS `fc9f959`, so hosted browser posting remains blocked for new and existing owners. Direct POST against a seeded linked Business row is not proof of fresh business onboarding.
+The frontend uses `/campaigns/new` for public submission and `/business/campaigns/new` for business submission; both send canonical `POST /api/campaigns`. The business form first calls implemented GET `/api/business/me`, offering profile setup when it returns `business:null`. Fresh registration/profile/photo posting/approval/enquiry/inbox passed against the hosted API and actual hosted Chrome; independent tester acceptance remains separate. Direct POST against a seeded Business row alone is not proof of fresh onboarding.
 
 Related rules are in the [business posting and image extension](campaign-posting-future-proposal.md), [business profile contract](business-profile-contract.md), [campaign read contract](campaign-read-contract.md) and [admin contract](admin-campaign-moderation-contract.md). The [API integration guide](../handoff/stage3-api-handoff.md) separates implemented work from remaining integration and deployment checks.
 
@@ -94,7 +94,7 @@ The ID and timestamp are generated when the database saves the row. Use the retu
 
 ## Business compatibility route
 
-`POST /api/campaigns/business` is implemented on the PR #22 integration branch.
+`POST /api/campaigns/business` is merged and deployed through PR #22.
 It accepts the same headers, fields and `201 {campaign: ...}` response as canonical
 `POST /api/campaigns`, including optional `imageId`, but only an active current
 `business_owner` may use it. Public users and admins receive `403`; a business

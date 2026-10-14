@@ -4,8 +4,14 @@ The real Stage 3 application is already hosted at [CauseConnect on AWS](https://
 with same-origin API calls, private MySQL and persistent uploads. Use the
 [current EC2 guide](ec2/README.md) and [host package](ec2/host/README.md) to update
 that existing server. Its root is `/srv/causeconnect/current/frontend/dist`.
-The [dated release evidence](../docs/evidence/stage-3/additional-apis/README.md)
-separates what was verified from the remaining business-profile dependency.
+The current application is `ab1bef2c1b2e55c401a78543d4034cd2e85d0a2c`, release
+`2026-10-14T10-17-18-153Z-ab1bef2c1b2e`. PR #22's profile integration is deployed
+on the same server with no new migration or cloud resource. Exact identity,
+eight supporting-API groups, eight business-API journey groups and the actual
+hosted Chrome business journey passed. The
+[current receipt](../docs/evidence/stage-3/business-profile-integration/README.md)
+records those layers separately; independent tester acceptance and full/offsite
+recovery remain unverified.
 
 ## Historical frontend-only preview instructions
 

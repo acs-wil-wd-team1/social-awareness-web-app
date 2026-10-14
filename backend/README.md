@@ -1,8 +1,8 @@
 # CauseConnect backend
 
-Node.js, Express, Sequelize and MySQL. APIs cover authentication, categories, public/business campaign submission, owner/admin reads and campaign approval, plus AWT-175 photos, owner edits/removal, participation, business enquiries and admin account/content management. Application commit `fc9f9594b9f27e70ad5dc0b2d8f1ee1d754e0949`, release `2026-10-14T09-34-26-691Z-fc9f9594b9f2`, is deployed at [CauseConnect on AWS](https://52.62.2.87). See the [current release evidence](../docs/evidence/stage-3/signup-minimum-six/README.md) for exact verification scope; the [PR #21 review-fix receipt](../docs/evidence/stage-3/review-hardening/README.md) remains historical.
+Node.js, Express, Sequelize and MySQL. APIs cover authentication, categories, public/business campaign submission, owner/admin reads and campaign approval, plus profiles, photos, owner edits/removal, participation, enquiries and admin account/content management. Application commit `ab1bef2c1b2e55c401a78543d4034cd2e85d0a2c`, release `2026-10-14T10-17-18-153Z-ab1bef2c1b2e`, is deployed at [CauseConnect on AWS](https://52.62.2.87). See the [current release evidence](../docs/evidence/stage-3/business-profile-integration/README.md) for exact verification scope; earlier PR #23/#21 receipts remain historical.
 
-GET/PUT `/api/business/me` is not merged or deployed and remains Kim's AWT-141/AWT-173 work. [PR #22](https://github.com/acs-wil-wd-team1/social-awareness-web-app/pull/22) provides an implementation but is open with conflicts and awaits resolution/review. Live profile routes still return `404`. Direct API posting against an existing linked Business row works. Browser business submission first needs GET `/api/business/me`, so it is blocked for existing as well as new owners; the full hosted business journey has not passed.
+[PR #22](https://github.com/acs-wil-wd-team1/social-awareness-web-app/pull/22) is merged and deployed after conflict resolution and integration repairs. GET/PUT `/api/business/me` uses the current owner's existing Business table, and the business posting compatibility route delegates to the shared photo-aware transaction. No new migration/table was needed. The full hosted API and actual Chrome business journeys passed; independent tester/device acceptance remains separate.
 
 ## Prerequisites
 
@@ -79,9 +79,9 @@ npm run test:integration
 
 Unit tests do not need MySQL. The integration suite requires an already-migrated, separate local test database: set `RUN_DB_INTEGRATION=1`, `NODE_ENV=test`, a local `DB_HOST`, and `DB_NAME_TEST` ending in `_test` and different from `DB_NAME`. It also needs your local database credentials and `JWT_SECRET`. It creates and removes only its own test records; do not point it at a shared or production database.
 
-For the disposable MySQL + real frontend/API run, use `npm run test:real-backend` from `frontend/`; see [isolated testing](../infra/real-backend-testing.md). Record the actual run results. jsdom checks are not deployed-browser acceptance, and fixture-seeded business profiles do not certify the missing profile API.
+For the disposable MySQL + real frontend/API run, use `npm run test:real-backend` from `frontend/`; see [isolated testing](../infra/real-backend-testing.md). Record actual results. The suite now includes real registration/profile setup for a new business owner; seeded historical fixtures remain separate. jsdom checks are not deployed-browser acceptance.
 
-Current local verification passed 89 backend unit tests, 73 HTTP/MySQL checks, 20 actual frontend/API/database checks and 631 frontend tests. The prior PR #21 results for the unchanged host/tooling tree remain 41 host checks, 21 runner/routing/argument-guard checks and 15 offline Postman assertion checks, not fresh execution against this AWS release. Exact release identity, eight fresh hosted API groups and hosted five-/six-character signup and login/logout checks passed separately. These layers have different scopes; stub/offline tests do not contact AWS, and the hosted result does not certify the unfinished profile journey or exhaustive browser coverage. The [PR #19 receipt](../docs/evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) preserves its original counts.
+Current local verification passed 106 backend units, 87 HTTP/MySQL checks, 26 actual frontend/API/database checks and 631 frontend tests. Also passed: 41 local host checks, 35 CLI/stub/routing checks and 15 offline Postman assertions, not live API execution. Exact release identity, eight supporting-API groups, eight business-API journey groups and an actual hosted Chrome business journey passed separately. These layers have different scopes and do not establish exhaustive browser coverage or independent tester acceptance. The [PR #19 receipt](../docs/evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) preserves its original counts.
 
 ## Campaign submission
 
@@ -111,6 +111,8 @@ Code layout:
 
 ## Additional APIs
 
+- `src/services/businessServices.js` — current-owner profile reads and transactional first save/update
+- `src/services/businessCampaignSubmissions.js` — business-only compatibility alias delegating to the canonical photo-aware transaction
 - `src/services/ownerCampaignManagement.js` — owner edit/resubmit and soft-delete
 - `src/services/adminManagement.js` — review history, unpublish/delete, account list and suspension/reactivation
 - `src/services/engagement.js` — own participation and business enquiries
@@ -143,7 +145,7 @@ paired backup integrity and API-restart photo persistence passed the recorded
 PR #19 checks; full restoration and offsite recovery were not tested. See the
 [image contract](../docs/api/campaign-posting-future-proposal.md),
 [deployment preparation](../infra/ec2/host/README.md) and
-[current release evidence](../docs/evidence/stage-3/signup-minimum-six/README.md).
+[current release evidence](../docs/evidence/stage-3/business-profile-integration/README.md).
 
 ### Read-only local photo report
 

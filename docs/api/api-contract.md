@@ -1,6 +1,6 @@
 # CauseConnect API contracts
 
-This index describes the current application API, commit `fc9f9594b9f27e70ad5dc0b2d8f1ee1d754e0949`, release `2026-10-14T09-34-26-691Z-fc9f9594b9f2`, at [CauseConnect on AWS](https://52.62.2.87). The [current release evidence](../evidence/stage-3/signup-minimum-six/README.md) records local checks, exact hosted identity, eight fresh hosted API groups and the five-/six-character signup and login/logout checks. The [PR #21 receipt](../evidence/stage-3/review-hardening/README.md) and [PR #19 receipt](../evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) remain historical evidence. The [Stage 3 API integration guide](../handoff/stage3-api-handoff.md) maps remaining work: Kim's profile implementation is in open, conflicting PR #22, not yet merged or deployed.
+This index describes deployed application commit `ab1bef2c1b2e55c401a78543d4034cd2e85d0a2c`, release `2026-10-14T10-17-18-153Z-ab1bef2c1b2e`, at [CauseConnect on AWS](https://52.62.2.87). PR #22 is merged with the repaired business-profile and compatibility posting integration. The [current release evidence](../evidence/stage-3/business-profile-integration/README.md) records 631 frontend/106 backend units, 87 HTTP/MySQL and 26 frontend/API/MySQL checks, exact hosted identity, eight supporting-API and eight business-API groups, plus the passing actual hosted Chrome business journey. Independent tester acceptance remains separate. Earlier PR #23/#21/#19 receipts remain historical; the [integration guide](../handoff/stage3-api-handoff.md) maps current routes and final acceptance work.
 
 | Document | Status and purpose |
 |---|---|
@@ -8,7 +8,7 @@ This index describes the current application API, commit `fc9f9594b9f27e70ad5dc0
 | [Shared conventions](shared-conventions.md) | Identifiers, current-account permissions and error handling |
 | [Campaign submission](campaign-posting-contract.md) | Public submission and business submission linked to an existing owner profile, with optional image attachment |
 | [Business posting and images](campaign-posting-future-proposal.md) | Deployed private filesystem upload, expiring references and controlled delivery |
-| [Business profile](business-profile-contract.md) | GET/PUT not merged/deployed; Kim's AWT-141/AWT-173 implementation in PR #22 awaits conflict resolution/review |
+| [Business profile](business-profile-contract.md) | Merged/deployed GET/PUT using current account/session checks and safe first-save/update transactions |
 | [Campaign reads and owner submissions](campaign-read-contract.md) | Expanded public/owner/admin reads, image delivery and deleted-record filtering |
 | [Admin moderation](admin-campaign-moderation-contract.md) | Transactional approval/rejection and expected-version checks |
 | [Owner campaign management](owned-campaign-management-contract.md) | Deployed edit/resubmit/soft-delete |
@@ -32,17 +32,18 @@ The [real-backend regression runner](../../infra/real-backend-testing.md) checks
 | `GET` | `/api/campaigns/categories` | Public | `200` with `categories: [{ id, name }]` |
 | `POST` | `/api/campaigns` | Active `public`, or `business_owner` with their own existing profile | `201` with a saved pending `campaign` |
 
-The frontend `/campaigns/new` uses category lookup and campaign POST, accepting an optional server-issued `imageId`. Business POST works directly through the API with an existing linked profile. Browser business submission first calls GET `/api/business/me` and is blocked for existing as well as new owners until that profile API is implemented. The full hosted business journey has not passed.
+The frontend `/campaigns/new` uses category lookup and campaign POST, accepting an optional server-issued `imageId`. `/business/campaigns/new` first loads GET `/api/business/me`; new owners can save their profile through PUT before posting. Both forms use canonical POST `/api/campaigns`. The compatibility POST `/api/campaigns/business` accepts the same photo-aware payload for business owners only. The full fresh-business hosted API and actual Chrome journeys passed; independent tester acceptance is still required.
 
 ## Stage 3 route reference
 
-All rows below are merged and deployed except GET/PUT `/api/business/me`. Existing owner reads and core approval predate PR #19; they are not new AWT-175 features.
+All rows below are merged and deployed. Existing owner reads and core approval predate PR #19; they are not new AWT-175 features. Profile GET/PUT and the business compatibility route were integrated through PR #22 without a new table or migration.
 
 | Method | Endpoint | Behaviour |
 |---|---|---|
-| `GET`, `PUT` | `/api/business/me` | **Not implemented:** current owner's Business row or `null`; safe create/update |
+| `GET`, `PUT` | `/api/business/me` | Current owner's Business row or `null`; safe first save/update with current account/session locks |
 | `POST` | `/api/campaign-images` | Private image upload, ownership, expiry and opaque reference |
 | `POST` | `/api/campaigns` | Extend existing route for optional `imageId` and current `business_owner` |
+| `POST` | `/api/campaigns/business` | Business-owner-only compatibility alias using the same fields, photo attachment and transaction as canonical POST |
 | `GET` | `/api/campaigns/mine` | Own submissions, pagination, status and latest review feedback |
 | `GET`, `PATCH`, `DELETE` | `/api/campaigns/mine/:id` | Owner-only detail/edit/resubmit/soft-delete with `expectedUpdatedAt` on writes |
 | `GET` | Existing public/admin campaign routes | Add type/category ID, business, date/audience and appropriate image delivery fields |
