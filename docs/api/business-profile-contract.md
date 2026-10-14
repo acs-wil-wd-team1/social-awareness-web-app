@@ -1,6 +1,6 @@
 # Business profile API
 
-**Status, 14 October 2026:** Frontend implemented; GET/PUT `/api/business/me` is still missing and returns `404` on the deployed PR #19 release. It remains Kim's AWT-141/AWT-173 work, outside the AWT-175 implementation. Registration creates a `users` row with role `business_owner`, but does not create a `businesses` row. Posting directly through the API works for an existing linked profile. **Browser business submission is blocked even for existing owners**, because the form first needs GET `/api/business/me`. The full hosted business registration → profile → posting → approval → enquiry/inbox journey has not passed. See the [release evidence](../evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026).
+**Source status, 14 October 2026:** GET/PUT `/api/business/me` is implemented on the reviewed PR #22 integration branch. Kim's original implementation is retained in its history, with integration repairs for validation, privacy and concurrent saves. See the [integration evidence](../evidence/stage-3/business-profile-integration/README.md) for checks actually completed. This source has not been published/deployed yet: AWS application `fc9f959` still returns `404` for these routes, so browser business posting remains blocked for new and existing owners until the new release passes hosted checks. Registration creates a `users` row with role `business_owner`, not a `businesses` row.
 
 `/business/profile` uses the two endpoints below. Both require an active session, an active current user and role `business_owner`. Resolve the user from the authenticated session. A client-supplied user/business/owner ID is not accepted.
 
@@ -60,5 +60,17 @@ The frontend sends all four keys and uses empty strings to clear optional fields
 | `description` | `Business.description` | `businesses.description TEXT` |
 
 The table and unique owner constraint already exist in `20260830103020-create-businesses.js`. Do not add a duplicate table. Use the unique owner constraint for safe concurrent first saves; resolve competing creation requests to the same owner's one row. Never upsert by a browser-provided business ID.
+
+The implementation locks/rechecks the current account and matching active session
+inside the same transaction as profile reads or saves. Saves lock the owning
+account before looking up the profile, so competing first saves for that account
+cannot create two rows. Return the saved transaction's profile, not a later
+writer's result. Internal failures use the shared safe error response without raw
+SQL, profile values or stack traces in responses/logs.
+
+After profile setup, `/business/campaigns/new` continues to use canonical
+`POST /api/campaigns`. The compatibility `POST /api/campaigns/business` accepts
+the same fields but allows only active business owners. Both delegate to the
+same photo-aware transaction; see the [campaign submission contract](campaign-posting-contract.md#business-compatibility-route).
 
 Test a newly registered business owner with no profile, first save, later edit, optional-field clearing, concurrent first saves, role/suspension changes, session expiry and attempts to access another owner's profile. Then test [business campaign posting](campaign-posting-future-proposal.md) with that saved profile.

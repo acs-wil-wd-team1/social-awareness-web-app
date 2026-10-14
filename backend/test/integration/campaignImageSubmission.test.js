@@ -117,7 +117,7 @@ describe("full application image upload, campaign submission and public reads", 
       await db.UserSession.create({ userId: users[key].userId, token: tokens[key], ipAddress: "127.0.0.1", userAgent: fixtureTag, status: "active" });
     }
     category = await db.Category.create({ categoryName: fixtureTag });
-    // Existing business profile fixture; this suite does not implement Kim's profile API.
+    // Existing-business fixture; fresh onboarding is covered by the profile/frontend suites.
     business = await db.Business.create({ ownerId: users.business.userId, businessName: `${fixtureTag} business`, website: "https://example.test/business", abn: "fixture-private-abn" });
     await new Promise((resolve) => { server = app.listen(0, "127.0.0.1", resolve); });
     origin = `http://127.0.0.1:${server.address().port}`;
@@ -281,5 +281,49 @@ describe("full application image upload, campaign submission and public reads", 
     assert.equal(blocked.status, 429);
     assert.equal(blocked.body.code, "IMAGE_OWNER_QUOTA_REACHED");
     assert.equal(await db.CampaignImage.count({ where: { ownerId: users.quota.userId } }), cap);
+  });
+
+  it("the dedicated business compatibility route attaches and protects the requested photo", async () => {
+    const reference = await upload("business");
+    const result = await request("/api/campaigns/business", {
+      method: "POST", key: "business", value: payload({ imageId: reference.imageId }),
+    });
+    assert.equal(result.status, 201);
+    assert.equal(result.body.campaign.type, "business");
+    assert.equal(result.body.campaign.businessId, business.businessId);
+    assert.equal(result.body.campaign.status, "pending");
+    assert.ok(result.body.campaign.updatedAt);
+    assert.equal((await db.CampaignImage.findByPk(reference.imageId)).campaignId, result.body.campaign.id);
+    assert.equal((await content(result.body.campaign.imageUrl)).status, 200);
+    assert.equal((await content(`/api/campaign-images/${reference.imageId}/content`)).status, 404);
+    assert.equal((await request(`/api/campaigns/${result.body.campaign.id}`)).status, 404);
+  });
+
+  it("the business alias rejects other roles, forged fields and another owner's photo without creating a campaign", async () => {
+    const before = await db.Campaign.count({ where: { categoryId: category.categoryId } });
+    for (const key of ["owner", "other", "admin"]) {
+      assert.equal((await request("/api/campaigns/business", { method: "POST", key, value: payload() })).status, 403);
+    }
+    const forged = await request("/api/campaigns/business", {
+      method: "POST", key: "business", value: payload({ businessId: business.businessId, status: "approved" }),
+    });
+    assert.equal(forged.status, 422);
+    const otherPhoto = await upload("other");
+    const wrongPhoto = await request("/api/campaigns/business", {
+      method: "POST", key: "business", value: payload({ imageId: otherPhoto.imageId }),
+    });
+    assert.equal(wrongPhoto.status, 422);
+    assert.equal(await db.Campaign.count({ where: { categoryId: category.categoryId } }), before);
+    assert.equal((await db.CampaignImage.findByPk(otherPhoto.imageId)).campaignId, null);
+  });
+
+  it("the business alias uses the current database role and refuses expired sessions", async () => {
+    const before = await db.Campaign.count({ where: { createdBy: users.business.userId } });
+    await db.User.update({ role: "public" }, { where: { userId: users.business.userId } });
+    assert.equal((await request("/api/campaigns/business", { method: "POST", key: "business", value: payload() })).status, 403);
+    await db.User.update({ role: "business_owner" }, { where: { userId: users.business.userId } });
+    await db.UserSession.update({ status: "expired" }, { where: { userId: users.business.userId } });
+    assert.equal((await request("/api/campaigns/business", { method: "POST", key: "business", value: payload() })).status, 401);
+    assert.equal(await db.Campaign.count({ where: { createdBy: users.business.userId } }), before);
   });
 });

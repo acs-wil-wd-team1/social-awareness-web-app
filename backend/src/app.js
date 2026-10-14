@@ -4,7 +4,8 @@ const cors = require("cors");
 const app = express();
 
 const userRoutes = require("./router/authRoutes");
-const campaignRoutes = require("./router/campaignRoutes")
+const campaignRoutes = require("./router/campaignRoutes");
+const businessRoutes = require("./router/businessRoutes");
 const models = require("./database/models");
 const { createCampaignImageRouter } = require("./router/campaignImageRoutes");
 
@@ -20,7 +21,8 @@ app.use("/api/auth", userRoutes);
 app.use("/api/campaign-images", createCampaignImageRouter(models));
 app.use("/api", require("./router/campaignManagementRoutes"));
 app.use("/api", require("./router/engagementRoutes"));
-app.use("/api/campaigns", campaignRoutes)
+app.use("/api/campaigns", campaignRoutes);
+app.use("/api/business", businessRoutes);
 app.use("/api", (req, res) => res.status(404).json({ status: 404, code: "NOT_FOUND", message: "API route not found", fieldErrors: null }));
 
 app.use((err, req, res, next) => {
@@ -46,7 +48,9 @@ app.use((err, req, res, next) => {
     return res.status(status).json({
       status,
       code: status === 413 ? "REQUEST_TOO_LARGE" : invalidBody ? "VALIDATION_FAILED" : "INTERNAL_SERVER_ERROR",
-      message: status === 413 ? "Request body is too large" : invalidBody ? "Campaign data is invalid" : "Something went wrong",
+      message: status === 413 ? "Request body is too large" : invalidBody
+        ? (/^\/api\/business(\/|$)/i.test(req.path) ? "Business profile data is invalid" : "Campaign data is invalid")
+        : "Something went wrong",
       fieldErrors: invalidBody ? { body: "Send a valid JSON object" } : null,
     });
   }

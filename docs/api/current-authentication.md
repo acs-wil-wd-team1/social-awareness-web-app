@@ -1,6 +1,6 @@
 # Current authentication API
 
-**Reference, 14 October 2026:** Authentication service/controllers in deployed application commit `e612d1b448a31cd6639f161740c31a9e22f63ed6`. Examples describe implemented responses; the [current release evidence](../evidence/stage-3/review-hardening/README.md) records bounded verification, not an exhaustive security audit.
+**Reference, 14 October 2026:** Authentication service/controllers in deployed application commit `fc9f9594b9f27e70ad5dc0b2d8f1ee1d754e0949`. Examples describe implemented responses; the [current release evidence](../evidence/stage-3/signup-minimum-six/README.md) records bounded verification, not an exhaustive security audit.
 
 ## Register
 
@@ -30,7 +30,7 @@ Registration does not return a token or create a business profile. Controller er
 
 The frontend limits the trimmed name to 100 characters and email to 150, matching the existing user columns. It confirms registration only when the returned role matches the submitted account type. These browser checks do not replace server-side validation.
 
-**Registration rule in this source update:** new signups
+**Current deployed registration rule:** new signups
 require **at least 6 Unicode code points and at most 72 UTF-8 bytes**
 in the password. Spaces and Unicode are allowed; the password is not trimmed.
 Both browser and server enforce the same registration rule. The byte ceiling
@@ -38,7 +38,9 @@ avoids bcrypt silently ignoring a suffix. Existing accounts retain their existin
 login passwords; login does not impose the new-signup minimum or rewrite hashes.
 The six-character minimum is the requested assessment setting; longer unique
 passwords are safer. This is not a security-certification claim. The earlier
-`e612d1b` release used 15 characters; the six-character rule needs the new release.
+PR #21 `e612d1b` release used 15 characters. PR #23 deploys the six-character
+minimum; the hosted browser rejected five characters, accepted exactly six, and
+completed login/logout. Existing accounts keep their original passwords.
 
 ## Login
 

@@ -4,9 +4,11 @@ const Controllers = require("../controllers");
 const { User, UserSession } = require("../database/models");
 const { createCampaignAuthorGuard } = require("../middleware/campaignAuthorAuthentication");
 const { createAdminGuard } = require("../middleware/adminAuthentication");
+const { createCurrentAccountGuard } = require("../middleware/currentAccountAuthentication");
 
 const requireCampaignAuthor = createCampaignAuthorGuard({ User, UserSession });
 const requireAdmin = createAdminGuard({ User, UserSession });
+const requireBusinessOwner = createCurrentAccountGuard({ User, UserSession }, { roles: ["business_owner"] });
 const campaigns = Controllers.campaignsContoller;
 const admin = Controllers.adminCampaignsController;
 
@@ -14,6 +16,8 @@ const admin = Controllers.adminCampaignsController;
 router.get("/categories", campaigns.getCampaignCategories);
 
 router.post("/", requireCampaignAuthor, campaigns.submitCampaign);
+// Compatibility route uses the same photo-aware, transactional submission logic.
+router.post("/business", requireBusinessOwner, Controllers.businessCampaignsController.createBusinessCampaigns);
 router.get("/mine", requireCampaignAuthor, campaigns.getMyCampaigns);
 router.get("/mine/:id", requireCampaignAuthor, campaigns.getMyCampaignById);
 

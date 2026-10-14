@@ -1,12 +1,12 @@
 # Campaign submission API
 
-Category lookup and campaign submission are implemented for signed-in `public` users (cause campaigns) and `business_owner` users (business campaigns). Optional uploaded-image attachment is merged through PR #19 and deployed at [CauseConnect on AWS](https://52.62.2.87). See the [release evidence](../evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) for verification scope and remaining gaps.
+Category lookup and canonical campaign submission are implemented for signed-in `public` users (cause campaigns) and `business_owner` users (business campaigns). Photo attachment is already deployed at [CauseConnect on AWS](https://52.62.2.87). The reviewed PR #22 integration branch adds business-profile GET/PUT and the business compatibility route described below; these additions are not deployed yet. See the [integration evidence](../evidence/stage-3/business-profile-integration/README.md) for completed checks and the [current deployed receipt](../evidence/stage-3/signup-minimum-six/README.md) for the earlier live version.
 
 **Business owners:** the server links the campaign to the owner's own `businesses` row, returning `type: "business"` and that `businessId`. An owner without a business profile receives `409 BUSINESS_PROFILE_REQUIRED` and no row is created. The client still cannot send `businessId`, `createdBy`, `type` or `status`. Admins cannot use this route (`403`). Optional `imageId` must belong to the authenticated user, be unexpired and not already attached.
 
 **Owner reads:** `GET /api/campaigns/mine` and `GET /api/campaigns/mine/:id` return only the signed-in creator's campaigns in every status, using the [campaign read contract](campaign-read-contract.md) object including `updatedAt` and the latest `review` feedback.
 
-The frontend uses `/campaigns/new` for public submission and `/business/campaigns/new` for business submission. The latter first calls GET `/api/business/me`, so browser business posting is blocked for both new and existing owners until Kim's profile API is available. Direct POST against an existing linked Business row is implemented and fixture-tested; it is not a completed hosted business browser journey.
+The frontend uses `/campaigns/new` for public submission and `/business/campaigns/new` for business submission; both send canonical `POST /api/campaigns`. The business form first calls GET `/api/business/me`. That profile route is implemented on the PR #22 integration branch but still returns `404` on live AWS `fc9f959`, so hosted browser posting remains blocked for new and existing owners. Direct POST against a seeded linked Business row is not proof of fresh business onboarding.
 
 Related rules are in the [business posting and image extension](campaign-posting-future-proposal.md), [business profile contract](business-profile-contract.md), [campaign read contract](campaign-read-contract.md) and [admin contract](admin-campaign-moderation-contract.md). The [API integration guide](../handoff/stage3-api-handoff.md) separates implemented work from remaining integration and deployment checks.
 
@@ -91,6 +91,23 @@ The server selects the signed-in creator, sets `businessId` to `null` for a publ
 ```
 
 The ID and timestamp are generated when the database saves the row. Use the returned ID and status for the confirmation. Do not require the sample ID or date above.
+
+## Business compatibility route
+
+`POST /api/campaigns/business` is implemented on the PR #22 integration branch.
+It accepts the same headers, fields and `201 {campaign: ...}` response as canonical
+`POST /api/campaigns`, including optional `imageId`, but only an active current
+`business_owner` may use it. Public users and admins receive `403`; a business
+owner without a profile receives `409 BUSINESS_PROFILE_REQUIRED`.
+
+This is an alias for the shared submission service, not another form or storage
+workflow. Both routes lock/recheck the current account and matching session,
+select the owner's own business, validate the category, create a pending campaign
+and attach an owned, valid photo in one transaction. They reject forged ownership
+or approval fields and do not silently discard `imageId`. Failed attachment rolls
+back the campaign and leaves an unused valid photo reference available for retry.
+The frontend continues to call canonical `POST /api/campaigns`; do not switch it
+or add a duplicate posting form merely because this compatibility path exists.
 
 ## Errors for these new routes
 

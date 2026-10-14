@@ -70,9 +70,13 @@ The current deployed source also bounds each owner's retained photos: default
 20 files/50 MiB, using `CAMPAIGN_UPLOAD_OWNER_MAX_PHOTOS` (1–100) and
 `CAMPAIGN_UPLOAD_OWNER_MAX_BYTES` (1–256 MiB). Attached and cleanup-pending images
 count; no attached files are purged to make space. These safeguards are included
-in application release `2026-10-14T08-35-53-193Z-e612d1b448a3`; see the
-[current release evidence](../../../docs/evidence/stage-3/review-hardening/README.md)
+in current application release `2026-10-14T09-34-26-691Z-fc9f9594b9f2`; see the
+[current release evidence](../../../docs/evidence/stage-3/signup-minimum-six/README.md)
 for the actual checks and limits.
+
+PR #23 changes signup validation, not this host/tooling tree. The PR #21 host
+checks and settings remain historical evidence for that unchanged tree; they
+were not rerun merely by updating the signup minimum.
 
 Only `/api/campaign-images` gets Nginx's 6 MiB multipart ceiling; Express still
 enforces the 5,000,000-byte photo limit. Uploads are limited to 3/minute per IP with

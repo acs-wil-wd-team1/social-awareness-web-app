@@ -1,6 +1,6 @@
 # CauseConnect API contracts
 
-This index describes the current application API, commit `e612d1b448a31cd6639f161740c31a9e22f63ed6`, release `2026-10-14T08-35-53-193Z-e612d1b448a3`, at [CauseConnect on AWS](https://52.62.2.87). The [current release evidence](../evidence/stage-3/review-hardening/README.md) records local checks, exact hosted identity and eight fresh hosted API acceptance groups. The [PR #19 receipt](../evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) remains dated historical evidence. The [Stage 3 API integration guide](../handoff/stage3-api-handoff.md) maps remaining work, including Kim's missing business-profile GET/PUT routes.
+This index describes the current application API, commit `fc9f9594b9f27e70ad5dc0b2d8f1ee1d754e0949`, release `2026-10-14T09-34-26-691Z-fc9f9594b9f2`, at [CauseConnect on AWS](https://52.62.2.87). The [current release evidence](../evidence/stage-3/signup-minimum-six/README.md) records local checks, exact hosted identity, eight fresh hosted API groups and the five-/six-character signup and login/logout checks. The [PR #21 receipt](../evidence/stage-3/review-hardening/README.md) and [PR #19 receipt](../evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) remain historical evidence. The [Stage 3 API integration guide](../handoff/stage3-api-handoff.md) maps remaining work: Kim's profile implementation is in open, conflicting PR #22, not yet merged or deployed.
 
 | Document | Status and purpose |
 |---|---|
@@ -8,7 +8,7 @@ This index describes the current application API, commit `e612d1b448a31cd6639f16
 | [Shared conventions](shared-conventions.md) | Identifiers, current-account permissions and error handling |
 | [Campaign submission](campaign-posting-contract.md) | Public submission and business submission linked to an existing owner profile, with optional image attachment |
 | [Business posting and images](campaign-posting-future-proposal.md) | Deployed private filesystem upload, expiring references and controlled delivery |
-| [Business profile](business-profile-contract.md) | GET/PUT still missing; Kim's AWT-141/AWT-173 work |
+| [Business profile](business-profile-contract.md) | GET/PUT not merged/deployed; Kim's AWT-141/AWT-173 implementation in PR #22 awaits conflict resolution/review |
 | [Campaign reads and owner submissions](campaign-read-contract.md) | Expanded public/owner/admin reads, image delivery and deleted-record filtering |
 | [Admin moderation](admin-campaign-moderation-contract.md) | Transactional approval/rejection and expected-version checks |
 | [Owner campaign management](owned-campaign-management-contract.md) | Deployed edit/resubmit/soft-delete |

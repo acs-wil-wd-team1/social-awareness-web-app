@@ -1,8 +1,8 @@
 # CauseConnect backend
 
-Node.js, Express, Sequelize and MySQL. APIs cover authentication, categories, public/business campaign submission, owner/admin reads and campaign approval, plus AWT-175 photos, owner edits/removal, participation, business enquiries and admin account/content management. Application commit `e612d1b448a31cd6639f161740c31a9e22f63ed6`, release `2026-10-14T08-35-53-193Z-e612d1b448a3`, is deployed at [CauseConnect on AWS](https://52.62.2.87). See the [current release evidence](../docs/evidence/stage-3/review-hardening/README.md) for exact verification scope.
+Node.js, Express, Sequelize and MySQL. APIs cover authentication, categories, public/business campaign submission, owner/admin reads and campaign approval, plus AWT-175 photos, owner edits/removal, participation, business enquiries and admin account/content management. Application commit `fc9f9594b9f27e70ad5dc0b2d8f1ee1d754e0949`, release `2026-10-14T09-34-26-691Z-fc9f9594b9f2`, is deployed at [CauseConnect on AWS](https://52.62.2.87). See the [current release evidence](../docs/evidence/stage-3/signup-minimum-six/README.md) for exact verification scope; the [PR #21 review-fix receipt](../docs/evidence/stage-3/review-hardening/README.md) remains historical.
 
-GET/PUT `/api/business/me` is still missing and remains Kim's AWT-141/AWT-173 work. Direct API posting against an existing linked Business row works. Browser business submission first needs GET `/api/business/me`, so it is blocked for existing as well as new owners; the full hosted business journey has not passed.
+GET/PUT `/api/business/me` is not merged or deployed and remains Kim's AWT-141/AWT-173 work. [PR #22](https://github.com/acs-wil-wd-team1/social-awareness-web-app/pull/22) provides an implementation but is open with conflicts and awaits resolution/review. Live profile routes still return `404`. Direct API posting against an existing linked Business row works. Browser business submission first needs GET `/api/business/me`, so it is blocked for existing as well as new owners; the full hosted business journey has not passed.
 
 ## Prerequisites
 
@@ -81,7 +81,7 @@ Unit tests do not need MySQL. The integration suite requires an already-migrated
 
 For the disposable MySQL + real frontend/API run, use `npm run test:real-backend` from `frontend/`; see [isolated testing](../infra/real-backend-testing.md). Record the actual run results. jsdom checks are not deployed-browser acceptance, and fixture-seeded business profiles do not certify the missing profile API.
 
-Current local verification passed 89 backend unit tests, 73 HTTP/MySQL checks, 19 actual frontend/API/database checks, 630 frontend tests, 41 host checks and 21 runner/routing/argument-guard checks. Fifteen Postman assertion checks passed offline, not against a live API. Exact release identity and eight fresh hosted API acceptance groups passed separately. These layers have different scopes; stub/offline tests do not contact AWS, and the hosted result does not certify the unfinished profile journey or exhaustive browser coverage. The [PR #19 receipt](../docs/evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) preserves its original counts.
+Current local verification passed 89 backend unit tests, 73 HTTP/MySQL checks, 20 actual frontend/API/database checks and 631 frontend tests. The prior PR #21 results for the unchanged host/tooling tree remain 41 host checks, 21 runner/routing/argument-guard checks and 15 offline Postman assertion checks, not fresh execution against this AWS release. Exact release identity, eight fresh hosted API groups and hosted five-/six-character signup and login/logout checks passed separately. These layers have different scopes; stub/offline tests do not contact AWS, and the hosted result does not certify the unfinished profile journey or exhaustive browser coverage. The [PR #19 receipt](../docs/evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) preserves its original counts.
 
 ## Campaign submission
 
@@ -89,12 +89,13 @@ The [campaign submission contract](../docs/api/campaign-posting-contract.md) lis
 
 ## Authentication
 
-This source update requires new signup passwords to contain at least
+The current deployed release requires new signup passwords to contain at least
 6 Unicode code points and no more than 72 UTF-8 bytes, without trimming. The
 server and registration form share that rule. Existing accounts keep their old
-login passwords; this is not a password reset or hash migration. The previous
-`e612d1b` release used 15 characters; the six-character minimum needs the new
-deployment. See the
+login passwords; this is not a password reset or hash migration. The historical
+PR #21 `e612d1b` release used 15 characters. PR #23's six-character minimum is
+deployed, with hosted five-/six-character signup and login/logout checks passed.
+See the
 [authentication contract](../docs/api/current-authentication.md).
 
 ## Admin campaign approval
@@ -142,7 +143,7 @@ paired backup integrity and API-restart photo persistence passed the recorded
 PR #19 checks; full restoration and offsite recovery were not tested. See the
 [image contract](../docs/api/campaign-posting-future-proposal.md),
 [deployment preparation](../infra/ec2/host/README.md) and
-[current release evidence](../docs/evidence/stage-3/review-hardening/README.md).
+[current release evidence](../docs/evidence/stage-3/signup-minimum-six/README.md).
 
 ### Read-only local photo report
 

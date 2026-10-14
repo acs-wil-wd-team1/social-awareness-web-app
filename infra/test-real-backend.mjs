@@ -153,7 +153,7 @@ async function browserFixture(env) {
   if (!address || typeof address === 'string' || address.address !== '127.0.0.1') throw new Error('Browser fixture did not bind to loopback.')
   console.log('Browser fixture ready. These accounts exist only in this disposable database:')
   console.log(JSON.stringify({ frontendUrl: `http://127.0.0.1:${address.port}`, run: tag, password: fixturePassword, accounts, category: { id: category.categoryId, name: category.categoryName }, campaigns }, null, 2))
-  console.log('Actual frontend and Express/MySQL are running. The business fixture is database-seeded; Kim’s profile API is not replaced by this check. This is not sample mode.')
+  console.log('Actual frontend and Express/MySQL are running. The existing-business fixture is database-seeded; fresh profile onboarding needs its own browser journey. This is not sample mode.')
   console.log('Enter inspect for a safe database readback, or press Ctrl+C to stop and remove this run’s fixture.')
   input = createInterface({ input: process.stdin, output: process.stdout, terminal: Boolean(process.stdin.isTTY) })
   input.on('SIGINT', () => stop('SIGINT'))
@@ -246,7 +246,7 @@ try {
   env.VITE_API_BASE_URL = `http://127.0.0.1:${server.address().port}/api`
   console.log('Testing actual frontend components and services against Express and MySQL (jsdom, native HTTP fetch; no API mocks).')
   await command(process.execPath, [path.join(frontend, 'node_modules/vitest/vitest.mjs'), 'run', '--config', 'vitest.real-backend.config.js'], { cwd: frontend, env })
-  console.log('Real-backend regression passed against the migrated disposable database. Kim’s business-profile APIs still require their own integration checks.')
+  console.log('Real-backend regression passed against the migrated disposable database. Hosted browser acceptance remains a separate check.')
 } catch (error) {
   console.error(error.message.replaceAll(password, '[redacted]'))
   process.exitCode = 1
