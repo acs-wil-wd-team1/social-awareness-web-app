@@ -204,6 +204,13 @@ a {
   font-weight: 600;
 }
 
+.auth-form__help {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
 .auth-button {
   display: block;
   width: 100%;

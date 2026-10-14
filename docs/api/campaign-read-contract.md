@@ -19,7 +19,7 @@ The owner list expands each item to show submitted details. The edit page additi
 
 The frontend sends `page` and `pageSize` explicitly. Owner/admin screens use `pageSize=10`. For new/updated routes: default page `1`, page size `20`; positive integers only, `pageSize` at most `100`. Preserve compatibility with existing callers that request `100`.
 
-Optional `status` is `pending`, `approved` or `rejected` for owner/admin. Optional `search` is a trimmed title search. Existing `category` is a positive category ID in the URL, not a category name. Public reads remain approved regardless of optional filters. Reject invalid recognised values with `422`; ignore unknown query keys. Apply all ownership/status filters before counting or paginating.
+Optional `status` is `pending`, `approved` or `rejected` for owner/admin. Optional `search` is a trimmed title search of at most 150 characters; the browser input and API use that same limit. Existing `category` is a positive category ID in the URL, not a category name. Public reads remain approved regardless of optional filters. Reject invalid recognised values with `422`; ignore unknown query keys. Apply all ownership/status filters before counting or paginating.
 
 Sort by `createdAt DESC`, then numeric `id DESC`. Return `200` with this envelope:
 

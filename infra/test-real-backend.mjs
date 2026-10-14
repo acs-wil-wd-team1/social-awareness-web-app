@@ -102,7 +102,7 @@ async function cleanup() {
 async function stop(signal) {
   try {
     await cleanup()
-    process.exit(signal === 'SIGINT' ? 130 : 143)
+    process.exit(signal === 'EOF' ? 0 : signal === 'SIGINT' ? 130 : 143)
   } catch (error) {
     console.error(`Cleanup needs attention: ${error.message}`)
     process.exit(1)
@@ -157,6 +157,9 @@ async function browserFixture(env) {
   console.log('Enter inspect for a safe database readback, or press Ctrl+C to stop and remove this run’s fixture.')
   input = createInterface({ input: process.stdin, output: process.stdout, terminal: Boolean(process.stdin.isTTY) })
   input.on('SIGINT', () => stop('SIGINT'))
+  // Closing the owning terminal must also close the disposable servers/database.
+  // Defer so cleanup's own input.close() cannot re-enter cleanup synchronously.
+  input.once('close', () => queueMicrotask(() => { if (!cleaning) void stop('EOF') }))
   let inspecting = false
   input.on('line', async line => {
     if (line.trim() !== 'inspect') {
@@ -186,6 +189,7 @@ async function browserFixture(env) {
 
 try {
   if (process.argv.length > 2 && !browserMode) throw new Error('Only --browser is accepted. This runner accepts no remote database, credentials, host or API arguments.')
+  if (browserMode && !process.stdin.isTTY) throw new Error('Browser checks require an interactive terminal. Run --browser without piping or closing its input; no test container was started.')
   dockerEndpoint = await resolveLocalDockerEndpoint()
   await docker(['info', '--format', '{{.ServerVersion}}'], { capture: true })
   try {

@@ -60,7 +60,7 @@ export default function AdminCampaignsPage({ token, role, campaignLoader = loadA
       }}>
         <div>
           <label htmlFor="admin-campaign-search">Search campaigns</label>
-          <input id="admin-campaign-search" type="search" value={searchInput} maxLength={200}
+          <input id="admin-campaign-search" type="search" value={searchInput} maxLength={150}
             onChange={(event) => setSearchInput(event.target.value)} placeholder="Search by title" />
         </div>
         <div>

@@ -1,4 +1,5 @@
 import { ApiError, apiRequest } from './apiClient.js'
+import { formatDisplayDate } from './dateFormatting.js'
 
 const positiveId = (value) => Number.isSafeInteger(value) && value > 0 && value <= 2147483647
 const timestamp = (value) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value) && Number.isFinite(Date.parse(value))
@@ -123,6 +124,6 @@ export function engagementErrorMessage(error) {
   return error?.message || 'The service could not be reached. Please try again.'
 }
 
-export function formatEngagementDate(value) {
-  return timestamp(value) ? new Intl.DateTimeFormat('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(value)) : 'Not available'
+export function formatEngagementDate(value, options = {}) {
+  return timestamp(value) ? formatDisplayDate(value, options) : 'Not available'
 }

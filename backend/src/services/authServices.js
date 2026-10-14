@@ -3,6 +3,7 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const { randomBytes } = require("node:crypto");
+const { UniqueConstraintError } = require("sequelize");
 
 const { sequelize, User, UserSession } = require("../database/models");
 const { validateRegistrationInput, validateLoginInput } = require("../utils/authValidation");
@@ -11,6 +12,14 @@ const accountTypeToRole = {
   user: "public",
   business: "business_owner",
 };
+
+function emailExistsError() {
+  return Object.assign(new Error("Unable to create your account"), {
+    status: 409,
+    code: "EMAIL_EXISTS",
+    fieldErrors: { email: "Email has already been registered. Please use different email." },
+  });
+}
 
 const registerUser = async (input) => {
   const { name, email, password, accountType } = validateRegistrationInput(input);
@@ -26,24 +35,28 @@ const registerUser = async (input) => {
   });
 
   if (existing) {
-    const error = new Error("Unable to create your account");
-    error.status = 409;
-    error.code = "EMAIL_EXISTS";
-    error.fieldErrors = {
-      email: "Email has already been registered. Please use different email.",
-    };
-
-    throw error;
+    throw emailExistsError();
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
 
-  const newUser = await User.create({
-    fullName: name,
-    email: normalizedEmail,
-    passwordHash,
-    role,
-  });
+  let newUser;
+  try {
+    newUser = await User.create({
+      fullName: name,
+      email: normalizedEmail,
+      passwordHash,
+      role,
+    });
+  } catch (error) {
+    // The pre-check cannot serialize concurrent signups. The database's unique
+    // email constraint is authoritative; only map that specific conflict.
+    if (error instanceof UniqueConstraintError && (
+      Object.hasOwn(error.fields || {}, "email")
+      || error.errors?.some((item) => item.path === "email")
+    )) throw emailExistsError();
+    throw error;
+  }
 
   return {
     message: "Registered!",

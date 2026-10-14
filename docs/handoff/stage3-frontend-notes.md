@@ -33,7 +33,7 @@ The [coverage table](stage3-feature-coverage.md) maps the broader Confluence req
 |---|---|
 | Visitor | Open `/`, browse approved campaigns, open `/campaigns/:id`, register or log in |
 | Public user | Submit/manage an owned campaign; join/withdraw/rejoin an approved cause campaign; send a business enquiry |
-| Business owner | Profile setup and first browser submission remain blocked on Kim's GET/PUT API. Existing-profile campaign APIs and private enquiries are implemented; cause participation is available |
+| Business owner | Browser business submission is blocked for new and existing owners on Kim's profile GET/PUT. Direct existing-profile campaign APIs and private enquiries are implemented; cause participation is available |
 | Administrator | Review campaigns and decision history; remove published content or soft-delete with a reason; suspend/reactivate non-admin accounts |
 
 New or edited submissions show pending review and remain hidden publicly. After approval, the owner can open the public page. After rejection, the owner can read the reason and edit/resubmit. The frontend shows the exact account role's links; admins do not use the ordinary submission forms. Soft deletion removes normal access while retaining records for backend-controlled recovery/audit.
@@ -58,7 +58,7 @@ The exact calls, bodies, response shapes and database mappings are in the [API i
 
 `VITE_DEMO_MODE=false` is the default and calls the real backend. `VITE_API_BASE_URL=/api` uses the same website origin/local proxy. A separate hosted API needs its full HTTPS prefix, including `/api`, plus matching backend CORS. These values are public build configuration; passwords and cloud/signing credentials must never be included. A changed value needs a new build.
 
-The real backend supports authentication, categories, public/owner/admin reads, public and existing-profile business posting, images, owner management, participation, enquiries and admin actions/history/accounts. These routes are merged and deployed. GET/PUT `/api/business/me` still returns `404`, so fresh-business onboarding remains unfinished. Local fixture-backed enquiry tests and sample-preview success must not be recorded as a completed new-business journey.
+The real backend supports authentication, categories, public/owner/admin reads, public and existing-profile business posting, images, owner management, participation, enquiries and admin actions/history/accounts. These routes are merged and deployed. Existing-profile posting works through direct API calls. The business form first requests GET `/api/business/me`, which still returns `404`, so browser posting is blocked for existing as well as new owners. Local fixture-backed enquiry tests and sample-preview success must not be recorded as a completed hosted business journey.
 
 Automatic updates use the existing read endpoints every 30 seconds while visible/online, plus focus/reconnection and manual refresh. This is polling, not WebSockets. Admin/history/engagement lists refresh through explicit buttons or following actions; do not describe every screen as continuously live.
 

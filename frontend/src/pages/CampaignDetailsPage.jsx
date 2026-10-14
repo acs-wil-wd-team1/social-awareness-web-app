@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import { getCampaignById } from '../services/campaignService.js'
+import { formatDisplayDate } from '../services/dateFormatting.js'
 import useLiveRefresh from '../hooks/useLiveRefresh.js'
 import CampaignParticipation from '../components/CampaignParticipation.jsx'
 import CampaignEnquiryForm from '../components/CampaignEnquiryForm.jsx'
@@ -37,14 +38,7 @@ function businessWebsite(value) {
 }
 
 function formatPublishedDate(createdAt) {
-  if (!createdAt || !Number.isFinite(Date.parse(createdAt))) return 'Not provided'
-
-  return new Intl.DateTimeFormat('en-AU', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'UTC',
-  }).format(new Date(createdAt))
+  return formatDisplayDate(createdAt, { fallback: 'Not provided' })
 }
 
 export default function CampaignDetailsPage({
@@ -76,7 +70,7 @@ export default function CampaignDetailsPage({
         <p>
           {isNotFound
             ? 'This campaign is unavailable or may have been removed.'
-            : 'Please try again.'}
+            : live.error.status === 429 ? live.error.message : 'Please try again.'}
         </p>
         {isNotFound ? null : (
           <button type="button" onClick={live.refresh}>
@@ -104,7 +98,7 @@ export default function CampaignDetailsPage({
         <button type="button" onClick={live.refresh} disabled={live.refreshing || live.paused === 'offline'}>Refresh campaign</button>
         {live.refreshing ? <p role="status">Checking for campaign updates…</p> : null}
         {live.paused === 'offline' ? <p role="status">You’re offline. Campaign updates will resume when you reconnect.</p> : null}
-        {live.error ? <p role="alert">Campaign updates could not be loaded. Showing the last loaded campaign. <button type="button" onClick={live.refresh}>Retry updates</button></p> : null}
+        {live.error ? <p role="alert">{live.error.status === 429 ? live.error.message : 'Campaign updates could not be loaded.'} Showing the last loaded campaign. <button type="button" onClick={live.refresh}>Retry updates</button></p> : null}
       </div>
 
       <article className={`campaign-details ${categoryClassName}`}>

@@ -6,6 +6,19 @@ const campaign = { id: 12, title: 'Neighbourhood gardens', description: 'Plant a
 afterEach(cleanup)
 
 describe('admin campaign queue', () => {
+  it.each([149, 150])('matches the API search limit and preserves all %s characters of a valid title search', async length => {
+    const loader = vi.fn().mockResolvedValue({ campaigns: [], page: 1, pageSize: 10 })
+    render(<AdminCampaignsPage token="admin" role="admin" campaignLoader={loader} />)
+    await screen.findByText('No campaigns found.')
+    const input = screen.getByLabelText('Search campaigns')
+    expect(input.maxLength).toBe(150)
+    const text = 'A'.repeat(length)
+    fireEvent.change(input, { target: { value: text } })
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+    await waitFor(() => expect(loader).toHaveBeenLastCalledWith(expect.objectContaining({ search: text, page: 1 })))
+    expect(input.value).toBe(text)
+  })
+
   it('blocks non-admin accounts before requesting private submissions', () => {
     const loader = vi.fn()
     render(<AdminCampaignsPage token="owner" role="public" campaignLoader={loader} />)

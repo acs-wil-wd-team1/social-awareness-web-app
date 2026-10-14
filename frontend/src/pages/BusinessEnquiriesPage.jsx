@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { engagementErrorMessage, formatEngagementDate, loadBusinessEnquiries } from '../services/engagementService.js'
+import { loadBusinessProfile } from '../services/businessService.js'
 import '../styles/engagement.css'
 
 export default function BusinessEnquiriesPage({ token, role }) {
@@ -17,7 +18,17 @@ export default function BusinessEnquiriesPage({ token, role }) {
     const controller = new AbortController()
     loadBusinessEnquiries({ token, signal: controller.signal, page, pageSize: 10 }).then((body) => {
       if (!controller.signal.aborted) { setResult(body); setLoading(false) }
-    }).catch((failure) => { if (!controller.signal.aborted) { setError(failure); setLoading(false) } })
+    }).catch(async (failure) => {
+      // Check a setup dependency only after the inbox explicitly requires it.
+      // Existing businesses can still use their inbox independently.
+      if (failure.code === 'BUSINESS_PROFILE_REQUIRED' && !controller.signal.aborted) {
+        try { await loadBusinessProfile({ token, signal: controller.signal }) }
+        catch (profileError) {
+          if (profileError.code === 'BUSINESS_PROFILE_UNAVAILABLE' || profileError.status === 401) failure = profileError
+        }
+      }
+      if (!controller.signal.aborted) { setError(failure); setLoading(false) }
+    })
     return () => controller.abort()
   }, [token, role, page, retry])
 
@@ -26,9 +37,9 @@ export default function BusinessEnquiriesPage({ token, role }) {
     {!token ? <a className="text-link" href="/login?returnTo=%2Fbusiness%2Fenquiries">Log in to see business enquiries</a>
       : !allowed ? <p>A business-owner account is needed to view enquiries.</p>
         : <>
-          <button type="button" disabled={loading} onClick={() => setRetry((value) => value + 1)}>Refresh enquiries</button>
+          {error?.code !== 'BUSINESS_PROFILE_UNAVAILABLE' && error?.status !== 404 ? <button type="button" disabled={loading} onClick={() => setRetry((value) => value + 1)}>Refresh enquiries</button> : null}
           {loading ? <p role="status">Loading your enquiries…</p> : null}
-          {error ? <div role="alert" className="engagement-notice"><p>{engagementErrorMessage(error)}</p>{error.status === 401 ? <a className="text-link" href="/login?returnTo=%2Fbusiness%2Fenquiries">Log in again</a> : error.code === 'BUSINESS_PROFILE_REQUIRED' ? <a className="text-link" href="/business/profile">Set up business profile</a> : null}</div> : null}
+          {error ? <div role="alert" className="engagement-notice"><p>{error.code === 'BUSINESS_PROFILE_UNAVAILABLE' ? 'Business profile setup is not available yet. Enquiries for a new business will be available once that service is connected. Please check back later.' : error.status === 404 ? 'Business enquiries are not available yet. Please check back later.' : engagementErrorMessage(error)}</p>{error.status === 401 ? <a className="text-link" href="/login?returnTo=%2Fbusiness%2Fenquiries">Log in again</a> : error.code === 'BUSINESS_PROFILE_REQUIRED' ? <a className="text-link" href="/business/profile">Set up business profile</a> : null}</div> : null}
           {result ? <><p role="status">{result.enquiries.length ? `${result.enquiries.length} enquir${result.enquiries.length === 1 ? 'y' : 'ies'} on page ${result.page}` : 'No enquiries on this page.'}</p>
             {result.enquiries.length ? <ul className="engagement-list">{result.enquiries.map((item) => <li key={item.id} className="engagement-card">
               <p className="engagement-help">Received {formatEngagementDate(item.createdAt)}</p><h2>{item.campaign?.title || 'Campaign unavailable'}</h2>

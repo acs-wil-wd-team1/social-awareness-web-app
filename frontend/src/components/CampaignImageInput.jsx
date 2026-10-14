@@ -35,7 +35,7 @@ export default function CampaignImageInput({ file, onChange, error = '', onError
   return (
     <div className="campaign-form-field campaign-form-field--full campaign-photo-field">
       <label htmlFor="submission-image">Campaign photo <span>(optional)</span></label>
-      <p id="submission-image-help" className="campaign-form-help">JPG, PNG or WebP, up to 5 MB. Your photo will appear with your campaign after approval.</p>
+      <p id="submission-image-help" className="campaign-form-help">Use a non-animated JPG, PNG or WebP photo up to 5 MB and 16 megapixels (for example, 4,000 × 4,000 pixels). Larger phone photos need to be resized or exported as a smaller JPG first. Your photo will appear with your campaign after approval.</p>
       <input ref={input} id="submission-image" name="imageId" type="file" accept="image/jpeg,image/png,image/webp" disabled={disabled}
         onChange={change} aria-invalid={Boolean(error)} aria-describedby={`submission-image-help${error ? ' submission-image-error' : ''}`} />
       {error ? <p id="submission-image-error" className="campaign-form-error">{error}</p> : null}

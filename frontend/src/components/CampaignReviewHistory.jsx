@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
+import { formatDisplayTimestamp } from '../services/dateFormatting.js'
 import { loadCampaignReviews } from '../services/campaignManagementService.js'
 import '../styles/admin-management.css'
 
 function reviewedAt(value) {
-  return new Intl.DateTimeFormat('en-AU', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
+  return formatDisplayTimestamp(value)
 }
 
 export default function CampaignReviewHistory({ campaignId, token, role, refreshKey = 0, historyLoader = loadCampaignReviews }) {
@@ -34,7 +35,7 @@ export default function CampaignReviewHistory({ campaignId, token, role, refresh
       <h3 id="campaign-review-history-title">Review history</h3>
       <p className="campaign-management__meta">Approval and rejection decisions, newest first. Times use your browser’s time zone.</p>
       {state === 'loading' ? <p role="status">Loading review history…</p> : null}
-      {state === 'error' ? <div role="alert"><p>{error?.status === 401 ? 'Log in again to view review history.' : error?.status === 403 ? 'Your account cannot view review history.' : 'Review history could not be loaded.'}</p>
+      {state === 'error' ? <div role="alert"><p>{error?.status === 401 ? 'Log in again to view review history.' : error?.status === 403 ? 'Your account cannot view review history.' : error?.status === 429 ? error.message : 'Review history could not be loaded.'}</p>
         {error?.status === 401 ? <a className="text-link" href={`/login?returnTo=${encodeURIComponent(`/admin/campaigns/${campaignId}`)}`}>Log in again</a> : error?.status !== 403 ? <button type="button" onClick={() => setRetry((value) => value + 1)}>Retry review history</button> : null}</div> : null}
       {state === 'success' && result ? <>
         {!result.reviews.length ? <p>No review decisions on this page.</p> : <ol>{result.reviews.map((review) => <li key={review.id}>

@@ -32,7 +32,7 @@ The [real-backend regression runner](../../infra/real-backend-testing.md) checks
 | `GET` | `/api/campaigns/categories` | Public | `200` with `categories: [{ id, name }]` |
 | `POST` | `/api/campaigns` | Active `public`, or `business_owner` with their own existing profile | `201` with a saved pending `campaign` |
 
-The frontend `/campaigns/new` uses category lookup and campaign POST, accepting an optional server-issued `imageId`. Business POST works with an existing profile, but the new-business browser journey remains blocked until GET/PUT `/api/business/me` is implemented.
+The frontend `/campaigns/new` uses category lookup and campaign POST, accepting an optional server-issued `imageId`. Business POST works directly through the API with an existing linked profile. Browser business submission first calls GET `/api/business/me` and is blocked for existing as well as new owners until that profile API is implemented. The full hosted business journey has not passed.
 
 ## Stage 3 route reference
 

@@ -22,11 +22,26 @@ The third group does not mock `fetch`, API responses, authentication or database
 
 This is **jsdom UI + real API/database testing**, not real-browser verification. It does not prove navigation, browser CORS enforcement or AWS routing. GET/PUT `/api/business/me` is still missing: business rows are isolated fixtures, and the frontend profile case confirms a real 404/error without changing the row. It does not simulate a profile API or certify the new-business registration → profile → posting journey. Backend tests include deliberate fault injection for safe error handling; frontend real-backend tests do not.
 
+The missing profile lookup also blocks browser posting for owners who already have a Business row. Existing linked owners can still use the implemented inbox independently; direct posting API fixture coverage is not proof that the browser posting journey works.
+
 The opt-in files use `.real-backend.jsx`, not `.test.jsx`, so ordinary `npm test` does not start Docker or touch any database. Running the opt-in Vitest configuration directly is rejected unless the isolated runner supplies its safety settings. Do not point this runner at a shared, developer, staging or production database.
 
 If interrupted with a force-kill or the Docker engine stops, automatic cleanup may not finish. Check the exact `causeconnect-regression-<run-id>` name printed by that run and its `causeconnect.regression.run` label before removing that specific test container. Do not delete Docker volumes, images or other containers in bulk.
 
 ## Local verification
+
+On **14 October 2026**, the local `fix/stage3-review-hardening` source passed
+**89 backend units, 73 HTTP/MySQL checks and 19 real frontend/API/database checks**
+through this disposable runner. The separate frontend suite passed **630 tests**
+and the production build passed. This includes signup boundaries, concurrent
+duplicate email, retained-photo quotas and a read-only file/ledger report.
+Chrome also exercised real local registration/login, oversized-photo feedback,
+pending photo submission/privacy, saved-photo refresh, admin approval, public
+delivery and logout. Existing-owner business posting correctly remains blocked
+on the missing profile lookup; the linked owner's inbox is usable independently.
+See the [dated hardening evidence](../docs/evidence/stage-3/review-hardening/README.md).
+These changes are not merged or deployed, and the business onboarding journey
+and fresh AWS acceptance remain open.
 
 On **13 October 2026**, the AWT-175 branch passed **64 backend HTTP/MySQL checks and 18 real frontend/API/database checks**. The separate frontend suite passed **591 tests**. These local results are not merge, deployment or cloud/browser acceptance, and do not include a working business-profile API.
 
@@ -41,6 +56,8 @@ npm run test:real-backend -- --browser
 ```
 
 This uses the same local-only Docker checks, empty temporary database and repository migrations. It starts the real Express application and a separate Vite server on unused loopback ports. Vite ignores project `.env` files, disables sample mode, and proxies `/api` to this run's Express server. Your usual development servers stay untouched.
+
+Browser mode requires an interactive terminal and refuses piped/closed input before starting Docker. Closing the terminal input also triggers fixture cleanup; force-killing the process or stopping Docker can still prevent cleanup. The automated mode does not require a terminal.
 
 The terminal prints the frontend address and fresh local-only public, business-owner and admin logins. It creates an existing business profile plus approved/pending campaign fixtures. Open the address to check real authentication, public posting, photos, owner edits, participation and admin actions. The profile API is not simulated: the business form's profile lookup remains unavailable until Kim's routes are implemented. Browser mode does not run the automated suites; run the original command separately for those results.
 

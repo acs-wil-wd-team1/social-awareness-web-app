@@ -21,7 +21,7 @@ The frontend covers:
 
 PR #19 is merged into `main`, and the real frontend, API and database are live at [CauseConnect on AWS](https://52.62.2.87). The deployed application commit is `ffe3df679e5d8d1dc43c8bd1669b96aed757ad86`. Alongside the existing posting, reads and approval routes, AWT-175 adds image upload/delivery, owner editing/removal, participation, enquiries and admin account/content management. The [release evidence](docs/evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) records the release identifier, passed local checks and eight production acceptance groups.
 
-Kim's GET/PUT `/api/business/me` is still missing (AWT-141/AWT-173). A business owner with an existing profile can post through the API, but a new owner's full registration → profile → posting journey is not yet complete. See the [feature coverage](docs/handoff/stage3-feature-coverage.md), [frontend README](frontend/README.md), current [API handoff](docs/handoff/stage3-api-handoff.md) and [deployment preparation](infra/README.md).
+Kim's GET/PUT `/api/business/me` is still missing (AWT-141/AWT-173). Direct API posting works for an existing linked Business row, but the browser form first needs GET `/api/business/me`: browser business submission is blocked for existing as well as new owners. The full hosted business registration → profile → posting → approval → enquiry/inbox journey has not passed. See the [feature coverage](docs/handoff/stage3-feature-coverage.md), [frontend README](frontend/README.md), current [API handoff](docs/handoff/stage3-api-handoff.md) and [deployment preparation](infra/README.md).
 
 ## Looking ahead to Stage 3
 

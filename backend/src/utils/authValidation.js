@@ -47,6 +47,11 @@ function validateRegistrationInput(body) {
   }
 
   const values = credentials(body, errors);
+  // Apply the new-account policy at registration only. Existing passwords must
+  // still reach bcrypt during login; count Unicode code points, not UTF-16 units.
+  if (!errors.password && Array.from(values.password).length < 15) {
+    errors.password = "Use at least 15 characters. A longer passphrase is easier to remember";
+  }
   if (!["user", "business"].includes(body.accountType)) {
     errors.accountType = body.accountType == null || body.accountType === ""
       ? "Account type is required" : "Account type must be user or business";

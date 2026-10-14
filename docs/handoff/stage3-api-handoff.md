@@ -4,7 +4,7 @@ The frontend covers public/business campaign posting, photos, owner editing, par
 
 PR #19 is merged into `main`, and application commit `ffe3df679e5d8d1dc43c8bd1669b96aed757ad86` is live at [CauseConnect on AWS](https://52.62.2.87). The release includes AWT-175 images, owner editing/removal, participation, enquiries and admin account/content management alongside existing posting, reads and approval. The [release evidence](../evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) records release `2026-10-13T12-59-21-475Z-ffe3df679e5d`, passed local checks and eight production acceptance groups.
 
-The tables map each API group to its current code. Linked contracts define the payloads and rules, and `frontend/src/services/` contains the callers. GET/PUT `/api/business/me` is still missing; completing a new business owner's profile and first-post journey remains Kim's work.
+The tables map each API group to its current code. Linked contracts define the payloads and rules, and `frontend/src/services/` contains the callers. GET/PUT `/api/business/me` is still missing; completing the profile and business browser-posting journey remains Kim's work. Existing owners are blocked by the form's profile GET too, although direct API posting with an existing linked Business row works.
 
 ## Agreed responsibilities
 
@@ -32,7 +32,7 @@ When a session expires, private page state is cleared and the frontend offers si
 |---|---|---|
 | `/campaigns/new` | GET categories, optional POST image, POST campaign | Deployed public POST with optional image upload/attachment |
 | `/business/profile` | GET/PUT `/api/business/me` | **Still missing — Kim (AWT-141/AWT-173)**; existing Business table should be reused |
-| `/business/campaigns/new` | GET profile + categories, optional POST image, POST campaign | POST accepts an existing own Business row; new-business browser journey still blocked on profile GET/PUT |
+| `/business/campaigns/new` | GET profile + categories, optional POST image, POST campaign | Direct POST accepts an existing own Business row; browser submission is blocked for new **and existing** owners on profile GET/PUT |
 | `/my-campaigns` | GET `/api/campaigns/mine?page=1&pageSize=10&status=pending` | Implemented owner read; omit status for all statuses |
 | `/my-campaigns/:id/edit` | GET/PATCH/DELETE `/api/campaigns/mine/:id` | Deployed detail, edit/resubmit and soft-delete |
 | Approved cause detail; `/my-participation` | GET/PUT `/api/campaigns/:id/participation`; GET `/api/participations/mine` | Deployed; existing own records stay readable/withdrawable after unpublishing or deletion |
@@ -103,7 +103,7 @@ Optional `?` markers in this table explain fields; they are not literal JSON pro
 | Campaign creation | `backend/src/services/campaignSubmission.js`; `controllers/campaigns.js`; `router/campaignRoutes.js` | Public/business posting with optional image reference; transaction for attachment |
 | Campaign reads | `services/campaignQueries.js`; `utils/campaignSerializer.js`; `services/campaignServices.js` | Shared serialization, owner scope, latest review, total, visibility-safe image URL |
 | Business profile | `database/models/business.js`; migration `20260830103020-create-businesses.js` | Existing unique owner and columns; add service/controller/routes, no duplicate table |
-| Campaign decision | `services/campaignModeration.js`; `database/models/campaignreview.js` | Transaction and version checks implemented; existing review table has no automatic timestamps |
+| Campaign decision | `services/campaignModeration.js`; `database/models/campaignReview.js` | Transaction and version checks implemented; existing review table has no automatic timestamps |
 | Campaign images | `services/campaignImages.js`; `campaignImageStorage.js`; `database/models/campaignImage.js` | Upload metadata migration, private filesystem storage, controlled delivery and bounded cleanup implemented |
 | Categories | `database/models/category.js` | Existing ID/name mapping; GET returns `{categories:[{id,name}]}` |
 | Owner editing | `services/ownerCampaignManagement.js` | Owner-only updates, version checks, photo replacement/removal and shared soft deletion implemented |

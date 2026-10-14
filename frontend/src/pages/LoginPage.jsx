@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { apiRequest } from '../services/apiClient.js'
 import { authPagePath, safeReturnPath, storeSession } from '../services/authSession.js'
 
@@ -13,6 +13,16 @@ export default function LoginPage() {
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [apiError, setApiError] = useState('')
+  const [validationAnnouncement, setValidationAnnouncement] = useState('')
+  const form = useRef(null)
+  const focusError = useRef(false)
+
+  useEffect(() => {
+    if (focusError.current && !isSubmitting) {
+      form.current?.querySelector('[aria-invalid="true"]')?.focus()
+      focusError.current = false
+    }
+  }, [errors, isSubmitting])
 
   function validateField(name, value) {
     if (!value.trim()) {
@@ -39,6 +49,7 @@ export default function LoginPage() {
 
     setFormValues(nextValues)
     setApiError('')
+    setValidationAnnouncement('')
 
     if (errors[name]) {
       setErrors({
@@ -58,8 +69,11 @@ export default function LoginPage() {
 
     setErrors(nextErrors)
     setApiError('')
+    setValidationAnnouncement('')
 
     if (Object.values(nextErrors).some(Boolean)) {
+      focusError.current = true
+      setValidationAnnouncement('Please correct the highlighted fields before logging in.')
       return
     }
 
@@ -83,7 +97,9 @@ export default function LoginPage() {
       storeSession(body.token, body.user)
       window.location.href = returnTo
     } catch (error) {
-      setErrors(current => ({ ...current, ...error.fieldErrors }))
+      const fields = Object.fromEntries(Object.entries(error.fieldErrors || {}).filter(([name]) => Object.hasOwn(initialValues, name)))
+      setErrors(current => ({ ...current, ...fields }))
+      focusError.current = Object.keys(fields).length > 0
       setApiError(error.message || 'The login service could not be reached.')
     } finally {
       setIsSubmitting(false)
@@ -95,7 +111,8 @@ export default function LoginPage() {
       <div className="auth-card">
         <h1 id="login-title">Login</h1>
 
-        <form onSubmit={handleSubmit} noValidate>
+        <form ref={form} onSubmit={handleSubmit} noValidate>
+          <p className="visually-hidden" aria-live="polite" aria-atomic="true">{validationAnnouncement}</p>
           <div className="auth-field">
             <label htmlFor="login-email">Email</label>
             <input
@@ -107,9 +124,10 @@ export default function LoginPage() {
               onChange={handleChange}
               placeholder="e.g. kim@example.com"
               aria-invalid={Boolean(errors.email)}
+              aria-describedby={errors.email ? 'login-email-error' : undefined}
             />
             {errors.email ? (
-              <p className="auth-field__error">{errors.email}</p>
+              <p id="login-email-error" className="auth-field__error">{errors.email}</p>
             ) : null}
           </div>
 
@@ -124,9 +142,10 @@ export default function LoginPage() {
               onChange={handleChange}
               placeholder="Password"
               aria-invalid={Boolean(errors.password)}
+              aria-describedby={errors.password ? 'login-password-error' : undefined}
             />
             {errors.password ? (
-              <p className="auth-field__error">{errors.password}</p>
+              <p id="login-password-error" className="auth-field__error">{errors.password}</p>
             ) : null}
           </div>
 
