@@ -4,7 +4,8 @@ const cors = require("cors");
 const app = express();
 
 const userRoutes = require("./router/authRoutes");
-const campaignRoutes = require("./router/campaignRoutes")
+const campaignRoutes = require("./router/campaignRoutes");
+const businessRoutes = require("./router/businessRoutes");
 
 app.use(
   cors({
@@ -15,7 +16,8 @@ app.use(
 app.use(express.json());
 
 app.use("/api/auth", userRoutes);
-app.use("/api/campaigns", campaignRoutes)
+app.use("/api/campaigns", campaignRoutes);
+app.use("/api/business", businessRoutes);
 
 app.use((err, req, res, next) => {
   if (req.method === "POST" && /^\/api\/campaigns\/?$/i.test(req.path)) {

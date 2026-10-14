@@ -4,6 +4,7 @@ const { getCampaigns, campaignById  } = require("../services/campaignServices");
 const { apiErrorResponse } = require("../utils/apiErrorResponse");
 const { Campaign, Category } = require("../database/models");
 const { createCampaignSubmissionService } = require("../services/campaignSubmission");
+
 const submissionService = createCampaignSubmissionService({ Campaign, Category });
 
 const getCampaignCategories = async (req, res) => {

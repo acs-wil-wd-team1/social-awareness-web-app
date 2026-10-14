@@ -2,5 +2,7 @@ const campaigns = require("./campaigns");
 
 module.exports = {
     authController: require("./auth"),
-    campaignsContoller: require("./campaigns")
+    campaignsController: require("./campaigns"),
+    businessController: require("./business"),
+    businessCampaignsController: require("./businessCampaigns")
 }
