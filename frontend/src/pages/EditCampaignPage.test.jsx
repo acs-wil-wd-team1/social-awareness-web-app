@@ -326,6 +326,36 @@ describe('owner campaign editing', () => {
 })
 
 describe('owner campaign removal', () => {
+  it.each(['\n', '\r', '\r\n'])('allows the saved title to be pasted into removal confirmation with internal line ending %j', async (lineEnding) => {
+    const title = `Community${lineEnding}garden`
+    handlers.load = () => json({ ...original, title })
+    render(page())
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove campaign' }))
+    const confirmation = screen.getByLabelText(/to confirm/)
+    fireEvent.change(confirmation, { target: { value: title } })
+    // A multiline control canonicalizes CR and CRLF to LF; that must not
+    // prevent confirmation of an otherwise valid saved title.
+    expect(confirmation.value).toBe(title.replace(/\r\n?/g, '\n'))
+    expect(screen.getByRole('button', { name: 'Confirm removal' }).disabled).toBe(false)
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm removal' }))
+    await screen.findByText('Campaign removed')
+    expect(writes()).toHaveLength(1)
+    expect(writes()[0][1].method).toBe('DELETE')
+  })
+
+  it('does not normalize other title whitespace or accept an inexact removal confirmation', async () => {
+    const title = 'Community  garden'
+    handlers.load = () => json({ ...original, title })
+    render(page())
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove campaign' }))
+    const confirmation = screen.getByLabelText(/to confirm/)
+    fireEvent.change(confirmation, { target: { value: 'Community garden' } })
+    expect(screen.getByRole('button', { name: 'Confirm removal' }).disabled).toBe(true)
+    expect(writes()).toHaveLength(0)
+    fireEvent.change(confirmation, { target: { value: title } })
+    expect(screen.getByRole('button', { name: 'Confirm removal' }).disabled).toBe(false)
+  })
+
   it('requires the exact title, allows cancellation and only sends DELETE after confirmation', async () => {
     render(page()); await ready()
     fireEvent.click(screen.getByRole('button', { name: 'Remove campaign' }))

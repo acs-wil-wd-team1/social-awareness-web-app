@@ -14,7 +14,7 @@ import MyParticipationPage from './pages/MyParticipationPage.jsx'
 import BusinessEnquiriesPage from './pages/BusinessEnquiriesPage.jsx'
 import AdminUsersPage from './pages/AdminUsersPage.jsx'
 import SiteNavigation from './components/SiteNavigation.jsx'
-import { authPagePath, useSession } from './services/authSession.js'
+import { authPagePath, dismissSessionStorageFailure, SESSION_STORAGE_FAILURE_MESSAGE, useSession } from './services/authSession.js'
 import './styles/stage3-shell.css'
 
 const DemoBanner = import.meta.env.VITE_DEMO_MODE === 'true' ? lazy(() => import('./demo/DemoBanner.jsx')) : null
@@ -53,7 +53,7 @@ export default function App({ pathname = window.location.pathname }) {
   useEffect(() => {
     document.title = `${routeTitles[route.name] || 'Page not found'} | CauseConnect`
   }, [route.name])
-  const { token, user, sessionExpired } = useSession()
+  const { token, user, sessionExpired, storageFailure } = useSession()
   const role = user?.role
   const sessionProps = { token, role }
   const createPath = role === 'business_owner' ? '/business/campaigns/new' : '/campaigns/new'
@@ -68,6 +68,10 @@ export default function App({ pathname = window.location.pathname }) {
         <SiteNavigation key={`${token || 'guest'}:${role}:${route.name}`} {...sessionProps} route={route} createPath={createPath} />
       </div>
     </header>
+    {storageFailure ? <div className="content-width campaign-profile-state" role="alert">
+      <p>{SESSION_STORAGE_FAILURE_MESSAGE}</p>
+      <button className="campaign-secondary-button" type="button" onClick={dismissSessionStorageFailure}>Dismiss sign-in message</button>
+    </div> : null}
     {/* Logout must retain its in-memory revocation token after clearing browser storage. */}
     <main id="main-content" key={route.name === 'logout' ? 'logout' : token || 'guest'}>
       {sessionExpired && route.name !== 'logout' ? <div className="content-width campaign-profile-state" role="alert">
@@ -78,7 +82,7 @@ export default function App({ pathname = window.location.pathname }) {
       {route.name === 'home' ? <HomePage {...sessionProps} /> : null}
       {route.name === 'campaign-details' ? <CampaignDetailsPage {...sessionProps} campaignId={route.campaignId} /> : null}
       {route.name === 'register' ? <RegistrationPage /> : null}
-      {route.name === 'login' ? <LoginPage /> : null}
+      {route.name === 'login' ? <LoginPage storageFailureFeedbackOwnedByShell /> : null}
       {route.name === 'logout' ? <LogoutPage /> : null}
       {route.name === 'create-campaign' ? <CreateCampaignPage {...sessionProps} /> : null}
       {route.name === 'business-campaign' ? <CreateCampaignPage {...sessionProps} mode="business" /> : null}

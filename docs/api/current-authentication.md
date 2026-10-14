@@ -1,6 +1,6 @@
 # Current authentication API
 
-**Reference, 14 October 2026:** Authentication service/controllers in deployed application commit `ab1bef2c1b2e55c401a78543d4034cd2e85d0a2c`, release `2026-10-14T10-17-18-153Z-ab1bef2c1b2e`. Examples describe implemented responses; the [current release evidence](../evidence/stage-3/business-profile-integration/README.md) records local, hosted API and actual Chrome checks, not an exhaustive security audit or independent tester acceptance.
+**Current reference, 15 October 2026:** Authentication in deployed application commit `af5dac741af06240e4885d098379c74c975ad893`, release `2026-10-14T12-12-08-602Z-af5dac741af0`. Examples describe implemented responses. The [evidence index](../evidence/stage-3/README.md), [readiness regression](../evidence/stage-3/final-readiness/README.md) and [14 October hosted checks](../evidence/stage-3/final-readiness/hosted-2026-10-14.md) separate local tests from actual Chrome/API results; they are not an exhaustive security audit or independent tester acceptance.
 
 ## Register
 

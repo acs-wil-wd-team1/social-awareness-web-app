@@ -94,6 +94,20 @@ describe('document titles', () => {
 })
 
 describe('navigation and session updates', () => {
+  it('keeps a dismissible non-secret storage notice outside the session-keyed subtree', () => {
+    loginAs('public')
+    render(<App pathname="/login" />)
+    act(() => clearSession('storage-failure'))
+    const notice = screen.getByRole('alert')
+    expect(notice.textContent).toContain('Allow site storage and try again')
+    expect(notice.closest('main')).toBeNull()
+    expect(screen.getByRole('link', { name: 'Login' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss sign-in message' }))
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(localStorage.getItem('token')).toBeNull()
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
   it('shows public navigation and an accessible skip link for guests', () => {
     render(<App pathname="/" />)
     const nav = within(screen.getByRole('navigation', { name: 'Primary navigation' }))

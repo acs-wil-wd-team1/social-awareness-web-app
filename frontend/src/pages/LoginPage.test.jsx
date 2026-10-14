@@ -194,6 +194,63 @@ describe('CauseConnect login page', () => {
     expect(screen.getByRole('button', { name: 'Login' }).disabled).toBe(false)
   })
 
+  it('keeps storage-failure feedback visible when a failed account switch clears the starting session', async () => {
+    const startingToken = `header.${btoa(JSON.stringify({ id: 9, role: 'public', exp: 9999999999 }))}.signature`
+    storeSession(startingToken, { id: 9, name: 'Starting account', role: 'public' })
+    const originalSetItem = Storage.prototype.setItem
+    const blockedStorage = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (key, value) {
+      if (key === 'causeconnect.user') throw new Error('Storage quota exceeded')
+      return originalSetItem.call(this, key, value)
+    })
+    fetch.mockResolvedValueOnce(response(200, validBody))
+    render(<App pathname="/login" />)
+    fillLogin()
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Login' })))
+    // The second write failed after saving the new token. Fail closed instead
+    // of leaving that token paired with the previous account's saved details.
+    expect(getSession().token).toBeNull()
+    expect(localStorage.getItem('causeconnect.user')).toBeNull()
+    expect(window.location.hash).toBe('#before-login')
+    expect(screen.getByRole('alert').textContent).toContain('Allow site storage and try again')
+    expect(screen.getAllByRole('alert')).toHaveLength(1)
+    blockedStorage.mockRestore()
+    fetch.mockResolvedValueOnce(response(401, { message: 'Email or password is incorrect.' }))
+    fillLogin()
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Login' })))
+    expect(screen.getAllByRole('alert')).toHaveLength(1)
+    expect(screen.getByRole('alert').textContent).toBe('Email or password is incorrect.')
+    expect(screen.queryByText(/Allow site storage and try again/)).toBeNull()
+    expect(getSession().token).toBeNull()
+  })
+
+  it('shows only the shell storage notice for a guest failure without a session remount', async () => {
+    fetch.mockResolvedValueOnce(response(200, validBody))
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Storage blocked') })
+    render(<App pathname="/login" />)
+    fillLogin()
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Login' })))
+    expect(screen.getAllByRole('alert')).toHaveLength(1)
+    expect(screen.getByRole('alert').closest('main')).toBeNull()
+    expect(screen.getByRole('alert').textContent).toContain('Allow site storage and try again')
+    expect(getSession().token).toBeNull()
+    expect(window.location.hash).toBe('#before-login')
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss sign-in message' }))
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Login' }).disabled).toBe(false)
+  })
+
+  it('does not hide an ordinary API error with the same text as a storage notice', async () => {
+    const message = 'Your browser could not save the login. Allow site storage and try again.'
+    fetch.mockResolvedValueOnce(response(500, { message }))
+    render(<App pathname="/login" />)
+    fillLogin()
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Login' })))
+    expect(screen.getAllByRole('alert')).toHaveLength(1)
+    expect(screen.getByRole('alert').closest('main')).toBeTruthy()
+    expect(screen.getByRole('alert').textContent).toBe(message)
+    expect(screen.queryByRole('button', { name: 'Dismiss sign-in message' })).toBeNull()
+  })
+
   it('accepts a normal login after StrictMode repeats effect setup', async () => {
     fetch.mockResolvedValueOnce(response(200, validBody))
     render(<StrictMode><LoginPage /></StrictMode>)

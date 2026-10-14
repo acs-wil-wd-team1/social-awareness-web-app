@@ -1,8 +1,8 @@
-# Social Awareness Web Application
+# CauseConnect
 
 Team 1 project for the ACS Professional Year Work Integrated Learning — Web Development program.
 
-The application will help people discover campaigns supporting social causes and allow small-business owners to promote their businesses.
+CauseConnect lets people discover social causes, post campaigns and participate in community initiatives. Small-business owners can create a business profile, post a campaign and receive enquiries. Administrators review submissions before they appear publicly.
 
 ## Current stage
 
@@ -19,13 +19,13 @@ The frontend covers:
 5. Admin approval/rejection, review history, content removal and user suspension/reactivation
 6. Automatic updates on the public campaign list/detail and owner submission status
 
-The real frontend, API and database are live at [CauseConnect on AWS](https://52.62.2.87). The current application commit is `ab1bef2c1b2e55c401a78543d4034cd2e85d0a2c`, release `2026-10-14T10-17-18-153Z-ab1bef2c1b2e`. PR #22 adds business profiles and the shared business-posting compatibility route while retaining the six-character signup setting and earlier review fixes. Exact release identity, eight supporting-API groups, eight full business-API journey groups and the actual hosted Chrome business journey passed. The [current release evidence](docs/evidence/stage-3/business-profile-integration/README.md) records each layer's scope; independent tester acceptance remains separate. Earlier PR #23/#21/#19 receipts stay historical.
+The frontend, API and database are live at [CauseConnect on AWS](https://52.62.2.87). The deployed application is `af5dac741af06240e4885d098379c74c975ad893`, release `2026-10-14T12-12-08-602Z-af5dac741af0`. Later documentation commits do not change those application bytes. The [evidence index](docs/evidence/stage-3/README.md) links the current regression and hosted checks, with older results kept as dated receipts.
 
-Kim's [PR #22](https://github.com/acs-wil-wd-team1/social-awareness-web-app/pull/22) is merged and deployed after conflict resolution and integration repairs. GET/PUT `/api/business/me` now supports first setup and later edits. Fresh registration → profile → photo campaign → approval → enquiry/inbox passed against both the hosted API and actual Chrome, including refresh, pending privacy, owner removal and logout protection. Meet and Prince's independent acceptance is still required. See the [feature coverage](docs/handoff/stage3-feature-coverage.md), [frontend README](frontend/README.md), [API handoff](docs/handoff/stage3-api-handoff.md) and [deployment preparation](infra/README.md).
+Kim's [PR #22](https://github.com/acs-wil-wd-team1/social-awareness-web-app/pull/22) supplies the integrated business-profile APIs. The full hosted business journey is recorded in its [dated receipt](docs/evidence/stage-3/business-profile-integration/README.md); the later [readiness receipt](docs/evidence/stage-3/final-readiness/hosted-2026-10-14.md) covers the repaired release. Independent team testing, manuals and recording remain separate deliverables. See the [feature coverage](docs/handoff/stage3-feature-coverage.md), [frontend guide](frontend/README.md), [API guide](docs/handoff/stage3-api-handoff.md) and [deployment instructions](infra/ec2/README.md).
 
-## Looking ahead to Stage 3
+## Stage 3 deliverables
 
-Stage 3 is due **Sunday 25 October 2026, 11:59 pm**. It extends the running Stage 2 prototype with:
+Stage 3 is due **Sunday 25 October 2026, 11:59 pm**. The application extends the Stage 2 prototype with:
 
 - Campaign creation for social causes
 - Small-business campaign posting
@@ -38,26 +38,18 @@ Stage 3 is due **Sunday 25 October 2026, 11:59 pm**. It extends the running Stag
 
 The list above is the overall Stage 3 scope. Local implementation and regression evidence do not replace cloud/browser testing, manuals or the final recording. Jira remains the place for team task allocation and review status. There is no public admin signup, role-promotion screen, payment system or full CRM.
 
-## Why this repository was created
+## Technology
 
-This repository was prepared as a head start for the development work. The structure is open for the team to review and change.
+| Part | Implementation |
+|---|---|
+| Frontend | React, Vite and CSS |
+| API and database | Node.js, Express, MySQL and Sequelize migrations |
+| Authentication | JWTs, database-backed sessions and hashed passwords |
+| Hosting | One AWS EC2 server in Sydney; Nginx serves HTTPS and forwards API requests |
+| Photos | Private persistent server storage, with API checks for public or owner/admin access |
+| Collaboration | GitHub, Jira and Confluence |
 
-It gives the frontend, backend, designs, API agreement, tests and submission evidence one organised place without deciding individual ownership before the team agrees.
-
-## Initial project direction
-
-Meeting 1 recorded the following initial choices:
-
-- React
-- Node.js and Express
-- MySQL
-- AWS
-- GitHub
-- Jira and Confluence
-- draw.io
-- Selenium and Cypress
-
-Additional implementation tools are listed in [`docs/project/tools.md`](docs/project/tools.md). Some are course-aligned suggestions and still need team confirmation.
+The database is not publicly exposed. The older S3/CloudFront sample frontend is separate from the integrated EC2 application. Details are in the [tools register](docs/project/tools.md) and [hosting guide](infra/ec2/README.md).
 
 ## Repository structure
 
@@ -68,24 +60,22 @@ Additional implementation tools are listed in [`docs/project/tools.md`](docs/pro
 - `docs/design/` — design links, standards and approved exports
 - `docs/testing/` — test planning and test cases
 - `docs/deployment/` — Stage 2 cloud deployment model
-- `docs/evidence/` — Stage 2 submission-evidence checklist
+- `docs/evidence/` — dated Stage 2 and Stage 3 verification receipts
 - `docs/development-log/` — records created as development work is completed
 - `docs/manuals/` — reserved for the Stage 3 User Manual and Developers Manual
-- `infra/` — Stage 3 deployment preparation and release checks
+- `infra/` — local regression, deployment, backup and release checks
 
 ## Design handoff
 
-The Front-end Designers can choose the design tool they are most comfortable using. Figma is one suggestion, while Canva can also be used for wireframes and storyboards.
-
-The editable design remains in the chosen tool. Once the team selects a version, dated exports can be uploaded to `docs/design/` using the contributor's own GitHub account.
+The team's design and submission documents are in [Confluence](https://acs-wil-team1.atlassian.net/wiki/spaces/AWT/). The running application and its [technical notes](docs/handoff/stage3-frontend-notes.md) describe the implemented interface. Keep any dated design exports with their source and contributor in `docs/design/`.
 
 ## Team roles
 
 The confirmed roles are recorded in [`docs/project/team-roles.md`](docs/project/team-roles.md).
 
-The repository does not assign individual features or documents. Nithya and the team will confirm those allocations.
+Jira records current task allocation and review status; this repository does not reassign features or documents.
 
-## Suggested working agreements
+## Working agreements
 
 - Use your own account and Git identity for your contributions.
 - Do not add work under another person's name.
@@ -99,7 +89,7 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) before making changes.
 
 - [Jira project](https://acs-wil-team1.atlassian.net/jira/software/projects/AWT/)
 - [Confluence space](https://acs-wil-team1.atlassian.net/wiki/spaces/AWT/)
-- Design source: to be added after the Front-end Designers choose their tool
+- [Implementation reference for manuals, demo and testers](https://acs-wil-team1.atlassian.net/wiki/spaces/AWT/pages/13598722/Stage+3+-+Implementation+Notes+-+Manuals+and+Demo)
 - Submitted Project Charter: stored in the team's approved submission records
 
 ## Important documents
@@ -115,6 +105,6 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) before making changes.
 
 ## Current status
 
-The [live AWS application](https://52.62.2.87) uses real accounts, API calls and persistent data. The older [AWS preview](https://d10e86f5qx46up.cloudfront.net) is a separate **Preview as** sample build using browser-only data; it is not backend evidence. The [current receipt](docs/evidence/stage-3/business-profile-integration/README.md) records the merged business-profile release and bounded checks. Earlier photo/approval, backup integrity and restart results remain dated evidence, not a full restore test. Independent tester acceptance, manuals and recording remain separate deliverables. Technical notes for those authors are in [the frontend handoff](docs/handoff/stage3-frontend-notes.md).
+The [live AWS application](https://52.62.2.87) uses real accounts, API calls and persistent data. The older [AWS preview](https://d10e86f5qx46up.cloudfront.net) uses browser-only sample data and is not backend evidence. The [evidence index](docs/evidence/stage-3/README.md) records exact releases and checks. Independent team acceptance, final manuals and recording remain separate from developer verification. Backup integrity and restart checks are not a full/off-site restoration test.
 
 No feature should be described as complete until its implementation and evidence are present.

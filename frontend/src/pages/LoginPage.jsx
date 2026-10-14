@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { apiRequest } from '../services/apiClient.js'
-import { authPagePath, getSession, safeReturnPath, storeSession } from '../services/authSession.js'
+import { authPagePath, dismissSessionStorageFailure, getSession, safeReturnPath, SESSION_STORAGE_FAILURE_CODE, storeSession } from '../services/authSession.js'
 
 const initialValues = {
   email: '',
   password: '',
 }
 
-export default function LoginPage() {
+export default function LoginPage({ storageFailureFeedbackOwnedByShell = false }) {
   const returnTo = safeReturnPath(new URLSearchParams(window.location.search).get('returnTo'))
   const [formValues, setFormValues] = useState(initialValues)
   const [errors, setErrors] = useState({})
@@ -76,6 +76,7 @@ export default function LoginPage() {
   async function handleSubmit(event) {
     event.preventDefault()
     if (inFlight.current || !mounted.current) return
+    dismissSessionStorageFailure()
 
     const nextErrors = {
       email: validateField('email', formValues.email),
@@ -124,6 +125,9 @@ export default function LoginPage() {
       window.location.href = returnTo
     } catch (error) {
       if (!isCurrent() || error.code === 'ABORTED') return
+      // The shell retains this notice across session remounts and owns dismissal.
+      // Keeping a second form error would make a dismissed notice reappear.
+      if (storageFailureFeedbackOwnedByShell && error.code === SESSION_STORAGE_FAILURE_CODE) return
       const fields = Object.fromEntries(Object.entries(error.fieldErrors || {}).filter(([name]) => Object.hasOwn(initialValues, name)))
       setErrors(current => ({ ...current, ...fields }))
       focusError.current = Object.keys(fields).length > 0

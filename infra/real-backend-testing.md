@@ -30,23 +30,31 @@ If interrupted with a force-kill or the Docker engine stops, automatic cleanup m
 
 ## Current verification
 
-PR #22's reviewed source passed **631 frontend tests, 106 backend units, 87
+Application `af5dac741af06240e4885d098379c74c975ad893`, release
+`2026-10-14T12-12-08-602Z-af5dac741af0`, was verified live on 15 October.
+Its local regression passed **710 frontend tests, 116 backend units, 90
 HTTP/MySQL checks and 26 real frontend/API/database checks**, plus the production
-build. The disposable database and upload fixtures were removed. Also passed:
-41 local host checks, 35 CLI/stub/routing checks and 15 offline Postman assertions;
-the latter are not live API calls.
+build, on 14 October and again locally on 15 October. The disposable database
+and upload fixtures were removed. The dated [readiness record](../docs/evidence/stage-3/final-readiness/README.md)
+also has 41 host, 39 CLI/stub/routing and 15 offline Postman checks; the latter
+groups are not live API calls.
 
-Application `ab1bef2c1b2e55c401a78543d4034cd2e85d0a2c`, release
-`2026-10-14T10-17-18-153Z-ab1bef2c1b2e`, is deployed. Exact identity, eight
-supporting-API groups, eight business-API groups and the actual hosted Chrome
-new-business journey passed separately. The Chrome journey covered profile
-save/refresh, pending-photo privacy, admin approval, public photo/business
-details, enquiry/inbox refresh, owner soft removal and logout protection.
-See the [current receipt](../docs/evidence/stage-3/business-profile-integration/README.md)
-for fixture cleanup and scope. Meet/Prince's independent acceptance, device and
+The [14 October hosted receipt](../docs/evidence/stage-3/final-readiness/hosted-2026-10-14.md)
+records exact identity, 11 core HTTP groups and actual Chrome
+admin/profile/photo/logout smoke checks. The [evidence index](../docs/evidence/stage-3/README.md)
+keeps the preceding PR #22 full business journey separate. No new hosted writes
+were run on 15 October. Meet/Prince's independent acceptance, device and
 accessibility checks, manuals and the final recording remain separate work.
 
 ## Historical local verification
+
+On **14 October 2026**, the preceding PR #22 source `ab1bef2` passed
+631 frontend tests, 106 backend units, 87 HTTP/MySQL and 26 real
+frontend/API/database checks plus build. Its [dated receipt](../docs/evidence/stage-3/business-profile-integration/README.md)
+also records eight supporting-API groups, eight business-API groups and the actual
+hosted Chrome profile → photo posting/privacy → approval/public details →
+enquiry/inbox → owner removal/logout journey. Those full hosted checks were not
+repeated in the later readiness smoke pass.
 
 Before the profile integration, on **14 October 2026**, the local `fix/stage3-review-hardening` source passed
 **89 backend units, 73 HTTP/MySQL checks and 19 real frontend/API/database checks**

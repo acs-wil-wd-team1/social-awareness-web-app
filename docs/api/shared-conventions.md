@@ -1,6 +1,6 @@
 # Shared API conventions
 
-**Status, 14 October 2026:** Conventions used by the campaign, profile, management, engagement and image routes in deployed application commit `ab1bef2c1b2e55c401a78543d4034cd2e85d0a2c` at [CauseConnect on AWS](https://52.62.2.87), release `2026-10-14T10-17-18-153Z-ab1bef2c1b2e`. PR #22's business-profile integration is merged and deployed. See the [current release evidence](../evidence/stage-3/business-profile-integration/README.md) for local checks, hosted API groups and the passing hosted Chrome business journey. Independent tester acceptance remains separate; earlier PR #23/#21 receipts are historical.
+**Current reference, 15 October 2026:** Conventions used by the campaign, profile, management, engagement and image routes in deployed application commit `af5dac741af06240e4885d098379c74c975ad893` at [CauseConnect on AWS](https://52.62.2.87), release `2026-10-14T12-12-08-602Z-af5dac741af0`. The [evidence index](../evidence/stage-3/README.md) separates current [readiness regression](../evidence/stage-3/final-readiness/README.md) and [hosted checks](../evidence/stage-3/final-readiness/hosted-2026-10-14.md) from the preceding PR #22 business journey. Independent tester acceptance remains separate; earlier release receipts are historical.
 
 Submission rules are in the [campaign contract](campaign-posting-contract.md). The [Stage 3 API integration guide](../handoff/stage3-api-handoff.md) maps implemented routes and remaining work. Oversized JSON uses `413 REQUEST_TOO_LARGE`; image errors are documented separately.
 
@@ -53,7 +53,7 @@ Stage 3 API errors use:
 | `500` | `INTERNAL_SERVER_ERROR` | Unexpected server failure |
 | `503` | `SERVICE_UNAVAILABLE` / `IMAGE_STORAGE_FULL` / `UPLOAD_BUSY` | API/storage dependency temporarily unavailable |
 
-API parser and unknown-route errors are normalised to JSON. The legacy logout middleware still has its older error shape; see [current authentication](current-authentication.md). Use status/code where supplied rather than matching error prose.
+API parser and unknown-route errors are normalised to JSON. Logout retains its legacy `error` string alongside the typed `status`, `code`, `message` and `fieldErrors` envelope. Invalid/expired credentials return `401 INVALID_TOKEN`; a session-store failure returns retryable `503 SERVICE_UNAVAILABLE`. Other routes' role-based `403` responses are unchanged. See [current authentication](current-authentication.md); use status/code rather than matching error prose.
 
 The current image decoder distinguishes `422 IMAGE_DIMENSIONS_TOO_LARGE`,
 `IMAGE_DECODE_FAILED`, `IMAGE_TYPE_MISMATCH` and `ANIMATED_IMAGE_NOT_SUPPORTED` so

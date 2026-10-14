@@ -1,12 +1,12 @@
 # Campaign submission API
 
-Category lookup and canonical campaign submission are implemented for signed-in `public` users (cause campaigns) and `business_owner` users (business campaigns). Photo attachment, business-profile GET/PUT and the compatibility route below are deployed at [CauseConnect on AWS](https://52.62.2.87), application `ab1bef2c1b2e55c401a78543d4034cd2e85d0a2c`, release `2026-10-14T10-17-18-153Z-ab1bef2c1b2e`. See the [current integration evidence](../evidence/stage-3/business-profile-integration/README.md) for local and hosted API checks. Earlier signup/review receipts stay historical.
+Category lookup and canonical campaign submission are implemented for signed-in `public` users (cause campaigns) and `business_owner` users (business campaigns). As verified on 15 October, photo attachment, business-profile GET/PUT and the compatibility route below are deployed at [CauseConnect on AWS](https://52.62.2.87), application `af5dac741af06240e4885d098379c74c975ad893`, release `2026-10-14T12-12-08-602Z-af5dac741af0`. See the [evidence index](../evidence/stage-3/README.md) and [current hosted receipt](../evidence/stage-3/final-readiness/hosted-2026-10-14.md). Earlier full business-journey, signup and review receipts stay historical.
 
 **Business owners:** the server links the campaign to the owner's own `businesses` row, returning `type: "business"` and that `businessId`. An owner without a business profile receives `409 BUSINESS_PROFILE_REQUIRED` and no row is created. The client still cannot send `businessId`, `createdBy`, `type` or `status`. Admins cannot use this route (`403`). Optional `imageId` must belong to the authenticated user, be unexpired and not already attached.
 
 **Owner reads:** `GET /api/campaigns/mine` and `GET /api/campaigns/mine/:id` return only the signed-in creator's campaigns in every status, using the [campaign read contract](campaign-read-contract.md) object including `updatedAt` and the latest `review` feedback.
 
-The frontend uses `/campaigns/new` for public submission and `/business/campaigns/new` for business submission; both send canonical `POST /api/campaigns`. The business form first calls implemented GET `/api/business/me`, offering profile setup when it returns `business:null`. Fresh registration/profile/photo posting/approval/enquiry/inbox passed against the hosted API and actual hosted Chrome; independent tester acceptance remains separate. Direct POST against a seeded Business row alone is not proof of fresh onboarding.
+The frontend uses `/campaigns/new` for public submission and `/business/campaigns/new` for business submission; both send canonical `POST /api/campaigns`. The business form first calls GET `/api/business/me`, offering profile setup when it returns `business:null`. Fresh registration/profile/photo posting/approval/enquiry/inbox passed on the [preceding PR #22 release on 14 October](../evidence/stage-3/business-profile-integration/README.md). Current-release Chrome smoke checks covered signup/profile/photo posting and logout, not a repeat of the full approval/enquiry/inbox journey. Independent tester acceptance remains separate. Direct POST against a seeded Business row alone is not proof of fresh onboarding.
 
 Related rules are in the [business posting and image extension](campaign-posting-future-proposal.md), [business profile contract](business-profile-contract.md), [campaign read contract](campaign-read-contract.md) and [admin contract](admin-campaign-moderation-contract.md). The [API integration guide](../handoff/stage3-api-handoff.md) separates implemented work from remaining integration and deployment checks.
 
@@ -133,7 +133,7 @@ or add a duplicate posting form merely because this compatibility path exists.
 | `422` | Invalid body/types/dates, unknown category or unsupported fields |
 | `500` | Unexpected failure; response must not expose database details |
 
-These new-route responses do not imply that every older authentication/read route already uses the same envelope. See [current authentication](current-authentication.md) and [shared conventions](shared-conventions.md).
+See [current authentication](current-authentication.md) and [shared conventions](shared-conventions.md) for endpoint-specific errors. Logout also retains its legacy `error` field alongside the typed envelope.
 
 ## Request fields and database columns
 

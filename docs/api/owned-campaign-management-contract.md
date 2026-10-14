@@ -85,7 +85,7 @@ Persist millisecond precision for this protocol, and make the version advance ev
 
 Migration `20261013090000-campaign-updated-at-milliseconds.js` and the Campaign model preserve `updatedAt` with MySQL `DATETIME(3)` / Sequelize `DATE(3)`. Owner and admin APIs use this same version column. The next timestamp is at least the previous saved version plus one millisecond, generated inside the transaction and returned from the saved state. Do not modify the older applied create-table migration or add a second version column.
 
-Approval/rejection, unpublish and admin deletion also send `expectedUpdatedAt`. An owner edit committed first must invalidate an already-open admin review; checking only `status:pending` would let the admin approve content they never saw. Apply the [admin version rules](admin-campaign-moderation-contract.md#proposed-review-action) as well as the owner version check.
+Approval/rejection, unpublish and admin deletion also send `expectedUpdatedAt`. An owner edit committed first must invalidate an already-open admin review; checking only `status:pending` would let the admin approve content they never saw. Apply the [admin version rules](admin-campaign-moderation-contract.md#review-action) as well as the owner version check.
 
 ## Remove a campaign
 

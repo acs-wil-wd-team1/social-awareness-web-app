@@ -2,7 +2,7 @@
 
 The frontend covers public/business campaign posting, photos, owner editing, participation, business enquiries, admin campaign/account management and automatic campaign refresh. This guide maps those screens to backend routes, validation, database changes and integration checks. The labelled sample preview uses browser data; live mode calls the real endpoints and reports errors when they are unavailable.
 
-Application commit `ab1bef2c1b2e55c401a78543d4034cd2e85d0a2c`, release `2026-10-14T10-17-18-153Z-ab1bef2c1b2e`, is live at [CauseConnect on AWS](https://52.62.2.87). PR #22 is merged with the repaired profile/compatibility integration, while the six-character signup setting and review fixes are retained. The [current release evidence](../evidence/stage-3/business-profile-integration/README.md) records local checks, exact identity, eight supporting-API and eight business-API groups, plus the passing actual hosted Chrome business journey. Independent tester acceptance remains separate. Earlier PR #23/#21/#19 receipts remain historical.
+Application commit `af5dac741af06240e4885d098379c74c975ad893`, release `2026-10-14T12-12-08-602Z-af5dac741af0`, is verified live on 15 October at [CauseConnect on AWS](https://52.62.2.87). It retains PR #22's profile/compatibility integration and the six-character signup setting, with the later readiness repairs. The [evidence index](../evidence/stage-3/README.md) links current [regression](../evidence/stage-3/final-readiness/README.md) and [14 October hosted smoke checks](../evidence/stage-3/final-readiness/hosted-2026-10-14.md). The preceding PR #22 full business journey is historical, not a new run against this release. Independent tester acceptance remains separate.
 
 The tables map each API group to its current code. Linked contracts define the payloads/rules, and `frontend/src/services/` contains the callers. Kim's [PR #22](https://github.com/acs-wil-wd-team1/social-awareness-web-app/pull/22) is merged and deployed after conflict resolution and integration repairs by Unice. GET/PUT `/api/business/me` now supports first setup and later editing; the old missing-profile blocker is removed. Both posting forms keep canonical POST `/api/campaigns`, while the business-only compatibility alias uses that same photo-aware transaction.
 
@@ -44,8 +44,8 @@ When a session expires, private page state is cleared and the frontend offers si
 
 ## What remains
 
-1. **Run independent business/browser acceptance.** Profile GET/PUT and posting integration are merged/deployed, and the developer's actual hosted Chrome journey passed. Meet and Prince should independently test freshly registered and existing owners through profile setup, photo posting, approval, enquiry/inbox, owner removal and logout protection. Follow the [profile contract](../api/business-profile-contract.md), record actual browser/device results and do not seed a Business row to bypass onboarding.
-2. **Use the current verified release as the baseline.** Deployed `ab1bef2` passed exact identity, eight supporting-API groups, eight business-API groups and the actual hosted Chrome business journey. Local checks passed 631 frontend tests, 106 backend units, 87 HTTP/MySQL and 26 real frontend/API/MySQL checks; also 41 local host, 35 CLI/stub/routing and 15 offline Postman checks, not live API calls. See the [current receipt](../evidence/stage-3/business-profile-integration/README.md). Earlier PR #23/#21/#19 evidence stays historical. Full restoration and offsite recovery are unverified.
+1. **Run independent business/browser acceptance.** Profile GET/PUT and posting integration are merged/deployed. The full developer-hosted Chrome journey passed on the preceding PR #22 release; current-release hosted checks are the narrower smoke scope below. Meet and Prince should independently test freshly registered and existing owners through profile setup, photo posting, approval, enquiry/inbox, owner removal and logout protection. Follow the [profile contract](../api/business-profile-contract.md), record actual browser/device results and do not seed a Business row to bypass onboarding.
+2. **Use the current verified release as the baseline.** Deployed `af5dac7` passed exact identity, 11 core HTTP groups and Chrome admin/profile/photo/logout smoke checks on 14 October. The [readiness regression](../evidence/stage-3/final-readiness/README.md) passed 710 frontend tests, 116 backend units, 90 HTTP/MySQL and 26 real frontend/API/MySQL checks plus build; those suites passed again locally on 15 October. The dated readiness checks also include 41 host, 39 CLI/stub/routing and 15 offline Postman checks, not live API calls. The [hosted receipt](../evidence/stage-3/final-readiness/hosted-2026-10-14.md) defines the current smoke scope; the [preceding PR #22 receipt](../evidence/stage-3/business-profile-integration/README.md) retains its eight supporting-API groups, eight business-API groups and full approval/enquiry/inbox journey. No new hosted writes were run on 15 October. Full restoration and offsite recovery are unverified.
 3. **Finish independent testing and submission material.** Use the tested release for cross-role browser checks, visible/online refresh, expired sessions and mobile behaviour. Record results and remaining defects in the testing document; then finish manuals and the video. Developer API checks do not replace Meet and Prince's independent acceptance.
 4. **Keep regressions passing for later changes.** Retest authentication, posting, [reads](../api/campaign-read-contract.md), [approval](../api/admin-campaign-moderation-contract.md), images, profiles and ownership; publish/deploy later code separately and verify the served revision.
 
@@ -58,7 +58,7 @@ Reuse the implemented [owner-management](../api/owned-campaign-management-contra
 - Profile getter/upsert: [complete examples](../api/business-profile-contract.md).
 - Uploaded reference: [201 upload response](../api/campaign-posting-future-proposal.md#upload-one-campaign-image).
 - List/detail shape: [campaign object](../api/campaign-read-contract.md#campaign-object). `campaigns` is the list key. Direct detail object, wrapped creation response, numeric IDs, ISO UTC timestamps and `YYYY-MM-DD` dates.
-- Decision body/result: [review action](../api/admin-campaign-moderation-contract.md#proposed-review-action).
+- Decision body/result: [review action](../api/admin-campaign-moderation-contract.md#review-action).
 - Owner editing and version conflicts: [owner management](../api/owned-campaign-management-contract.md).
 - Participation and enquiry payloads: [engagement](../api/engagement-contract.md).
 - Account status, review history and content removal: [admin management](../api/admin-management-contract.md).
@@ -102,7 +102,7 @@ Optional `?` markers in this table explain fields; they are not literal JSON pro
 |---|---|---|
 | Campaign creation | `backend/src/services/campaignSubmission.js`; `controllers/campaigns.js`; `router/campaignRoutes.js` | Public/business posting with optional image reference; transaction for attachment |
 | Campaign reads | `services/campaignQueries.js`; `utils/campaignSerializer.js`; `services/campaignServices.js` | Shared serialization, owner scope, latest review, total, visibility-safe image URL |
-| Business profile | `database/models/business.js`; migration `20260830103020-create-businesses.js` | Existing unique owner and columns; add service/controller/routes, no duplicate table |
+| Business profile | `services/businessServices.js`; `controllers/business.js`; `router/businessRoutes.js`; `database/models/business.js` | Current-owner GET/PUT implemented with account/session locks and the existing unique owner table; no duplicate migration |
 | Campaign decision | `services/campaignModeration.js`; `database/models/campaignReview.js` | Transaction and version checks implemented; existing review table has no automatic timestamps |
 | Campaign images | `services/campaignImages.js`; `campaignImageStorage.js`; `database/models/campaignImage.js` | Upload metadata migration, private filesystem storage, controlled delivery and bounded cleanup implemented |
 | Categories | `database/models/category.js` | Existing ID/name mapping; GET returns `{categories:[{id,name}]}` |
@@ -208,7 +208,7 @@ In each API PR/handoff, include the endpoints implemented, exact migration filen
 
 | Symptom | Check first |
 |---|---|
-| New page reports unavailable / `404` | Check the served revision, migrations and router order. Profile GET/PUT is included in `ab1bef2`; an older served release may still return `404`. A new owner's absent profile correctly returns `200 {business:null}`. |
+| New page reports unavailable / `404` | Check the served revision, migrations and router order. The current release includes profile GET/PUT; a pre-profile release may still return `404`. A new owner's absent profile correctly returns `200 {business:null}`. |
 | Login appears successful but a protected call fails | Use the actual login token; confirm the matching active session and current database role/status. Sample-role tokens are intentionally invalid in the real backend. |
 | Admin detail says its version cannot be read | Add `updatedAt` to the admin detail serializer, preserve milliseconds in MySQL/model, and return canonical UTC text. Do not substitute the current time in the response. |
 | Save succeeds in the server log but the UI refuses confirmation | Match the exact HTTP status, envelope, numeric IDs and returned status/version. In particular, DELETE is empty `204`; create is `201`; review/unpublish must return an advanced version. Check saved data before retrying. |
@@ -218,7 +218,7 @@ In each API PR/handoff, include the endpoints implemented, exact migration filen
 
 Resolve a contract mismatch in one agreed place and update its frontend service/tests and API document together. Do not return invented sample data or skip permission checks just to clear an error message.
 
-## Ready-to-connect checks
+## Integration acceptance checks
 
 - Login returns the actual backend role; refresh retains the correct account navigation; logout invalidates the session and protected routes reject the old token.
 - Public A's submission is saved pending, appears only in A's My campaigns and authorised admin views, and is absent from public list/detail. Public B cannot see it.

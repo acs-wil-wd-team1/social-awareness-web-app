@@ -1,7 +1,7 @@
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { useLayoutEffect } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { authPagePath, clearSession, getSession, safeReturnPath, storeSession, useSession } from './authSession.js'
+import { authPagePath, clearSession, dismissSessionStorageFailure, getSession, safeReturnPath, SESSION_STORAGE_FAILURE_CODE, SESSION_STORAGE_FAILURE_MESSAGE, storeSession, useSession } from './authSession.js'
 
 const jwt = (claims) => `header.${btoa(JSON.stringify(claims)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')}.signature`
 const token = jwt({ id: 7, role: 'public', exp: 9999999999 })
@@ -103,8 +103,54 @@ describe('browser sessions', () => {
     const nextToken = jwt({ id: 9, role: 'business_owner', exp: 9999999999 })
     act(() => expect(() => storeSession(nextToken, { id: 9, name: 'Next user', role: 'business_owner' })).toThrow())
     expect(getSession()).toEqual({ token: null, user: null })
-    expect(result.current).toEqual({ token: null, user: null })
+    expect(result.current).toEqual({ token: null, user: null, storageFailure: true })
     expect(localStorage.getItem('token')).toBeNull()
+  })
+
+  it('retains an initiating storage-failure notice through rechecks without saving its cause', () => {
+    vi.useFakeTimers()
+    const { result } = renderHook(() => useSession())
+    const changed = vi.fn()
+    window.addEventListener('causeconnect:session', changed)
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Private browser diagnostic') })
+    let failure
+    act(() => {
+      try { storeSession(token, { id: 7, role: 'public' }) } catch (error) { failure = error }
+    })
+    expect(failure).toBeInstanceOf(Error)
+    expect(failure).toMatchObject({ code: SESSION_STORAGE_FAILURE_CODE, message: SESSION_STORAGE_FAILURE_MESSAGE })
+    expect(result.current).toEqual({ token: null, user: null, storageFailure: true })
+    expect(changed.mock.calls[0][0].detail).toEqual({ reason: 'storage-failure' })
+    expect(localStorage.length).toBe(0)
+    act(() => vi.advanceTimersByTime(60000))
+    expect(result.current.storageFailure).toBe(true)
+    act(() => window.dispatchEvent(new StorageEvent('storage', { key: 'unrelated-key', newValue: 'changed' })))
+    expect(result.current.storageFailure).toBe(true)
+    window.removeEventListener('causeconnect:session', changed)
+  })
+
+  it('clears storage-failure notices on dismissal, a new session or intentional sign-out', () => {
+    const { result } = renderHook(() => useSession())
+    act(() => clearSession('storage-failure'))
+    expect(result.current.storageFailure).toBe(true)
+    act(() => dismissSessionStorageFailure())
+    expect(result.current).toEqual({ token: null, user: null })
+    act(() => clearSession('storage-failure'))
+    act(() => storeSession(token, { id: 7, role: 'public' }))
+    expect(result.current.token).toBe(token)
+    expect(result.current.storageFailure).toBeUndefined()
+    act(() => clearSession('storage-failure'))
+    act(() => clearSession())
+    expect(result.current).toEqual({ token: null, user: null })
+  })
+
+  it('does not create a failure notice from another tab or erase expiry when dismissing notices', () => {
+    const { result } = renderHook(() => useSession())
+    act(() => window.dispatchEvent(new StorageEvent('storage', { key: 'token', newValue: null })))
+    expect(result.current.storageFailure).toBeUndefined()
+    act(() => clearSession('expired'))
+    act(() => dismissSessionStorageFailure())
+    expect(result.current.sessionExpired).toBe(true)
   })
 
   it('ignores an unauthorized response from an older token, but clears the current rejected one', () => {

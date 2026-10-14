@@ -1,6 +1,6 @@
 # CauseConnect API contracts
 
-This index describes deployed application commit `ab1bef2c1b2e55c401a78543d4034cd2e85d0a2c`, release `2026-10-14T10-17-18-153Z-ab1bef2c1b2e`, at [CauseConnect on AWS](https://52.62.2.87). PR #22 is merged with the repaired business-profile and compatibility posting integration. The [current release evidence](../evidence/stage-3/business-profile-integration/README.md) records 631 frontend/106 backend units, 87 HTTP/MySQL and 26 frontend/API/MySQL checks, exact hosted identity, eight supporting-API and eight business-API groups, plus the passing actual hosted Chrome business journey. Independent tester acceptance remains separate. Earlier PR #23/#21/#19 receipts remain historical; the [integration guide](../handoff/stage3-api-handoff.md) maps current routes and final acceptance work.
+This index describes application commit `af5dac741af06240e4885d098379c74c975ad893`, release `2026-10-14T12-12-08-602Z-af5dac741af0`, verified live on 15 October at [CauseConnect on AWS](https://52.62.2.87). The [readiness regression](../evidence/stage-3/final-readiness/README.md) passed 710 frontend tests, 116 backend units, 90 HTTP/MySQL and 26 frontend/API/MySQL checks plus the production build; those suites passed again locally on 15 October. The [14 October hosted receipt](../evidence/stage-3/final-readiness/hosted-2026-10-14.md) records 11 core HTTP groups and Chrome admin/profile/photo/logout smoke checks. The preceding PR #22 full business journey remains historical in the [evidence index](../evidence/stage-3/README.md), not a fresh current-release run. Independent tester acceptance remains separate; the [integration guide](../handoff/stage3-api-handoff.md) maps current routes and final acceptance work.
 
 | Document | Status and purpose |
 |---|---|
@@ -16,7 +16,7 @@ This index describes deployed application commit `ab1bef2c1b2e55c401a78543d4034c
 | [Admin management](admin-management-contract.md) | Deployed account status, review history, unpublish and soft-delete |
 | [Postman requests](postman/README.md) | Importable requests and response assertions; use only with an isolated local test database |
 
-The [real-backend regression runner](../../infra/real-backend-testing.md) checks existing frontend pages/services against Express and disposable MySQL. It does not certify endpoints that have not been implemented.
+The [real-backend regression runner](../../infra/real-backend-testing.md) checks frontend pages/services against Express and disposable MySQL. It does not replace hosted-browser or independent tester acceptance.
 
 ## Existing routes carried forward
 
@@ -32,7 +32,7 @@ The [real-backend regression runner](../../infra/real-backend-testing.md) checks
 | `GET` | `/api/campaigns/categories` | Public | `200` with `categories: [{ id, name }]` |
 | `POST` | `/api/campaigns` | Active `public`, or `business_owner` with their own existing profile | `201` with a saved pending `campaign` |
 
-The frontend `/campaigns/new` uses category lookup and campaign POST, accepting an optional server-issued `imageId`. `/business/campaigns/new` first loads GET `/api/business/me`; new owners can save their profile through PUT before posting. Both forms use canonical POST `/api/campaigns`. The compatibility POST `/api/campaigns/business` accepts the same photo-aware payload for business owners only. The full fresh-business hosted API and actual Chrome journeys passed; independent tester acceptance is still required.
+The frontend `/campaigns/new` uses category lookup and campaign POST, accepting an optional server-issued `imageId`. `/business/campaigns/new` first loads GET `/api/business/me`; new owners can save their profile through PUT before posting. Both forms use canonical POST `/api/campaigns`. The compatibility POST `/api/campaigns/business` accepts the same photo-aware payload for business owners only. The full fresh-business hosted API and Chrome journeys passed on the [preceding PR #22 release on 14 October](../evidence/stage-3/business-profile-integration/README.md); independent acceptance of the current release is still required.
 
 ## Stage 3 route reference
 
@@ -58,7 +58,7 @@ All rows below are merged and deployed. Existing owner reads and core approval p
 | `PATCH` | `/api/campaigns/admin/:id/publication` | Approved → pending, with expected-version check, required reason and audit record |
 | `DELETE` | `/api/campaigns/admin/:id` | Recoverable soft deletion, with expected-version check, required reason and audit record |
 
-The isolated regression suite exercises implemented routes against Express/MySQL. The dated release evidence separately records merge, deployment and eight production acceptance groups; do not infer exhaustive cloud/browser coverage from local tests. Account role changes/admin promotion, account deletion and a full CRM are not included.
+The isolated regression suite exercises implemented routes against Express/MySQL. The dated evidence separately records deployment and the current release's 11 hosted core groups and Chrome smoke checks; the preceding PR #22 eight supporting-API and eight business-API groups remain historical. Do not infer exhaustive cloud/browser coverage from local tests. Account role changes/admin promotion, account deletion and a full CRM are not included.
 
 Public campaign list/detail and My campaigns use their read endpoints for visible/online polling every 30 seconds, plus refresh on focus/reconnection. No WebSocket or separate push API is required by this implementation. Campaign reads must reflect current status/ownership and exclude soft-deleted campaigns. Private participation history retains the user's records without exposing unavailable campaign content. Private responses must not be cached publicly.
 

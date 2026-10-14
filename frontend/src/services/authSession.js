@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 
 const changeEvent = 'causeconnect:session'
+const dismissNoticeEvent = 'causeconnect:session-notice-dismissed'
 const roles = ['public', 'business_owner', 'admin']
+export const SESSION_STORAGE_FAILURE_MESSAGE = 'Your browser could not save the login. Allow site storage and try again.'
+export const SESSION_STORAGE_FAILURE_CODE = 'SESSION_STORAGE_UNAVAILABLE'
 
 function claimsFor(token) {
   try {
@@ -29,8 +32,10 @@ export function storeSession(token, user) {
     else localStorage.removeItem('causeconnect.user')
   } catch {
     // Never leave a new token paired with the previous account's saved details.
-    clearSession()
-    throw new Error('Your browser could not save the login. Allow site storage and try again.')
+    clearSession('storage-failure')
+    const failure = new Error(SESSION_STORAGE_FAILURE_MESSAGE)
+    failure.code = SESSION_STORAGE_FAILURE_CODE
+    throw failure
   }
   window.dispatchEvent(new Event(changeEvent))
 }
@@ -42,22 +47,40 @@ export function clearSession(reason) {
   window.dispatchEvent(new CustomEvent(changeEvent, { detail: { reason } }))
 }
 
+export function dismissSessionStorageFailure() {
+  // This notice is local to the initiating window; never save it or its cause.
+  window.dispatchEvent(new Event(dismissNoticeEvent))
+}
+
 export function useSession() {
   const [session, setSession] = useState(getSession)
   useEffect(() => {
     const update = (event) => {
+      if (event?.type === dismissNoticeEvent) {
+        setSession(previous => {
+          const { storageFailure, ...remaining } = previous
+          return remaining
+        })
+        return
+      }
       const next = getSession()
       setSession(previous => {
         const expired = event?.detail?.reason === 'expired'
           || (!event && previous.token && !next.token && typeof claimsFor(previous.token).exp === 'number' && claimsFor(previous.token).exp * 1000 <= Date.now())
           || (!event && previous.sessionExpired)
-        return !next.token && expired ? { ...next, sessionExpired: true } : next
+        const storageFailure = event?.detail?.reason === 'storage-failure'
+          || ((!event || event.type === 'storage') && previous.storageFailure && next.token === previous.token)
+        return { ...next,
+          ...(!next.token && expired ? { sessionExpired: true } : {}),
+          ...(!next.token && storageFailure ? { storageFailure: true } : {}),
+        }
       })
     }
     const unauthorized = (event) => {
       if (event.detail?.token && event.detail.token === getSession().token) clearSession('expired')
     }
     window.addEventListener(changeEvent, update)
+    window.addEventListener(dismissNoticeEvent, update)
     window.addEventListener('storage', update)
     window.addEventListener('causeconnect:unauthorized', unauthorized)
     // A child effect can sign out before this subscription is installed.
@@ -65,6 +88,7 @@ export function useSession() {
     const interval = setInterval(update, 30000)
     return () => {
       window.removeEventListener(changeEvent, update)
+      window.removeEventListener(dismissNoticeEvent, update)
       window.removeEventListener('storage', update)
       window.removeEventListener('causeconnect:unauthorized', unauthorized)
       clearInterval(interval)

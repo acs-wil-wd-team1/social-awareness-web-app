@@ -7,6 +7,7 @@ import CampaignImageInput from '../components/CampaignImageInput.jsx'
 import '../styles/campaign-posting.css'
 
 const fields = ['title', 'description', 'categoryId', 'targetAudience', 'startDate', 'endDate']
+const normalizeLineEndings = value => value.replace(/\r\n?/g, '\n')
 export default function EditCampaignPage({ campaignId, token, role }) {
   const allowed = ['public', 'business_owner'].includes(role)
   const [campaign, setCampaign] = useState(null), [categories, setCategories] = useState([])
@@ -45,13 +46,14 @@ export default function EditCampaignPage({ campaignId, token, role }) {
   }, [errors, imageError, busy])
   useEffect(() => { if (outcome) result.current?.focus() }, [outcome])
   const blocked = uncertain || [401, 403, 404].includes(error?.status)
+  const removalConfirmed = Boolean(campaign && normalizeLineEndings(deleteName) === normalizeLineEndings(campaign.title))
 
   function change(event) { const { name, value } = event.target; setValues(v => ({ ...v, [name]: value })); setErrors(v => ({ ...v, [name]: '' })) }
   function field(name) { return { name, value: values[name] || '', onChange: change, 'aria-invalid': Boolean(errors[name]), 'aria-describedby': errors[name] ? `edit-${name}-error` : undefined } }
   function fieldError(name) { return errors[name] ? <p id={`edit-${name}-error`} className="campaign-form-error">{errors[name]}</p> : null }
   async function write(remove = false) {
     if (inFlight.current || blocked || outcome || !campaign || !token || !allowed) return
-    if (remove && (!confirmDelete || deleteName !== campaign.title)) return
+    if (remove && (!confirmDelete || !removalConfirmed)) return
     if (!remove && confirmDelete) return
     const validation = remove ? {} : validateCampaignSubmission(values, categories)
     shouldFocusError.current = !remove && (Object.keys(validation).length > 0 || Boolean(imageError))
@@ -116,7 +118,12 @@ export default function EditCampaignPage({ campaignId, token, role }) {
           </fieldset>
         </form>
         <div className="campaign-category-state"><h2>Remove this campaign</h2><p>Removal hides the campaign from browsing and your active submissions. It does not permanently erase its history.</p>
-          {confirmDelete ? <div role="group" aria-label="Confirm campaign removal"><label htmlFor="delete-campaign-name">Type “{campaign.title}” to confirm</label><input id="delete-campaign-name" value={deleteName} disabled={busy || blocked} onChange={e => setDeleteName(e.target.value)} /><button type="button" disabled={busy || blocked || deleteName !== campaign.title} onClick={() => write(true)}>Confirm removal</button><button type="button" disabled={busy} onClick={() => { setConfirmDelete(false); setDeleteName('') }}>Cancel</button></div> : <button type="button" disabled={busy || blocked} onClick={() => setConfirmDelete(true)}>Remove campaign</button>}
+          {confirmDelete ? <div role="group" aria-label="Confirm campaign removal">
+            <div className="campaign-form-field"><label htmlFor="delete-campaign-name">Type “<span style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{normalizeLineEndings(campaign.title)}</span>” to confirm</label>
+              <textarea id="delete-campaign-name" rows={2} value={deleteName} disabled={busy || blocked} onChange={e => setDeleteName(e.target.value)} /></div>
+            <button className="campaign-secondary-button" type="button" disabled={busy || blocked || !removalConfirmed} onClick={() => write(true)}>Confirm removal</button>
+            <button className="campaign-secondary-button" type="button" disabled={busy} onClick={() => { setConfirmDelete(false); setDeleteName('') }}>Cancel</button>
+          </div> : <button className="campaign-secondary-button" type="button" disabled={busy || blocked} onClick={() => setConfirmDelete(true)}>Remove campaign</button>}
         </div>
       </> : null}
     </>}
