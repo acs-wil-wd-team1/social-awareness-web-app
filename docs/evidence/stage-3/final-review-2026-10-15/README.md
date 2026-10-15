@@ -1,6 +1,10 @@
 # Final testing and document review — 15 October 2026
 
-## Candidate status
+## Current publication
+
+Tested application `ad94ecb4348458803673c9ef3737fd0b48938d66` is now deployed. The [separate hosted receipt](hosted.md) records its verified release, core HTTP checks and actual Chrome smoke scope. Earlier sections below preserve the preparation/testing sequence, not a claim that every intermediate candidate was deployed.
+
+## Initial predeployment boundary
 
 This receipt accompanies the final frontend edge-case repairs and documentation refresh. At the time of these checks, AWS still served application `af5dac741af06240e4885d098379c74c975ad893`, release `2026-10-14T12-12-08-602Z-af5dac741af0`. The new repairs are local candidate work, not yet a hosted result. Publication and the served identity need a separate receipt.
 
@@ -83,3 +87,11 @@ Session writes/clears now rotate a non-secret persisted UUID generation, retaine
 The final root rerun passed **740 frontend tests in 32 files**, **116 backend units**, **90 HTTP/MySQL** and **26 frontend/API/MySQL** checks, plus build (`index-BI1RZF7h.js`, `index-B4f_CvAQ.css`). Owned full-stack run `27879283b147` removed its database/uploads. A separate read-only reviewer found no additional material defect in the four-file generation delta; it did not run tests. Actual Chrome additionally passed fixture-admin login, the consistent Manage accounts navigation, private-page reload and confirmed server logout after the new guard.
 
 This closes the reproduced completed-before-check ABA sequence. It does **not** claim an atomic cross-tab check-and-write transaction, guaranteed marker invalidation when storage blocks both replacement and removal, or zero bugs. The broader browser/device/screen-reader/team acceptance limits above remain.
+
+## Final independent Claude report
+
+Claude's final report reviewed exact `ad94ecb`, verified 290 packet checksums, executed 164 focused auth/session/App checks, all 740 frontend checks and the production build, and found no further material issue. Its build assets matched the root's. Backend tests were not rerun in that last pass; its preceding v2 execution passed 116.
+
+In actual cloud Chromium with **mocked APIs**, Claude drove the app's Login/Logout pages in another tab while delaying a pending response and receiving storage notifications by three seconds. It independently reproduced stale login on v2 and blocked it on v3, with both normal and delayed notifications. A blocked marker write sent zero login requests, displayed one shell notice and allowed a successful retry. The earlier 55 cloud-browser assertions reran: 54 passed; the only miss was an optional cancellation message disappearing during a session-keyed remount. Cancellation itself succeeded, and neither the contract nor the reference promises persistence of that message. It is retained as a low-severity usability observation, not silently counted as passed.
+
+Claude did not connect to the Mac fixture, use actual MySQL, test the public AWS site, Safari/Edge or screen readers, or induce a browser's real storage-block setting. Its cloud Node 22.22.0 remained below jsdom's stated minimum; the root's supported Node 22.23.2 run independently passed. The v3 packet cover still says V2 and its frozen reference has the older CRLF/LF wording; the source pin/checksums are correct, and the canonical/published reference uses CR, LF and CRLF. Original packets and report evidence were not rewritten.
