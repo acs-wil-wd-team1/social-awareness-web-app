@@ -20,6 +20,7 @@ export default function EditCampaignPage({ campaignId, token, role }) {
   const [confirmDelete, setConfirmDelete] = useState(false), [deleteName, setDeleteName] = useState('')
   const request = useRef(null), version = useRef(0), inFlight = useRef(false), uploaded = useRef(null), form = useRef(null), result = useRef(null)
   const shouldFocusError = useRef(false)
+  const deleteConfirmation = useRef(null), removeTrigger = useRef(null), restoreRemovalFocus = useRef(false)
   const loginPath = authPagePath('/login', `/my-campaigns/${campaignId}/edit`)
   useEffect(() => {
     const current = ++version.current, controller = new AbortController()
@@ -45,8 +46,16 @@ export default function EditCampaignPage({ campaignId, token, role }) {
     }
   }, [errors, imageError, busy])
   useEffect(() => { if (outcome) result.current?.focus() }, [outcome])
+  useEffect(() => {
+    if (confirmDelete) deleteConfirmation.current?.focus()
+    else if (restoreRemovalFocus.current) {
+      removeTrigger.current?.focus()
+      restoreRemovalFocus.current = false
+    }
+  }, [confirmDelete])
   const blocked = uncertain || [401, 403, 404].includes(error?.status)
   const removalConfirmed = Boolean(campaign && normalizeLineEndings(deleteName) === normalizeLineEndings(campaign.title))
+  const removalMismatch = deleteName.length > 0 && !removalConfirmed
 
   function change(event) { const { name, value } = event.target; setValues(v => ({ ...v, [name]: value })); setErrors(v => ({ ...v, [name]: '' })) }
   function field(name) { return { name, value: values[name] || '', onChange: change, 'aria-invalid': Boolean(errors[name]), 'aria-describedby': errors[name] ? `edit-${name}-error` : undefined } }
@@ -120,10 +129,12 @@ export default function EditCampaignPage({ campaignId, token, role }) {
         <div className="campaign-category-state"><h2>Remove this campaign</h2><p>Removal hides the campaign from browsing and your active submissions. It does not permanently erase its history.</p>
           {confirmDelete ? <div role="group" aria-label="Confirm campaign removal">
             <div className="campaign-form-field"><label htmlFor="delete-campaign-name">Type “<span style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{normalizeLineEndings(campaign.title)}</span>” to confirm</label>
-              <textarea id="delete-campaign-name" rows={2} value={deleteName} disabled={busy || blocked} onChange={e => setDeleteName(e.target.value)} /></div>
+              <p id="delete-campaign-help" className="campaign-form-help">Match the title exactly, including any line breaks. Do not add extra spaces or an extra final line.</p>
+              <textarea ref={deleteConfirmation} id="delete-campaign-name" rows={2} value={deleteName} disabled={busy || blocked} aria-invalid={removalMismatch} aria-describedby={`delete-campaign-help${removalMismatch ? ' delete-campaign-match' : ''}`} onChange={e => setDeleteName(e.target.value)} />
+              {removalMismatch ? <p id="delete-campaign-match" className="campaign-form-error" role="status">The title does not match yet. Check for extra spaces or an extra final line.</p> : null}</div>
             <button className="campaign-secondary-button" type="button" disabled={busy || blocked || !removalConfirmed} onClick={() => write(true)}>Confirm removal</button>
-            <button className="campaign-secondary-button" type="button" disabled={busy} onClick={() => { setConfirmDelete(false); setDeleteName('') }}>Cancel</button>
-          </div> : <button className="campaign-secondary-button" type="button" disabled={busy || blocked} onClick={() => setConfirmDelete(true)}>Remove campaign</button>}
+            <button className="campaign-secondary-button" type="button" disabled={busy} onClick={() => { restoreRemovalFocus.current = true; setConfirmDelete(false); setDeleteName('') }}>Cancel</button>
+          </div> : <button ref={removeTrigger} className="campaign-secondary-button" type="button" disabled={busy || blocked} onClick={() => setConfirmDelete(true)}>Remove campaign</button>}
         </div>
       </> : null}
     </>}

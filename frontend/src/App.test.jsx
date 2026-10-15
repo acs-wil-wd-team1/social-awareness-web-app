@@ -94,6 +94,18 @@ describe('document titles', () => {
 })
 
 describe('navigation and session updates', () => {
+  it.each(['/login', '/missing'])('restores useful focus after dismissing a sign-in notice on %s', (pathname) => {
+    render(<App pathname={pathname} />)
+    act(() => clearSession('storage-failure'))
+    const dismiss = screen.getByRole('button', { name: 'Dismiss sign-in message' })
+    dismiss.focus()
+    fireEvent.click(dismiss)
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(document.activeElement).toBe(pathname === '/login' ? screen.getByLabelText('Email') : screen.getByRole('main'))
+    expect(localStorage.getItem('token')).toBeNull()
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
   it('keeps a dismissible non-secret storage notice outside the session-keyed subtree', () => {
     loginAs('public')
     render(<App pathname="/login" />)
@@ -143,7 +155,7 @@ describe('navigation and session updates', () => {
     const nav = within(screen.getByRole('navigation', { name: 'Primary navigation' }))
     expect(nav.getByRole('link', { name: 'Review campaigns' }).getAttribute('href')).toBe('/admin/campaigns')
     fireEvent.click(nav.getByRole('button', { name: 'Account' }))
-    expect(nav.getByRole('link', { name: 'Manage users' }).getAttribute('href')).toBe('/admin/users')
+    expect(nav.getByRole('link', { name: 'Manage accounts' }).getAttribute('href')).toBe('/admin/users')
     expect(nav.queryByRole('link', { name: 'My participation' })).toBeNull()
     expect(nav.queryByRole('link', { name: 'Create campaign' })).toBeNull()
     expect(nav.queryByRole('link', { name: 'My campaigns' })).toBeNull()

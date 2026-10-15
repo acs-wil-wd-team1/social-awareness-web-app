@@ -326,6 +326,40 @@ describe('owner campaign editing', () => {
 })
 
 describe('owner campaign removal', () => {
+  it('moves focus into the title confirmation when removal is opened', async () => {
+    render(page()); await ready()
+    const remove = screen.getByRole('button', { name: 'Remove campaign' })
+    remove.focus()
+    fireEvent.click(remove)
+    expect(document.activeElement).toBe(screen.getByLabelText(/to confirm/))
+  })
+
+  it('returns focus to Remove campaign after cancellation', async () => {
+    render(page()); await ready()
+    fireEvent.click(screen.getByRole('button', { name: 'Remove campaign' }))
+    const cancel = screen.getByRole('button', { name: 'Cancel' })
+    cancel.focus()
+    fireEvent.click(cancel)
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Remove campaign' }))
+    expect(writes()).toHaveLength(0)
+  })
+
+  it('explains an extra final line without relaxing exact-title confirmation', async () => {
+    render(page()); await ready()
+    fireEvent.click(screen.getByRole('button', { name: 'Remove campaign' }))
+    const confirmation = screen.getByLabelText(/to confirm/)
+    fireEvent.change(confirmation, { target: { value: `${original.title}\n` } })
+    expect(screen.getByRole('button', { name: 'Confirm removal' }).disabled).toBe(true)
+    expect(confirmation.getAttribute('aria-invalid')).toBe('true')
+    expect(confirmation.getAttribute('aria-describedby')).toContain('delete-campaign-match')
+    expect(screen.getByText('The title does not match yet. Check for extra spaces or an extra final line.').getAttribute('role')).toBe('status')
+    expect(writes()).toHaveLength(0)
+    fireEvent.change(confirmation, { target: { value: original.title } })
+    expect(confirmation.getAttribute('aria-invalid')).toBe('false')
+    expect(screen.queryByText('The title does not match yet. Check for extra spaces or an extra final line.')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Confirm removal' }).disabled).toBe(false)
+  })
+
   it.each(['\n', '\r', '\r\n'])('allows the saved title to be pasted into removal confirmation with internal line ending %j', async (lineEnding) => {
     const title = `Community${lineEnding}garden`
     handlers.load = () => json({ ...original, title })

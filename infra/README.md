@@ -37,7 +37,7 @@ Before creating resources, select the project AWS account, region, server and in
 
 ## Build a frontend release
 
-Use Node.js 22.12+ and install frontend dependencies once:
+Use Node.js 22.22.2 or newer within the Node 22 line and install frontend dependencies once:
 
 ```sh
 npm ci --prefix frontend

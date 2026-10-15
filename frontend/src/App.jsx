@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense, useEffect, useRef } from 'react'
 import HomePage from './pages/HomePage.jsx'
 import CampaignDetailsPage from './pages/CampaignDetailsPage.jsx'
 import RegistrationPage from './pages/RegistrationPage.jsx'
@@ -50,6 +50,7 @@ export function getRoute(pathname) {
 
 export default function App({ pathname = window.location.pathname }) {
   const route = getRoute(pathname)
+  const main = useRef(null)
   useEffect(() => {
     document.title = `${routeTitles[route.name] || 'Page not found'} | CauseConnect`
   }, [route.name])
@@ -57,6 +58,11 @@ export default function App({ pathname = window.location.pathname }) {
   const role = user?.role
   const sessionProps = { token, role }
   const createPath = role === 'business_owner' ? '/business/campaigns/new' : '/campaigns/new'
+  function dismissSignInMessage() {
+    dismissSessionStorageFailure()
+    const target = route.name === 'login' ? main.current?.querySelector('#login-email') || main.current : main.current
+    target?.focus()
+  }
   return <div className="site-shell">
     <a className="skip-link" href="#main-content">Skip to main content</a>
     {DemoBanner ? <Suspense fallback={<aside className="preview-banner"><strong>Frontend preview · sample data</strong></aside>}><DemoBanner /></Suspense> : null}
@@ -70,10 +76,10 @@ export default function App({ pathname = window.location.pathname }) {
     </header>
     {storageFailure ? <div className="content-width campaign-profile-state" role="alert">
       <p>{SESSION_STORAGE_FAILURE_MESSAGE}</p>
-      <button className="campaign-secondary-button" type="button" onClick={dismissSessionStorageFailure}>Dismiss sign-in message</button>
+      <button className="campaign-secondary-button" type="button" onClick={dismissSignInMessage}>Dismiss sign-in message</button>
     </div> : null}
     {/* Logout must retain its in-memory revocation token after clearing browser storage. */}
-    <main id="main-content" key={route.name === 'logout' ? 'logout' : token || 'guest'}>
+    <main ref={main} id="main-content" tabIndex="-1" key={route.name === 'logout' ? 'logout' : token || 'guest'}>
       {sessionExpired && route.name !== 'logout' ? <div className="content-width campaign-profile-state" role="alert">
         <p>Your session has expired. Please log in again.</p>
         {['create-campaign', 'business-campaign', 'business-profile', 'edit-campaign'].includes(route.name) ? <p>Unsaved changes were cleared for security. If you were saving, check your saved records before trying again.</p> : null}

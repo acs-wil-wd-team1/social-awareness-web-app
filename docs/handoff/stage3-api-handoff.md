@@ -22,7 +22,7 @@ Use Jira for current dates and review/assignment status. This code reference doe
 
 The older [AWS frontend preview](https://d10e86f5qx46up.cloudfront.net) has separate [dated verification evidence](../evidence/stage-3/frontend-preview/README.md). It uses browser-only data and a **Preview as** selector. Use the live AWS application above for real integration testing; do not confuse sample interactions with saved API/database results. Later local changes still require their own deployment and verification.
 
-The application uses one dedicated admin account with role `admin`. Its primary navigation includes **Review campaigns**, with **Manage users** under **Account**. Public registration and account screens do not create or promote administrators; the backend enforces admin access independently.
+The application uses one dedicated admin account with role `admin`. Its primary navigation includes **Review campaigns**, with **Manage accounts** under **Account**. Public registration and account screens do not create or promote administrators; the backend enforces admin access independently.
 
 When a session expires, private page state is cleared and the frontend offers sign-in back to the same page. Unsaved drafts are not carried into another account. If a save was interrupted, check the saved records after signing in before retrying; the browser does not assume the write failed.
 
@@ -134,7 +134,7 @@ Use an isolated test database with two active public users (A/B), two business o
 
 ## Commands and evidence to return
 
-Run commands from the indicated folder. Node.js 22.12+ is required. Keep local database credentials and `JWT_SECRET` in the untracked backend environment file; do not put them into commands shared in a PR or screenshot.
+Run commands from the indicated folder. Use Node.js 22.22.2 or newer within the Node 22 line (the server uses 22.23.2). Keep local database credentials and `JWT_SECRET` in the untracked backend environment file; do not put them into commands shared in a PR or screenshot.
 
 ### Ready-made requests and isolated regression
 

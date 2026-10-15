@@ -161,6 +161,81 @@ describe('CauseConnect login page', () => {
     expect(window.location.hash).toBe('#before-login')
   })
 
+  it('does not restore a delayed guest login after queued cross-tab login and logout changes', async () => {
+    let resolve
+    fetch.mockReturnValueOnce(new Promise(done => { resolve = done }))
+    render(<App pathname="/login" />)
+    fillLogin()
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }))
+    const signal = fetch.mock.calls[0][1].signal
+    const newerToken = `header.${btoa(JSON.stringify({ id: 9, role: 'public', exp: 9999999999 }))}.signature`
+    await act(async () => {
+      // By the time this tab receives the other tab's queued storage events,
+      // the durable session has already returned to its original guest state.
+      localStorage.setItem('token', newerToken)
+      localStorage.setItem('causeconnect.user', JSON.stringify({ id: 9, name: 'Newer account', role: 'public' }))
+      localStorage.removeItem('token')
+      localStorage.removeItem('causeconnect.user')
+      window.dispatchEvent(new StorageEvent('storage', { key: 'token', oldValue: null, newValue: newerToken }))
+      window.dispatchEvent(new StorageEvent('storage', { key: 'token', oldValue: newerToken, newValue: null }))
+    })
+    expect(signal.aborted).toBe(true)
+    expect(screen.getByRole('button', { name: 'Login' }).disabled).toBe(false)
+    expect(screen.getByRole('alert').textContent).toContain('another tab changed the login session')
+    expect(getSession().token).toBeNull()
+    await act(async () => resolve(response(200, validBody)))
+    expect.soft(getSession().token).toBeNull()
+    expect.soft(window.location.hash).toBe('#before-login')
+  })
+
+  it('ignores unrelated storage and notice events while a login is pending', async () => {
+    let resolve
+    fetch.mockReturnValueOnce(new Promise(done => { resolve = done }))
+    render(<App pathname="/login" />)
+    fillLogin()
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }))
+    const signal = fetch.mock.calls[0][1].signal
+    await act(async () => {
+      window.dispatchEvent(new StorageEvent('storage', { key: 'unrelated-key', newValue: 'changed' }))
+      window.dispatchEvent(new StorageEvent('storage', { key: 'token', newValue: 'unrelated-session-storage', storageArea: window.sessionStorage }))
+      window.dispatchEvent(new Event('causeconnect:session-notice-dismissed'))
+    })
+    expect(signal.aborted).toBe(false)
+    expect(screen.getByRole('button', { name: 'Logging in...' }).disabled).toBe(true)
+    expect(screen.queryByRole('alert')).toBeNull()
+    await act(async () => resolve(response(200, validBody)))
+    expect(getSession()).toEqual({ token, user: validBody.user })
+    expect(window.location.hash).toBe('')
+  })
+
+  it('allows a fresh StrictMode retry after a cross-tab clear without an old finally unlocking it', async () => {
+    let resolveOld, resolveNew
+    fetch.mockReturnValueOnce(new Promise(done => { resolveOld = done }))
+      .mockReturnValueOnce(new Promise(done => { resolveNew = done }))
+    render(<StrictMode><App pathname="/login" /></StrictMode>)
+    fillLogin()
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }))
+    const oldSignal = fetch.mock.calls[0][1].signal
+    await act(async () => window.dispatchEvent(new StorageEvent('storage', { key: null, storageArea: window.localStorage })))
+    expect(oldSignal.aborted).toBe(true)
+    expect(screen.getByRole('button', { name: 'Login' }).disabled).toBe(false)
+    fillLogin({ email: 'fresh@example.test' })
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }))
+    expect(fetch).toHaveBeenCalledTimes(2)
+    const newSignal = fetch.mock.calls[1][1].signal
+    await act(async () => resolveOld(response(200, validBody)))
+    expect(getSession().token).toBeNull()
+    expect(window.location.hash).toBe('#before-login')
+    expect(screen.getByRole('button', { name: 'Logging in...' }).disabled).toBe(true)
+    expect(newSignal.aborted).toBe(false)
+    const freshToken = `header.${btoa(JSON.stringify({ id: 11, role: 'public', exp: 9999999999 }))}.signature`
+    const freshBody = { token: freshToken, user: { id: 11, name: 'Fresh account', role: 'public' } }
+    await act(async () => resolveNew(response(200, freshBody)))
+    expect(getSession()).toEqual(freshBody)
+    expect(window.location.hash).toBe('')
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
   it('still stores and redirects a normal App login through the session remount', async () => {
     fetch.mockResolvedValueOnce(response(200, validBody))
     render(<App pathname="/login" />)

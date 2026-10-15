@@ -6,7 +6,7 @@ Node.js, Express, Sequelize and MySQL. APIs cover authentication, categories, pu
 
 ## Prerequisites
 
-- Node.js 22.12+ and npm
+- Node.js 22.22.2 or newer within the Node 22 line and npm (the server uses 22.23.2)
 - MySQL 8
 - Git
 

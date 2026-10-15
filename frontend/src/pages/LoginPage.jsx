@@ -23,8 +23,24 @@ export default function LoginPage({ storageFailureFeedbackOwnedByShell = false }
 
   useEffect(() => {
     mounted.current = true
+    const sessionChangedInAnotherTab = event => {
+      if (!mounted.current || !inFlight.current || (event.key !== 'token' && event.key !== null)) return
+      if (event.storageArea) {
+        try { if (event.storageArea !== window.localStorage) return } catch { /* Cancel if auth storage became unavailable. */ }
+      }
+      // Queued token changes can end at the starting value before React renders.
+      // Invalidate the request even when comparing the final token would miss it.
+      requestVersion.current += 1
+      inFlight.current = false
+      request.current?.abort()
+      request.current = null
+      setIsSubmitting(false)
+      setApiError('Sign-in was cancelled because another tab changed the login session. Please try again.')
+    }
+    window.addEventListener('storage', sessionChangedInAnotherTab)
     return () => {
       mounted.current = false
+      window.removeEventListener('storage', sessionChangedInAnotherTab)
       requestVersion.current += 1
       request.current?.abort()
       inFlight.current = false

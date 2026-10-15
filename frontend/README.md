@@ -15,7 +15,7 @@ npm run dev
 
 The development server forwards `/api` requests to `http://127.0.0.1:3000`. Live mode needs the backend and database. Use the explicitly labelled sample mode below only for interface review without a backend.
 
-Use Node.js 22.12 or newer. Backend configuration is in the [backend README](../backend/README.md).
+Use Node.js 22.22.2 or newer within the Node 22 line (the server uses 22.23.2). Backend configuration is in the [backend README](../backend/README.md).
 
 ## Live API and sample preview
 
@@ -86,7 +86,7 @@ Campaign image and type values come from API responses. The live UI does not inf
 
 - The shared colours, typography and responsive layout follow the current Stage 2 web design standards.
 - Primary navigation contains **Home**, **Campaigns**, and **Create campaign** for authors or **Review campaigns** for admins. Guests see **Login** and **Register**.
-- The **Account** dropdown groups My campaigns, My participation, Business profile, Enquiries, Manage users and Logout according to the current role.
+- The **Account** dropdown groups My campaigns, My participation, Business profile, Enquiries, Manage accounts and Logout according to the current role.
 - **Campaigns** moves to the homepage list. The hero offers **Explore campaigns** and an account-appropriate signup, posting or review action. Campaign cards keep equal widths within the responsive grid.
 - Each `View campaign` link opens the matching public campaign details route. Admin search and owner/admin status filters are available on their respective pages.
 - Login and registration preserve a validated local destination, including its query string and fragment. External and malformed return destinations fall back to the homepage.

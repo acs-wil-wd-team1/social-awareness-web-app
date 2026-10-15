@@ -17,7 +17,7 @@ export default function SiteNavigation({ token, role, route, createPath }) {
       { href: '/business/profile', label: 'Business profile', routes: ['business-profile'] },
       { href: '/business/enquiries', label: 'Enquiries', routes: ['business-enquiries'] },
     ] : []),
-    ...(role === 'admin' ? [{ href: '/admin/users', label: 'Manage users', routes: ['admin-users'] }] : []),
+    ...(role === 'admin' ? [{ href: '/admin/users', label: 'Manage accounts', routes: ['admin-users'] }] : []),
     { href: '/logout', label: 'Logout', routes: ['logout'] },
   ]
   const accountActive = accountLinks.some(link => link.routes.includes(route.name))
