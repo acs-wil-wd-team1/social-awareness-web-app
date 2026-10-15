@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { apiRequest } from '../services/apiClient.js'
-import { authPagePath, dismissSessionStorageFailure, getSession, safeReturnPath, SESSION_STORAGE_FAILURE_CODE, storeSession } from '../services/authSession.js'
+import { authPagePath, captureSessionGeneration, dismissSessionStorageFailure, getSession, getSessionGeneration, safeReturnPath, SESSION_GENERATION_KEY, storeSession } from '../services/authSession.js'
 
 const initialValues = {
   email: '',
@@ -24,7 +24,7 @@ export default function LoginPage({ storageFailureFeedbackOwnedByShell = false }
   useEffect(() => {
     mounted.current = true
     const sessionChangedInAnotherTab = event => {
-      if (!mounted.current || !inFlight.current || (event.key !== 'token' && event.key !== null)) return
+      if (!mounted.current || !inFlight.current || !['token', SESSION_GENERATION_KEY, null].includes(event.key)) return
       if (event.storageArea) {
         try { if (event.storageArea !== window.localStorage) return } catch { /* Cancel if auth storage became unavailable. */ }
       }
@@ -109,6 +109,14 @@ export default function LoginPage({ storageFailureFeedbackOwnedByShell = false }
       return
     }
 
+    let generation
+    try {
+      generation = captureSessionGeneration()
+    } catch (error) {
+      if (!storageFailureFeedbackOwnedByShell) setApiError(error.message)
+      return
+    }
+
     inFlight.current = true
     setIsSubmitting(true)
     const version = ++requestVersion.current
@@ -117,6 +125,7 @@ export default function LoginPage({ storageFailureFeedbackOwnedByShell = false }
     request.current = controller
     const isCurrent = () => mounted.current && version === requestVersion.current
       && !controller.signal.aborted && getSession().token === previousToken
+      && getSessionGeneration() === generation
 
     try {
       const body = await apiRequest('/api/auth/login', {
@@ -137,13 +146,17 @@ export default function LoginPage({ storageFailureFeedbackOwnedByShell = false }
 
       // Check before storing: the normal session event can remount this page.
       // Keep storing and redirecting synchronous once this request is accepted.
-      storeSession(body.token, body.user)
+      try {
+        storeSession(body.token, body.user)
+      } catch (error) {
+        // Our failed save rotates/clears the marker, so it must not be mistaken
+        // for a stale response. The shell keeps its notice across a session remount.
+        if (!storageFailureFeedbackOwnedByShell) setApiError(error.message)
+        return
+      }
       window.location.href = returnTo
     } catch (error) {
       if (!isCurrent() || error.code === 'ABORTED') return
-      // The shell retains this notice across session remounts and owns dismissal.
-      // Keeping a second form error would make a dismissed notice reappear.
-      if (storageFailureFeedbackOwnedByShell && error.code === SESSION_STORAGE_FAILURE_CODE) return
       const fields = Object.fromEntries(Object.entries(error.fieldErrors || {}).filter(([name]) => Object.hasOwn(initialValues, name)))
       setErrors(current => ({ ...current, ...fields }))
       focusError.current = Object.keys(fields).length > 0

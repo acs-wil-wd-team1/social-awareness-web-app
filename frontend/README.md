@@ -2,9 +2,9 @@
 
 React frontend for CauseConnect. It includes campaign browsing and posting, business profiles, owner edits, participation, business enquiries, admin campaign/account management and registration/login/logout.
 
-The layout follows the CauseConnect storyboard and web design standards. The frontend calls the [API contracts](../docs/api/api-contract.md). The application is live at [CauseConnect on AWS](https://52.62.2.87), commit `af5dac741af06240e4885d098379c74c975ad893`, release `2026-10-14T12-12-08-602Z-af5dac741af0`. The [readiness evidence](../docs/evidence/stage-3/final-readiness/README.md), [API integration guide](../docs/handoff/stage3-api-handoff.md) and [feature coverage](../docs/handoff/stage3-feature-coverage.md) separate verified work from remaining checks. Earlier receipts remain historical.
+The layout follows the CauseConnect storyboard and web design standards. The frontend calls the [API contracts](../docs/api/api-contract.md). The real application is hosted at [CauseConnect on AWS](https://52.62.2.87); its [release manifest](https://52.62.2.87/release.json) identifies the served commit/build. This guide describes repository source, which may be newer than that build. The [15 October repair receipt](../docs/evidence/stage-3/final-review-2026-10-15/README.md), [API integration guide](../docs/handoff/stage3-api-handoff.md) and [feature coverage](../docs/handoff/stage3-feature-coverage.md) distinguish source checks from hosted and independent acceptance.
 
-[PR #22](https://github.com/acs-wil-wd-team1/social-awareness-web-app/pull/22) is merged and deployed after integration repairs. GET/PUT `/api/business/me` now creates or edits the current owner's profile; the previous missing-profile blocker is removed. Fresh registration → profile → photo campaign → approval → enquiry/inbox passed in the real React/Express/MySQL suite, hosted API checks and actual hosted Chrome. Independent tester/device acceptance remains separate.
+[PR #22](https://github.com/acs-wil-wd-team1/social-awareness-web-app/pull/22) supplies the integrated GET/PUT `/api/business/me` for the current owner's profile. Its [14 October integration receipt](../docs/evidence/stage-3/business-profile-integration/README.md) records fresh registration → profile → photo campaign → approval → enquiry/inbox in the real React/Express/MySQL suite, hosted API checks and actual hosted Chrome. Those results do not certify a later build; independent tester/device acceptance remains separate.
 
 ## Run locally
 
@@ -43,7 +43,9 @@ npm run build
 
 For API/database checks, use `npm run test:real-backend`. It runs actual components/services against Express and fresh disposable MySQL, then removes its own container and upload fixtures. It needs a running Docker engine, cached `mysql:8` image and installed backend dependencies. Read the [runner instructions and limits](../infra/real-backend-testing.md) first.
 
-Verification for the 14 October readiness release: **710 frontend tests, 116 backend units, 90 HTTP/MySQL checks and 26 real frontend/API/database checks passed**, plus the production build. The real frontend/API suite uses jsdom, not a full browser. Also passed: 41 local host checks, 39 CLI/stub/routing checks and 15 offline Postman assertions; these do not constitute live API execution. Eleven hosted HTTP groups and an actual Chrome admin/profile/photo/logout smoke pass covered the readiness release. The earlier complete hosted approval → public view → enquiry → inbox journey is recorded separately in [PR #22 integration evidence](../docs/evidence/stage-3/business-profile-integration/README.md); it was not repeated in that readiness smoke pass. See the [readiness results and limits](../docs/evidence/stage-3/final-readiness/README.md). Independent team, cross-browser and accessibility acceptance remain separate.
+Use the [15 October repair receipt](../docs/evidence/stage-3/final-review-2026-10-15/README.md) for the latest source regression, build, real-database and bounded browser/reviewer results. Local checks are not a new hosted release; the real frontend/API suite uses jsdom, while Claude's browser checks used mocked APIs.
+
+The [14 October readiness evidence](../docs/evidence/stage-3/final-readiness/README.md) and its [hosted receipt](../docs/evidence/stage-3/final-readiness/hosted-2026-10-14.md) retain that release's regression and narrower HTTP/Chrome smoke scope. The preceding complete hosted approval → public view → enquiry → inbox journey is recorded separately in [PR #22 integration evidence](../docs/evidence/stage-3/business-profile-integration/README.md); it was not repeated in the readiness smoke pass. Independent team, cross-browser and accessibility acceptance remain separate.
 
 ## Routes
 
@@ -86,7 +88,7 @@ Campaign image and type values come from API responses. The live UI does not inf
 
 - The shared colours, typography and responsive layout follow the current Stage 2 web design standards.
 - Primary navigation contains **Home**, **Campaigns**, and **Create campaign** for authors or **Review campaigns** for admins. Guests see **Login** and **Register**.
-- The **Account** dropdown groups My campaigns, My participation, Business profile, Enquiries, Manage accounts and Logout according to the current role.
+- In the current source, the **Account** dropdown groups My campaigns, My participation, Business profile, Enquiries, Manage accounts and Logout according to the role. An older hosted build may still label the admin link **Manage users**; both open `/admin/users`.
 - **Campaigns** moves to the homepage list. The hero offers **Explore campaigns** and an account-appropriate signup, posting or review action. Campaign cards keep equal widths within the responsive grid.
 - Each `View campaign` link opens the matching public campaign details route. Admin search and owner/admin status filters are available on their respective pages.
 - Login and registration preserve a validated local destination, including its query string and fragment. External and malformed return destinations fall back to the homepage.
@@ -96,6 +98,6 @@ Campaign image and type values come from API responses. The live UI does not inf
 
 The original team logo PNG is included at `public/images/brand/causeconnect-logo.png` and used by the shared header.
 
-Use the [live AWS application](https://52.62.2.87) for real API integration. The older [AWS preview](https://d10e86f5qx46up.cloudfront.net) is a separate **Preview as** sample build using disposable browser data, not the current API deployment. The [readiness evidence](../docs/evidence/stage-3/final-readiness/README.md) records the served revision and passed checks. Deployment instructions are in [infra](../infra/README.md). AWS free-tier eligibility or credits do not guarantee zero charges; review the approved resource plan and actual usage.
+Use the [live AWS application](https://52.62.2.87) for real API integration and check its [release manifest](https://52.62.2.87/release.json) before recording results. The older [AWS preview](https://d10e86f5qx46up.cloudfront.net) is a separate **Preview as** sample build using disposable browser data, not the integrated API deployment. The [evidence index](../docs/evidence/stage-3/README.md) links dated source and hosted checks. Deployment instructions are in [infra](../infra/README.md). AWS free-tier eligibility or credits do not guarantee zero charges; review the approved resource plan and actual usage.
 
 Notes for the developers manual and demonstration are in [the frontend handoff](../docs/handoff/stage3-frontend-notes.md).

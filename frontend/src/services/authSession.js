@@ -5,6 +5,39 @@ const dismissNoticeEvent = 'causeconnect:session-notice-dismissed'
 const roles = ['public', 'business_owner', 'admin']
 export const SESSION_STORAGE_FAILURE_MESSAGE = 'Your browser could not save the login. Allow site storage and try again.'
 export const SESSION_STORAGE_FAILURE_CODE = 'SESSION_STORAGE_UNAVAILABLE'
+export const SESSION_GENERATION_KEY = 'causeconnect.session-generation'
+
+function storageFailure() {
+  const failure = new Error(SESSION_STORAGE_FAILURE_MESSAGE)
+  failure.code = SESSION_STORAGE_FAILURE_CODE
+  return failure
+}
+
+function rotateSessionGeneration() {
+  try {
+    const generation = crypto.randomUUID()
+    localStorage.setItem(SESSION_GENERATION_KEY, generation)
+    return generation
+  } catch {
+    // A failed mutation must not leave an earlier request's marker looking current.
+    try { localStorage.removeItem(SESSION_GENERATION_KEY) } catch { /* Storage may be blocked. */ }
+    throw storageFailure()
+  }
+}
+
+export function captureSessionGeneration() {
+  try {
+    return localStorage.getItem(SESSION_GENERATION_KEY) || rotateSessionGeneration()
+  } catch {
+    clearSession('storage-failure')
+    throw storageFailure()
+  }
+}
+
+export function getSessionGeneration() {
+  // Completion checks never initialize: a clear or unreadable marker invalidates the request.
+  try { return localStorage.getItem(SESSION_GENERATION_KEY) || null } catch { return null }
+}
 
 function claimsFor(token) {
   try {
@@ -27,20 +60,21 @@ export function getSession() {
 
 export function storeSession(token, user) {
   try {
+    rotateSessionGeneration()
     localStorage.setItem('token', token)
     if (user) localStorage.setItem('causeconnect.user', JSON.stringify({ id: user.id, name: user.name, role: user.role }))
     else localStorage.removeItem('causeconnect.user')
   } catch {
     // Never leave a new token paired with the previous account's saved details.
     clearSession('storage-failure')
-    const failure = new Error(SESSION_STORAGE_FAILURE_MESSAGE)
-    failure.code = SESSION_STORAGE_FAILURE_CODE
-    throw failure
+    throw storageFailure()
   }
   window.dispatchEvent(new Event(changeEvent))
 }
 
 export function clearSession(reason) {
+  // Keep a new marker after logout so guest -> account -> guest cannot look unchanged.
+  try { rotateSessionGeneration() } catch { /* Logout remains best-effort if storage is blocked. */ }
   for (const key of ['token', 'causeconnect.user', 'isLoggedIn']) {
     try { localStorage.removeItem(key) } catch { /* Storage may have become blocked since login. */ }
   }

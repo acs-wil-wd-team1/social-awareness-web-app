@@ -1,8 +1,8 @@
 # CauseConnect backend
 
-Node.js, Express, Sequelize and MySQL. APIs cover authentication, categories, public/business campaign submission, owner/admin reads and campaign approval, plus profiles, photos, owner edits/removal, participation, enquiries and admin account/content management. Application commit `ab1bef2c1b2e55c401a78543d4034cd2e85d0a2c`, release `2026-10-14T10-17-18-153Z-ab1bef2c1b2e`, is deployed at [CauseConnect on AWS](https://52.62.2.87). See the [current release evidence](../docs/evidence/stage-3/business-profile-integration/README.md) for exact verification scope; earlier PR #23/#21 receipts remain historical.
+Node.js, Express, Sequelize and MySQL. APIs cover authentication, categories, public/business campaign submission, owner/admin reads and campaign approval, plus profiles, photos, owner edits/removal, participation, enquiries and admin account/content management. The real application is hosted at [CauseConnect on AWS](https://52.62.2.87); its [release manifest](https://52.62.2.87/release.json) is the authority for the served application, not the current checkout. The [15 October repair receipt](../docs/evidence/stage-3/final-review-2026-10-15/README.md) records the latest source/local verification separately from publication and hosted checks.
 
-[PR #22](https://github.com/acs-wil-wd-team1/social-awareness-web-app/pull/22) is merged and deployed after conflict resolution and integration repairs. GET/PUT `/api/business/me` uses the current owner's existing Business table, and the business posting compatibility route delegates to the shared photo-aware transaction. No new migration/table was needed. The full hosted API and actual Chrome business journeys passed; independent tester/device acceptance remains separate.
+[PR #22](https://github.com/acs-wil-wd-team1/social-awareness-web-app/pull/22) supplies GET/PUT `/api/business/me` using the current owner's existing Business table; the business posting compatibility route delegates to the shared photo-aware transaction. No new migration/table was needed. Its [14 October receipt](../docs/evidence/stage-3/business-profile-integration/README.md) records the full hosted API/Chrome business journeys. The subsequent [14 October readiness smoke](../docs/evidence/stage-3/final-readiness/hosted-2026-10-14.md) had a narrower scope; neither record automatically verifies later changes. Independent tester/device acceptance remains separate.
 
 ## Prerequisites
 
@@ -81,7 +81,7 @@ Unit tests do not need MySQL. The integration suite requires an already-migrated
 
 For the disposable MySQL + real frontend/API run, use `npm run test:real-backend` from `frontend/`; see [isolated testing](../infra/real-backend-testing.md). Record actual results. The suite now includes real registration/profile setup for a new business owner; seeded historical fixtures remain separate. jsdom checks are not deployed-browser acceptance.
 
-Current local verification passed 106 backend units, 87 HTTP/MySQL checks, 26 actual frontend/API/database checks and 631 frontend tests. Also passed: 41 local host checks, 35 CLI/stub/routing checks and 15 offline Postman assertions, not live API execution. Exact release identity, eight supporting-API groups, eight business-API journey groups and an actual hosted Chrome business journey passed separately. These layers have different scopes and do not establish exhaustive browser coverage or independent tester acceptance. The [PR #19 receipt](../docs/evidence/stage-3/additional-apis/README.md#aws-release--14-october-2026) preserves its original counts.
+The [15 October repair receipt](../docs/evidence/stage-3/final-review-2026-10-15/README.md) records current source test/build results and their limits. The earlier [PR #22 receipt](../docs/evidence/stage-3/business-profile-integration/README.md) preserves its own local counts and full hosted business journey; the [14 October readiness receipt](../docs/evidence/stage-3/final-readiness/README.md) records the later regression/smoke scope. Unit, jsdom/API/MySQL, offline Postman and actual hosted-browser checks are different evidence layers, not exhaustive browser coverage or independent tester acceptance. Older results remain in their dated receipts.
 
 ## Campaign submission
 
@@ -129,13 +129,13 @@ Images use a private persistent directory on the existing server, not a new S3 b
 
 Accept one JPEG, PNG or WebP up to 5,000,000 bytes and 16 million decoded pixels.
 Larger phone photos must be resized; HEIC/HEIF must be exported in a supported
-format. Unattached references expire after 24 hours. The current release uses
+format. Unattached references expire after 24 hours. The implementation uses
 default **20 retained photos/50 MiB per owner**: every owner image row counts
 until safe cleanup removes its file and metadata, including attached, expired,
 replaced/removed and soft-deleted-campaign images. Expiry/removal does not instantly
 free the quota. Configure `CAMPAIGN_UPLOAD_OWNER_MAX_PHOTOS` (1–100) and
 `CAMPAIGN_UPLOAD_OWNER_MAX_BYTES` (1–268,435,456 bytes); no attached image is purged.
-These server-only limits are included in the current release; changing or removing
+These server-only limits are part of the image service; changing or removing
 a campaign photo does not immediately reclaim retained storage.
 
 Private delivery uses five-minute signed tickets and rechecks the current
@@ -145,7 +145,7 @@ paired backup integrity and API-restart photo persistence passed the recorded
 PR #19 checks; full restoration and offsite recovery were not tested. See the
 [image contract](../docs/api/campaign-posting-future-proposal.md),
 [deployment preparation](../infra/ec2/host/README.md) and
-[current release evidence](../docs/evidence/stage-3/business-profile-integration/README.md).
+[dated PR #19 storage evidence](../docs/evidence/stage-3/additional-apis/README.md).
 
 ### Read-only local photo report
 

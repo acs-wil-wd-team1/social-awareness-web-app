@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { StrictMode } from 'react'
 import App from '../App.jsx'
 import LoginPage from './LoginPage.jsx'
-import { getSession, storeSession } from '../services/authSession.js'
+import { clearSession, getSession, getSessionGeneration, SESSION_GENERATION_KEY, storeSession } from '../services/authSession.js'
 
 const token = `header.${btoa(JSON.stringify({ id: 7, role: 'business_owner', exp: 9999999999 }))}.signature`
 const validBody = { token, user: { id: 7, name: 'Sam', role: 'business_owner' } }
@@ -188,6 +188,81 @@ describe('CauseConnect login page', () => {
     expect.soft(window.location.hash).toBe('#before-login')
   })
 
+  it('does not restore a guest login when cross-tab session events arrive after its response', async () => {
+    let resolve
+    fetch.mockReturnValueOnce(new Promise(done => { resolve = done }))
+    render(<App pathname="/login" />)
+    fillLogin()
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }))
+    const signal = fetch.mock.calls[0][1].signal
+    const newerToken = `header.${btoa(JSON.stringify({ id: 9, role: 'public', exp: 9999999999 }))}.signature`
+
+    // These app-managed changes occur in the other tab: its local custom
+    // notifications do not reach this tab, and its storage events are queued.
+    const dispatchEvent = window.dispatchEvent
+    const sourceTabEvents = vi.spyOn(window, 'dispatchEvent').mockImplementation(event =>
+      event.type === 'causeconnect:session' ? true : dispatchEvent.call(window, event))
+    try {
+      storeSession(newerToken, { id: 9, name: 'Newer account', role: 'public' })
+      clearSession()
+    } finally {
+      sourceTabEvents.mockRestore()
+    }
+    expect(getSession()).toEqual({ token: null, user: null })
+    expect(signal.aborted).toBe(false)
+
+    // The networking task and its promise continuation run before delivery
+    // of the already queued storage events from the completed login/logout.
+    await act(async () => resolve(response(200, validBody)))
+    expect.soft(getSession()).toEqual({ token: null, user: null })
+    expect.soft(window.location.hash).toBe('#before-login')
+    await act(async () => {
+      window.dispatchEvent(new StorageEvent('storage', { key: 'token', oldValue: null, newValue: newerToken, storageArea: window.localStorage }))
+      window.dispatchEvent(new StorageEvent('storage', { key: 'token', oldValue: newerToken, newValue: null, storageArea: window.localStorage }))
+    })
+    expect.soft(getSession()).toEqual({ token: null, user: null })
+    expect.soft(window.location.hash).toBe('#before-login')
+  })
+
+  it('invalidates a pending login after an external storage clear before its event and allows a fresh retry', async () => {
+    let resolve
+    fetch.mockReturnValueOnce(new Promise(done => { resolve = done }))
+    render(<App pathname="/login" />)
+    fillLogin()
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }))
+    expect(getSessionGeneration()).not.toBeNull()
+    localStorage.clear()
+    await act(async () => resolve(response(200, validBody)))
+    expect(getSession()).toEqual({ token: null, user: null })
+    expect(getSessionGeneration()).toBeNull()
+    expect(window.location.hash).toBe('#before-login')
+    expect(screen.getByRole('button', { name: 'Login' }).disabled).toBe(false)
+
+    fetch.mockResolvedValueOnce(response(200, validBody))
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Login' })))
+    expect(getSession()).toEqual(validBody)
+    expect(window.location.hash).toBe('')
+  })
+
+  it('does not accept a response when its saved generation can no longer be read', async () => {
+    let resolve
+    fetch.mockReturnValueOnce(new Promise(done => { resolve = done }))
+    render(<App pathname="/login" />)
+    fillLogin()
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }))
+    const getItem = Storage.prototype.getItem
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(function (key) {
+      if (key === SESSION_GENERATION_KEY) throw new DOMException('Access denied', 'SecurityError')
+      return getItem.call(this, key)
+    })
+    const write = vi.spyOn(Storage.prototype, 'setItem')
+    await act(async () => resolve(response(200, validBody)))
+    expect(write).not.toHaveBeenCalled()
+    expect(getSession()).toEqual({ token: null, user: null })
+    expect(window.location.hash).toBe('#before-login')
+    expect(screen.getByRole('button', { name: 'Login' }).disabled).toBe(false)
+  })
+
   it('ignores unrelated storage and notice events while a login is pending', async () => {
     let resolve
     fetch.mockReturnValueOnce(new Promise(done => { resolve = done }))
@@ -267,6 +342,60 @@ describe('CauseConnect login page', () => {
     expect(getSession().token).toBeNull()
     expect(window.location.hash).toBe('#before-login')
     expect(screen.getByRole('button', { name: 'Login' }).disabled).toBe(false)
+  })
+
+  it.each(['getItem', 'setItem'])('does not send a login when generation preflight %s fails and allows a fresh retry', async method => {
+    const original = Storage.prototype[method]
+    const blocked = vi.spyOn(Storage.prototype, method).mockImplementation(function (key, ...args) {
+      if (key === SESSION_GENERATION_KEY) throw new DOMException('Access denied', 'SecurityError')
+      return original.call(this, key, ...args)
+    })
+    render(<App pathname="/login" />)
+    fillLogin()
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Login' })))
+    expect(fetch).not.toHaveBeenCalled()
+    expect(getSession()).toEqual({ token: null, user: null })
+    expect(window.location.hash).toBe('#before-login')
+    expect(screen.getAllByRole('alert')).toHaveLength(1)
+    expect(screen.getByRole('alert').textContent).toContain('Allow site storage and try again')
+    expect(screen.getByRole('button', { name: 'Login' }).disabled).toBe(false)
+
+    blocked.mockRestore()
+    fetch.mockResolvedValueOnce(response(200, validBody))
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Login' })))
+    expect(getSession()).toEqual(validBody)
+    expect(window.location.hash).toBe('')
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it.each(['standalone', 'shell'])('keeps its own generation commit failure visible in the %s and allows retry', async surface => {
+    const startingToken = `header.${btoa(JSON.stringify({ id: 9, role: 'public', exp: 9999999999 }))}.signature`
+    storeSession(startingToken, { id: 9, name: 'Starting account', role: 'public' })
+    let resolve
+    fetch.mockReturnValueOnce(new Promise(done => { resolve = done }))
+    render(surface === 'shell' ? <App pathname="/login" /> : <LoginPage />)
+    fillLogin()
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }))
+    const setItem = Storage.prototype.setItem
+    const blocked = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (key, value) {
+      if (key === SESSION_GENERATION_KEY) throw new DOMException('Storage full', 'QuotaExceededError')
+      return setItem.call(this, key, value)
+    })
+    await act(async () => resolve(response(200, validBody)))
+    expect(getSessionGeneration()).toBeNull()
+    expect(getSession()).toEqual({ token: null, user: null })
+    expect(window.location.hash).toBe('#before-login')
+    expect(screen.getAllByRole('alert')).toHaveLength(1)
+    expect(screen.getByRole('alert').textContent).toContain('Allow site storage and try again')
+    expect(screen.getByRole('button', { name: 'Login' }).disabled).toBe(false)
+
+    blocked.mockRestore()
+    fetch.mockResolvedValueOnce(response(200, validBody))
+    fillLogin()
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Login' })))
+    expect(getSession()).toEqual(validBody)
+    expect(window.location.hash).toBe('')
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 
   it('keeps storage-failure feedback visible when a failed account switch clears the starting session', async () => {

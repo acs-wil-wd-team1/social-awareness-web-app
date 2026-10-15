@@ -1,7 +1,7 @@
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { useLayoutEffect } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { authPagePath, clearSession, dismissSessionStorageFailure, getSession, safeReturnPath, SESSION_STORAGE_FAILURE_CODE, SESSION_STORAGE_FAILURE_MESSAGE, storeSession, useSession } from './authSession.js'
+import { authPagePath, captureSessionGeneration, clearSession, dismissSessionStorageFailure, getSession, getSessionGeneration, safeReturnPath, SESSION_GENERATION_KEY, SESSION_STORAGE_FAILURE_CODE, SESSION_STORAGE_FAILURE_MESSAGE, storeSession, useSession } from './authSession.js'
 
 const jwt = (claims) => `header.${btoa(JSON.stringify(claims)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')}.signature`
 const token = jwt({ id: 7, role: 'public', exp: 9999999999 })
@@ -22,6 +22,67 @@ describe('browser sessions', () => {
     expect(getSession()).toEqual({ token, user: { id: 7, name: 'Alice', role: 'public' } })
     expect(changed).toHaveBeenCalledTimes(1)
     window.removeEventListener('causeconnect:session', changed)
+  })
+
+  it('initializes a generation for an attempt and rotates it on every store and clear', () => {
+    expect(getSessionGeneration()).toBeNull()
+    expect(localStorage.length).toBe(0)
+    const initial = captureSessionGeneration()
+    expect(initial).toEqual(expect.any(String))
+    expect(initial.length).toBeGreaterThan(0)
+    expect(captureSessionGeneration()).toBe(initial)
+    storeSession(token, { id: 7, role: 'public' })
+    const firstLogin = getSessionGeneration()
+    storeSession(token, { id: 7, role: 'public' })
+    const secondLogin = getSessionGeneration()
+    clearSession()
+    const loggedOut = getSessionGeneration()
+    expect(new Set([initial, firstLogin, secondLogin, loggedOut]).size).toBe(4)
+    expect(loggedOut).toEqual(expect.any(String))
+    expect(captureSessionGeneration()).toBe(loggedOut)
+    expect(getSession()).toEqual({ token: null, user: null })
+  })
+
+  it('does not recreate a cleared or unreadable generation during completion checks', () => {
+    captureSessionGeneration()
+    localStorage.clear()
+    expect(getSessionGeneration()).toBeNull()
+    expect(localStorage.length).toBe(0)
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('Storage unavailable') })
+    const write = vi.spyOn(Storage.prototype, 'setItem')
+    expect(getSessionGeneration()).toBeNull()
+    expect(write).not.toHaveBeenCalled()
+  })
+
+  it('removes an old generation when rotation fails and still clears the session', () => {
+    storeSession(token, { id: 7, role: 'public' })
+    expect(getSessionGeneration()).not.toBeNull()
+    const setItem = Storage.prototype.setItem
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (key, value) {
+      if (key === SESSION_GENERATION_KEY) throw new DOMException('Storage full', 'QuotaExceededError')
+      return setItem.call(this, key, value)
+    })
+    expect(() => clearSession()).not.toThrow()
+    expect(getSessionGeneration()).toBeNull()
+    expect(getSession()).toEqual({ token: null, user: null })
+    expect(() => storeSession(token, { id: 7, role: 'public' })).toThrow(SESSION_STORAGE_FAILURE_MESSAGE)
+    expect(getSessionGeneration()).toBeNull()
+    expect(getSession()).toEqual({ token: null, user: null })
+  })
+
+  it('keeps logout nonthrowing when the localStorage getter itself is blocked', () => {
+    storeSession(token, { id: 7, role: 'public' })
+    const blocked = vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
+      throw new DOMException('Access denied', 'SecurityError')
+    })
+    try {
+      expect(() => clearSession()).not.toThrow()
+      expect(getSessionGeneration()).toBeNull()
+      expect(() => captureSessionGeneration()).toThrow(SESSION_STORAGE_FAILURE_MESSAGE)
+      expect(() => storeSession(token, { id: 7, role: 'public' })).toThrow(SESSION_STORAGE_FAILURE_MESSAGE)
+    } finally {
+      blocked.mockRestore()
+    }
   })
 
   it('recognizes business owners using the token role ahead of stale user data', () => {
@@ -86,6 +147,7 @@ describe('browser sessions', () => {
     const { result } = renderHook(() => useSession())
     const blocked = () => { throw new DOMException('Access denied', 'SecurityError') }
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(blocked)
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(blocked)
     vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(blocked)
     expect(() => act(() => clearSession())).not.toThrow()
     expect(result.current).toEqual({ token: null, user: null })

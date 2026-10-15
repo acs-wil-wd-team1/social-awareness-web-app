@@ -66,19 +66,19 @@ move/delete photos. `configure-uploads.sh` adds the fixed directory, a 512 MiB
 upload cap and a 2 GiB free-space reserve to `app.env` without printing or changing
 existing secrets. It rejects a different existing upload path rather than moving data.
 
-The current deployed source also bounds each owner's retained photos: default
+The image service also bounds each owner's retained photos: default
 20 files/50 MiB, using `CAMPAIGN_UPLOAD_OWNER_MAX_PHOTOS` (1–100) and
 `CAMPAIGN_UPLOAD_OWNER_MAX_BYTES` (1–256 MiB). Attached and cleanup-pending images
-count; no attached files are purged to make space. These safeguards are included
-in current application release `2026-10-14T10-17-18-153Z-ab1bef2c1b2e`; see the
-[current release evidence](../../../docs/evidence/stage-3/business-profile-integration/README.md)
-for the actual checks and limits.
+count; no attached files are purged to make space. Check the site's
+[release manifest](https://52.62.2.87/release.json) before attributing source
+changes to the running server.
 
-PR #22 uses the existing server, storage and schema; it adds no cloud resource
-or migration. All 41 local host checks passed, including the opt-in isolated
-Nginx syntax check. These checks and the passing hosted API/Chrome journeys do
-not prove a full restore or offsite recovery. Earlier host receipts remain dated
-evidence rather than fresh recovery tests.
+The [15 October repair receipt](../../../docs/evidence/stage-3/final-review-2026-10-15/README.md)
+records the latest source/local checks. The [14 October PR #22 receipt](../../../docs/evidence/stage-3/business-profile-integration/README.md)
+records integration on the existing server/storage/schema without a new cloud
+resource or migration. The subsequent [14 October readiness receipt](../../../docs/evidence/stage-3/final-readiness/README.md)
+retains its host checks and narrower hosted smoke scope. Those dated results do
+not automatically verify a later deployment, full restore or offsite recovery.
 
 Only `/api/campaign-images` gets Nginx's 6 MiB multipart ceiling; Express still
 enforces the 5,000,000-byte photo limit. Uploads are limited to 3/minute per IP with
